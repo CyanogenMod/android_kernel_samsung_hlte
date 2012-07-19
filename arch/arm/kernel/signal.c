@@ -626,7 +626,7 @@ static int do_signal(struct pt_regs *regs, int syscall)
 		 */
 		switch (retval) {
 		case -ERESTART_RESTARTBLOCK:
-			restart++;
+			restart -= 2;
 		case -ERESTARTNOHAND:
 		case -ERESTARTSYS:
 		case -ERESTARTNOINTR:
@@ -679,17 +679,13 @@ static int do_signal(struct pt_regs *regs, int syscall)
 		return 0;
 	}
 
-	if (unlikely(restart)) {
-		if (restart > 1)
-			set_thread_flag(TIF_SYSCALL_RESTARTSYS);
-		regs->ARM_pc = continue_addr;
-	}
-
 	/* If there's no signal to deliver, we just put the saved sigmask
 	 * back.
 	 */
 	if (test_and_clear_thread_flag(TIF_RESTORE_SIGMASK))
 		set_current_blocked(&current->saved_sigmask);
+	if (unlikely(restart))
+		regs->ARM_pc = continue_addr;
 	return restart;
 }
 
@@ -704,13 +700,14 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
 				return 0;
 			local_irq_enable();
 			if (thread_flags & _TIF_SIGPENDING) {
-				if (unlikely(do_signal(regs, syscall))) {
+				int restart = do_signal(regs, syscall);
+				if (unlikely(restart)) {
 					/*
 					 * Restart without handlers.
 					 * Deal with it without leaving
 					 * the kernel space.
 					 */
-					return 1;
+					return restart;
 				}
 				syscall = 0;
 			} else {
