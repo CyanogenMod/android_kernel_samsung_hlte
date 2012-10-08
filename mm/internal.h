@@ -406,3 +406,6 @@ static inline int swap_cache_skip_readahead(struct vm_area_struct *vma)
 	return 0;
 }
 #endif	/* CONFIG_ZSWAP */
+
+unsigned long reclaim_clean_pages_from_list(struct zone *zone,
+					    struct list_head *page_list);
