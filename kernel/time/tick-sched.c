@@ -506,6 +506,9 @@ void tick_nohz_irq_exit(void)
 	if (!ts->inidle)
 		return;
 
+	/* Cancel the timer because CPU already waken up from the C-states*/
+	menu_hrtimer_cancel();
+
 	local_irq_save(flags);
 
 	tick_nohz_stop_sched_tick(ts);
@@ -573,6 +576,8 @@ void tick_nohz_idle_exit(void)
 
 	ts->inidle = 0;
 
+	/* Cancel the timer because CPU already waken up from the C-states*/
+	menu_hrtimer_cancel();
 	if (ts->idle_active || ts->tick_stopped)
 		now = ktime_get();
 
