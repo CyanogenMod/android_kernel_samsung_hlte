@@ -22,6 +22,8 @@
 #include <linux/list.h>
 #include <linux/clkdev.h>
 #include <linux/uaccess.h>
+#include <linux/mutex.h>
+
 #include <mach/clk-provider.h>
 
 #include "clock.h"
@@ -399,27 +401,60 @@ error:
 	debugfs_remove_recursive(clk_dir);
 	return -ENOMEM;
 }
+static DEFINE_MUTEX(clk_debug_lock);
+static int clk_debug_init_once;
+
+/**
+ * clock_debug_init() - Initialize clock debugfs
+ * Lock clk_debug_lock before invoking this function.
+ */
+static int clock_debug_init(void)
+{
+	if (clk_debug_init_once)
+		return 0;
+
+	clk_debug_init_once = 1;
+
+	debugfs_base = debugfs_create_dir("clk", NULL);
+	if (!debugfs_base)
+		return -ENOMEM;
+
+	if (!debugfs_create_u32("debug_suspend", S_IRUGO | S_IWUSR,
+				debugfs_base, &debug_suspend)) {
+		debugfs_remove_recursive(debugfs_base);
+		return -ENOMEM;
+	}
+
+	measure = clk_get_sys("debug", "measure");
+	if (IS_ERR(measure))
+		measure = NULL;
+
+	return 0;
+}
 
 /**
  * clock_debug_register() - Add additional clocks to clock debugfs hierarchy
  * @table: Table of clocks to create debugfs nodes for
  * @size: Size of @table
  *
- * Use this function to register additional clocks in debugfs. The clock debugfs
- * hierarchy must have already been initialized with clock_debug_init() prior to
- * calling this function. Unlike clock_debug_init(), this may be called multiple
- * times with different clock lists and can be used after the kernel has
- * finished booting.
  */
 int clock_debug_register(struct clk_lookup *table, size_t size)
 {
 	struct clk_table *clk_table;
 	unsigned long flags;
-	int i;
+	int i, ret;
+
+	mutex_lock(&clk_debug_lock);
+
+	ret = clock_debug_init();
+	if (ret)
+		goto out;
 
 	clk_table = kmalloc(sizeof(*clk_table), GFP_KERNEL);
-	if (!clk_table)
-		return -ENOMEM;
+	if (!clk_table) {
+		ret = -ENOMEM;
+		goto out;
+	}
 
 	clk_table->clocks = table;
 	clk_table->num_clocks = size;
@@ -431,7 +466,9 @@ int clock_debug_register(struct clk_lookup *table, size_t size)
 	for (i = 0; i < size; i++)
 		clock_debug_add(table[i].clk);
 
-	return 0;
+out:
+	mutex_unlock(&clk_debug_lock);
+	return ret;
 }
 
 #ifdef PM_EMERGENCY_CXO_OFF
