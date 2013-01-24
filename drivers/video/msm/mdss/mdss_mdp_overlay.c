@@ -1153,13 +1153,14 @@ static int mdss_mdp_overlay_rotate(struct msm_fb_data_type *mfd,
 	ret = mdss_mdp_overlay_get_buf(mfd, &rot->dst_buf, &req->dst_data, 1, flgs);
 	if (ret) {
 		pr_err("dst_data pmem error\n");
-		return ret;
+		goto dst_buf_fail;
 	}
 
 	ret = mdss_mdp_rotator_queue(rot);
 	if (ret)
 		pr_err("rotator queue error session id=%x\n", req->id);
 
+dst_buf_fail:
 	return ret;
 }
 
