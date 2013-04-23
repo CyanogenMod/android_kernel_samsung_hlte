@@ -748,6 +748,8 @@ static void mdss_mdp_overlay_cleanup(struct msm_fb_data_type *mfd)
 	mutex_unlock(&mfd->lock);
 	list_for_each_entry_safe(pipe, tmp, &destroy_pipes, cleanup_list)
 		mdss_mdp_pipe_destroy(pipe);
+
+	return 0;
 }
 
 static int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
@@ -765,6 +767,7 @@ static int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 		pr_err("unable to resume with pm_runtime_get_sync rc=%d\n", rc);
 		return rc;
 	}
+
 	if (mfd->panel_info->cont_splash_enabled) {
 		mdss_mdp_ctl_splash_finish(mdp5_data->ctl);
 		mdss_mdp_footswitch_ctrl_splash(0);
