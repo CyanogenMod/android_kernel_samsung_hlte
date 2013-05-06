@@ -1119,23 +1119,23 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	switch (event) {
 	case MDSS_EVENT_UNBLANK:
 		rc = mdss_dsi_on(pdata);
-		if (ctrl_pdata->dsi_on_state == DSI_LP_MODE)
+		if (ctrl_pdata->on_cmds.link_state == DSI_LP_MODE)
 			rc = mdss_dsi_unblank(pdata);
 		break;
 	case MDSS_EVENT_PANEL_ON:
 		ctrl_pdata->ctrl_state |= CTRL_STATE_MDP_ACTIVE;
 		ctrl_pdata->mdp_tg_on = 1;
-		if (ctrl_pdata->dsi_on_state == DSI_HS_MODE)
+		if (ctrl_pdata->on_cmds.link_state == DSI_HS_MODE)
 			rc = mdss_dsi_unblank(pdata);
 		break;
 	case MDSS_EVENT_BLANK:
-		if (ctrl_pdata->dsi_off_state == DSI_HS_MODE)
+		if (ctrl_pdata->off_cmds.link_state == DSI_HS_MODE)
 			rc = mdss_dsi_blank(pdata);
 		break;
 	case MDSS_EVENT_PANEL_OFF:
 		ctrl_pdata->ctrl_state &= ~CTRL_STATE_MDP_ACTIVE;
 		ctrl_pdata->mdp_tg_on = 0;
-		if (ctrl_pdata->dsi_off_state == DSI_LP_MODE)
+		if (ctrl_pdata->off_cmds.link_state == DSI_LP_MODE)
 			rc = mdss_dsi_blank(pdata);
 		rc = mdss_dsi_off(pdata);
 		break;
@@ -1159,12 +1159,12 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	case MDSS_EVENT_CONT_SPLASH_FINISH:
 		ctrl_pdata->ctrl_state &= ~CTRL_STATE_MDP_ACTIVE;
 		ctrl_pdata->mdp_tg_on = 0;
-		if (1){ //(ctrl_pdata->on_cmds.link_state == DSI_LP_MODE) {
+		if (ctrl_pdata->on_cmds.link_state == DSI_LP_MODE) {
 			rc = mdss_dsi_cont_splash_on(pdata);
 		} else {
 			pr_debug("%s:event=%d, Dsi On not called: ctrl_state: %d\n",
 				 __func__, event,
-				 ctrl_pdata->dsi_on_state);
+				 ctrl_pdata->on_cmds.link_state);
 			rc = -EINVAL;
 		}
 		break;
@@ -1737,12 +1737,8 @@ int dsi_panel_device_register(struct platform_device *pdev,
 
 	ctrl_pdata->panel_data.panel_reset_fn = panel_data->panel_reset;
 
-//	ctrl_pdata->on_cmd_buf = panel_data->on_cmd_buf;
-//	ctrl_pdata->on_cmd_len = panel_data->on_cmd_len;
-	ctrl_pdata->dsi_on_state = panel_data->dsi_on_state;
-//	ctrl_pdata->off_cmd_buf = panel_data->off_cmd_buf;
-//	ctrl_pdata->off_cmd_len = panel_data->off_cmd_len;
-	ctrl_pdata->dsi_off_state = panel_data->dsi_off_state;
+	ctrl_pdata->on_cmds = panel_data->on_cmds;
+	ctrl_pdata->off_cmds = panel_data->off_cmds;
 
 	memcpy(&((ctrl_pdata->panel_data).panel_info),
 				&(panel_data->panel_info),

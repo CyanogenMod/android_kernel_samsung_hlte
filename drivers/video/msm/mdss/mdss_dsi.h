@@ -275,6 +275,14 @@ struct dsi_panel_cmds {
 	int link_state;
 };
 
+struct dsi_panel_cmds {
+	char *buf;
+	int blen;
+	struct dsi_cmd_desc *cmds;
+	int cmd_cnt;
+	int link_state;
+};
+
 #define CMD_REQ_MAX     4
 
 typedef void (*fxn)(u32 data);
@@ -312,12 +320,6 @@ struct mdss_panel_common_pdata {
 	int (*off) (struct mdss_panel_data *pdata);
 	int (*blank) (struct mdss_panel_data *pdata, int blank);
 	void (*bl_fnc) (struct mdss_panel_data *pdata, u32 bl_level);
-	char *on_cmd_buf;
-	int on_cmd_len;
-	int dsi_on_state;
-	char *off_cmd_buf;
-	int off_cmd_len;
-	int dsi_off_state;
 	void (*panel_reset)(struct mdss_panel_data *pdata, int enable);
 	int (*event_handler) (int e);
 	int (*panel_registered) (struct mdss_panel_data *pdata);
@@ -325,6 +327,9 @@ struct mdss_panel_common_pdata {
 	int esd_gpio;
 #endif
 	int (*dimming_init) (struct mdss_panel_data *pdata);;
+
+	struct dsi_panel_cmds on_cmds;
+	struct dsi_panel_cmds off_cmds;
 };
 
 struct dsi_drv_cm_data {
@@ -399,12 +404,8 @@ struct mdss_dsi_ctrl_pdata {
 	u32 dsi_irq_mask;
 	struct mdss_hw *dsi_hw;
 
-//	char *on_cmd_buf;
-//	int on_cmd_len;
-	int dsi_on_state;
-//	char *off_cmd_buf;
-//	int off_cmd_len;
-	int dsi_off_state;
+	struct dsi_panel_cmds on_cmds;
+	struct dsi_panel_cmds off_cmds;
 
 	struct dcs_cmd_list cmdlist;
 	struct completion dma_comp;
