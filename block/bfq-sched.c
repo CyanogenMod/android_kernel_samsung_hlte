@@ -626,6 +626,13 @@ __bfq_entity_update_weight_prio(struct bfq_service_tree *old_st,
 		old_st->wsum -= entity->weight;
 
 		if (entity->new_weight != entity->orig_weight) {
+			if (entity->new_weight < BFQ_MIN_WEIGHT ||
+			    entity->new_weight > BFQ_MAX_WEIGHT) {
+				printk(KERN_CRIT "update_weight_prio: "
+						 "new_weight %d\n",
+					entity->new_weight);
+				BUG();
+			}
 			entity->orig_weight = entity->new_weight;
 			entity->ioprio =
 				bfq_weight_to_ioprio(entity->orig_weight);
@@ -1082,6 +1089,34 @@ static struct bfq_queue *bfq_get_next_queue(struct bfq_data *bfqd)
 	BUG_ON(bfqq == NULL);
 
 	return bfqq;
+}
+
+/*
+ * Forced extraction of the given queue.
+ */
+static void bfq_get_next_queue_forced(struct bfq_data *bfqd,
+				      struct bfq_queue *bfqq)
+{
+	struct bfq_entity *entity;
+	struct bfq_sched_data *sd;
+
+	BUG_ON(bfqd->in_service_queue != NULL);
+
+	entity = &bfqq->entity;
+	/*
+	 * Bubble up extraction/update from the leaf to the root.
+	*/
+	for_each_entity(entity) {
+		sd = entity->sched_data;
+		bfq_update_budget(entity);
+		bfq_update_vtime(bfq_entity_service_tree(entity));
+		bfq_active_extract(bfq_entity_service_tree(entity), entity);
+		sd->in_service_entity = entity;
+		sd->next_in_service = NULL;
+		entity->service = 0;
+	}
+
+	return;
 }
 
 static void __bfq_bfqd_reset_in_service(struct bfq_data *bfqd)
