@@ -46,6 +46,9 @@ struct mdp3_session_data {
 	struct mdp_overlay overlay;
 	struct mdp3_buffer_queue bufq_in;
 	struct mdp3_buffer_queue bufq_out;
+	int histo_status;
+	struct mutex histo_lock;
+	int lut_sel;
 };
 
 int mdp3_ctrl_init(struct msm_fb_data_type *mfd);
