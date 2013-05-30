@@ -123,6 +123,11 @@ struct mdss_mdp_vsync_handler {
 	struct list_head list;
 };
 
+enum mdss_mdp_wb_ctl_type {
+	MDSS_MDP_WB_CTL_TYPE_BLOCK = 1,
+	MDSS_MDP_WB_CTL_TYPE_LINE
+};
+
 struct mdss_mdp_ctl {
 	u32 num;
 	char __iomem *base;
@@ -157,6 +162,7 @@ struct mdss_mdp_ctl {
 	struct mdss_mdp_mixer *mixer_left;
 	struct mdss_mdp_mixer *mixer_right;
 	struct mutex lock;
+	struct mutex *shared_lock;
 
 	struct mdss_panel_data *panel_data;
 	struct mdss_mdp_vsync_handler vsync_handler;
@@ -176,6 +182,7 @@ struct mdss_mdp_ctl {
 	struct blocking_notifier_head notifier_head;
 
 	void *priv_data;
+	u32 wb_type;
 };
 
 struct mdss_mdp_mixer {
@@ -582,6 +589,9 @@ int mdss_mdp_calib_config_buffer(struct mdp_calib_config_buffer *cfg,
 						u32 *copyback);
 
 int mdss_mdp_pipe_is_staged(struct mdss_mdp_pipe *pipe);
+int mdss_mdp_writeback_display_commit(struct mdss_mdp_ctl *ctl, void *arg);
+struct mdss_mdp_ctl *mdss_mdp_ctl_mixer_switch(struct mdss_mdp_ctl *ctl,
+					       u32 return_type);
 
 int mdss_mdp_ctl_update_fps(struct mdss_mdp_ctl *ctl, int fps);
 void mdss_mdp_underrun_clk_info(void);

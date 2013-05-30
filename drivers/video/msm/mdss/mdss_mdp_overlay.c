@@ -505,6 +505,7 @@ static int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 	pipe->overfetch_disable = fmt->is_yuv &&
 			!(pipe->flags & MDP_SOURCE_ROTATED_90);
 
+	req->id = pipe->ndx;
 	pipe->req_data = *req;
 
 	if (pipe->flags & MDP_OVERLAY_PP_CFG_EN) {
@@ -591,7 +592,6 @@ static int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 	if(first_update)
 		pr_info("..lm..params_changed=%d\n", pipe->params_changed++);
 
-	req->id = pipe->ndx;
 	req->horz_deci = pipe->horz_deci;
 	req->vert_deci = pipe->vert_deci;
 
@@ -790,11 +790,14 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd)
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 	struct mdss_mdp_pipe *pipe;
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
-	int ret = 0;
-	int i = 0;
 #if defined (CONFIG_FB_MSM_MDSS_DBG_SEQ_TICK)
 	mdss_dbg_tick_save(KICKOFF);
 #endif
+	struct mdss_mdp_ctl *tmp;
+
+	if (ctl->shared_lock)
+		mutex_lock(ctl->shared_lock);
+
 	mutex_lock(&mdp5_data->ov_lock);
 	mutex_lock(&mfd->lock);
     
@@ -818,15 +821,44 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd)
 	list_for_each_entry(pipe, &mdp5_data->pipes_used, used_list) {
 		struct mdss_mdp_data *buf;
 
-		if (ctl->play_cnt == 0)
-			pipe->params_changed++;
-
 #ifdef CONFIG_FB_MSM_CAMERA_CSC
 		if (pre_csc_update != csc_update) {
 			if (pipe->type == MDSS_MDP_PIPE_TYPE_VIG)
 				pipe->params_changed = 1;
 		}
 #endif
+
+		/*
+		 * When external is connected and no dedicated wfd is present,
+		 * reprogram DMA pipe before kickoff to clear out any previous
+		 * block mode configuration.
+		 */
+		if ((pipe->type == MDSS_MDP_PIPE_TYPE_DMA) &&
+		    (ctl->shared_lock && !ctl->mdata->has_wfd_blk)) {
+			if (ctl->mdata->mixer_switched) {
+				ret = mdss_mdp_overlay_pipe_setup(mfd,
+						&pipe->req_data, &pipe);
+				pr_debug("reseting DMA pipe for ctl=%d",
+					 ctl->num);
+			}
+			if (ret) {
+				pr_err("can't reset DMA pipe ret=%d ctl=%d\n",
+					ret, ctl->num);
+				mutex_unlock(&mfd->lock);
+				goto commit_fail;
+			}
+
+			tmp = mdss_mdp_ctl_mixer_switch(ctl,
+					MDSS_MDP_WB_CTL_TYPE_LINE);
+			if (!tmp) {
+				mutex_unlock(&mfd->lock);
+				ret = -EINVAL;
+				goto commit_fail;
+			}
+			pipe->mixer = mdss_mdp_mixer_get(tmp,
+					MDSS_MDP_MIXER_MUX_DEFAULT);
+		}
+
 		if (pipe->back_buf.num_planes) {
 			buf = &pipe->back_buf;
 		} else if (ctl->play_cnt == 0 && pipe->front_buf.num_planes) {
@@ -883,6 +915,8 @@ commit_fail:
 	mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_FLUSHED);
 
 	mutex_unlock(&mdp5_data->ov_lock);
+	if (ctl->shared_lock)
+		mutex_unlock(ctl->shared_lock);
 
 	if (!IS_ERR_VALUE(ret)) {
 		ret = mdss_mdp_display_wait4pingpong(mdp5_data->ctl);
