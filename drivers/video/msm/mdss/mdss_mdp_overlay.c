@@ -1370,6 +1370,15 @@ pan_display_error:
 	mutex_unlock(&mdp5_data->ov_lock);
 }
 
+static void mdss_mdp_overlay_dispatch_vsync(struct work_struct *work)
+{
+	struct mdss_overlay_private *mdp5_data;
+	mdp5_data = container_of(work, struct mdss_overlay_private, vsync_work);
+	if (mdp5_data->ctl && mdp5_data->ctl->mfd)
+		sysfs_notify(&mdp5_data->ctl->mfd->fbi->dev->kobj, NULL,
+				"vsync_event");
+}
+
 /* function is called in irq context should have minimum processing */
 static void mdss_mdp_overlay_handle_vsync(struct mdss_mdp_ctl *ctl,
 						ktime_t t)
@@ -1385,17 +1394,14 @@ static void mdss_mdp_overlay_handle_vsync(struct mdss_mdp_ctl *ctl,
 	mdp5_data = mfd_to_mdp5_data(mfd);
 	pr_debug("vsync on fb%d play_cnt=%d\n", mfd->index, ctl->play_cnt);
 
-	spin_lock(&mdp5_data->vsync_lock);
 	mdp5_data->vsync_time = t;
-	complete(&mdp5_data->vsync_comp);
-	spin_unlock(&mdp5_data->vsync_lock);
+	schedule_work(&mdp5_data->vsync_work);
 }
 
 int mdss_mdp_overlay_vsync_ctrl(struct msm_fb_data_type *mfd, int en)
 {
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
-	unsigned long flags;
 	int rc;
 
 	if (!ctl)
@@ -1416,10 +1422,6 @@ int mdss_mdp_overlay_vsync_ctrl(struct msm_fb_data_type *mfd, int en)
 	}
 
 	pr_debug("fb%d vsync en=%d\n", mfd->index, en);
-
-	spin_lock_irqsave(&mdp5_data->vsync_lock, flags);
-	INIT_COMPLETION(mdp5_data->vsync_comp);
-	spin_unlock_irqrestore(&mdp5_data->vsync_lock, flags);
 
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 	if (en)
@@ -1530,33 +1532,16 @@ static ssize_t mdss_mdp_vsync_show_event(struct device *dev,
 	struct fb_info *fbi = dev_get_drvdata(dev);
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
-	unsigned long flags;
 	u64 vsync_ticks;
 	int ret;
 
 	if (!mdp5_data->ctl || !mdp5_data->ctl->power_on)
-		return 0;
+		return -EAGAIN;
 
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) \
-	|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL)
-	ret = wait_for_completion_interruptible_timeout(&mdp5_data->vsync_comp,
-			msecs_to_jiffies(VSYNC_PERIOD * 2));
-#else
-	ret = wait_for_completion_interruptible_timeout(&mdp5_data->vsync_comp,
-			msecs_to_jiffies(VSYNC_PERIOD * 5));
-#endif
-	if (ret <= 0) {
-		pr_debug("%s Sending current time as vsync timestamp for fb%d\n",
-				__func__, mfd->index);
-		mdp5_data->vsync_time = ktime_get();
-	}
-
-	spin_lock_irqsave(&mdp5_data->vsync_lock, flags);
 	vsync_ticks = ktime_to_ns(mdp5_data->vsync_time);
-	spin_unlock_irqrestore(&mdp5_data->vsync_lock, flags);
 
-	pr_debug("%s fb%d vsync=%llu", __func__, mfd->index, vsync_ticks);
-	ret = snprintf(buf, PAGE_SIZE, "VSYNC=%llu", vsync_ticks);
+	pr_debug("fb%d vsync=%llu", mfd->index, vsync_ticks);
+	ret = scnprintf(buf, PAGE_SIZE, "VSYNC=%llu", vsync_ticks);
 
 	return ret;
 }
@@ -2264,8 +2249,7 @@ int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd)
 
 	INIT_LIST_HEAD(&mdp5_data->pipes_used);
 	INIT_LIST_HEAD(&mdp5_data->pipes_cleanup);
-	init_completion(&mdp5_data->vsync_comp);
-	spin_lock_init(&mdp5_data->vsync_lock);
+	INIT_WORK(&mdp5_data->vsync_work, mdss_mdp_overlay_dispatch_vsync);
 	mutex_init(&mdp5_data->ov_lock);
 	mdp5_data->hw_refresh = true;
 	mdp5_data->overlay_play_enable = true;
