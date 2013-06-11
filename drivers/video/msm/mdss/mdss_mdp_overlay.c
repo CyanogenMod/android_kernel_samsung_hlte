@@ -1004,7 +1004,7 @@ static int mdss_mdp_overlay_unset(struct msm_fb_data_type *mfd, int ndx)
 
 	mdp5_data = mfd_to_mdp5_data(mfd);
 
-	if (!mdp5_data->ctl)
+	if (!mdp5_data || !mdp5_data->ctl)
 		return -ENODEV;
 
 	ret = mutex_lock_interruptible(&mdp5_data->ov_lock);
@@ -1374,12 +1374,11 @@ static void mdss_mdp_overlay_pan_display(struct msm_fb_data_type *mfd)
 	if (!mfd)
 		return;
 
+	fbi = mfd->fbi;
 	mdp5_data = mfd_to_mdp5_data(mfd);
 
-	if (!mdp5_data->ctl)
+	if (!mdp5_data || !mdp5_data->ctl)
 		return;
-
-	fbi = mfd->fbi;
 
 	if (!fbi->fix.smem_start || fbi->fix.smem_len == 0 ||
 	     mdp5_data->borderfill_enable) {
@@ -2177,6 +2176,10 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
 	if (mfd->key != MFD_KEY)
 		return -EINVAL;
 
+	mdp5_data = mfd_to_mdp5_data(mfd);
+	if (!mdp5_data)
+		return -EINVAL;
+
 	if (!mdp5_data->ctl) {
 		struct mdss_mdp_ctl *ctl;
 		struct mdss_panel_data *pdata;
@@ -2277,7 +2280,9 @@ static int mdss_mdp_overlay_off(struct msm_fb_data_type *mfd)
 	if (mfd->key != MFD_KEY)
 		return -EINVAL;
 
-	if (!mdp5_data->ctl) {
+	mdp5_data = mfd_to_mdp5_data(mfd);
+
+	if (!mdp5_data || !mdp5_data->ctl) {
 		pr_err("ctl not initialized\n");
 		return -ENODEV;
 	}
