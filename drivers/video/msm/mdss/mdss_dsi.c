@@ -696,10 +696,12 @@ static int mdss_dsi_off(struct mdss_panel_data *pdata)
 		mdss_dsi_panel_power_on(pdata, 0);
 		return ret;
 	}
-	mdss_dsi_disable_bus_clocks(ctrl_pdata);
 
 	/* disable DSI phy */
-	mdss_dsi_phy_enable(ctrl_pdata->ctrl_base, 0);
+	mdss_dsi_phy_enable(ctrl_pdata, 0);
+
+	mdss_dsi_disable_bus_clocks(ctrl_pdata);
+
 	ret = mdss_dsi_panel_power_on(pdata, 0);
 	if (ret) {
 		pr_err("%s: Panel power off failed\n", __func__);
