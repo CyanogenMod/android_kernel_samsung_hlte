@@ -17,6 +17,7 @@
 #include <linux/types.h>
 #include <linux/mutex.h>
 #include <linux/completion.h>
+#include <linux/timer.h>
 
 #include "mdp3.h"
 #include "mdp3_dma.h"
@@ -40,6 +41,7 @@ struct mdp3_session_data {
 	struct mdp3_intf *intf;
 	struct msm_fb_data_type *mfd;
 	ktime_t vsync_time;
+	int vsync_period;
 	struct mdp_overlay overlay;
 	struct mdp3_buffer_queue bufq_in;
 	struct mdp3_buffer_queue bufq_out;

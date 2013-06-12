@@ -19,6 +19,7 @@
 #include <linux/major.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
+#include <linux/delay.h>
 
 #include "mdp3_ctrl.h"
 #include "mdp3.h"
@@ -26,7 +27,6 @@
 
 #define MDP_CORE_CLK_RATE	100000000
 #define MDP_VSYNC_CLK_RATE	19200000
-#define VSYNC_PERIOD 16
 
 static void mdp3_ctrl_pan_display(struct msm_fb_data_type *mfd);
 static int mdp3_overlay_unset(struct msm_fb_data_type *mfd, int ndx);
@@ -126,8 +126,25 @@ static int mdp3_ctrl_vsync_enable(struct msm_fb_data_type *mfd, int enable)
 
 	mutex_lock(&mdp3_session->lock);
 	mdp3_session->dma->vsync_enable(mdp3_session->dma, arg);
+	if (enable && mdp3_session->status == 1 && !mdp3_session->intf->active)
+		mod_timer(&mdp3_session->vsync_timer,
+			jiffies + msecs_to_jiffies(mdp3_session->vsync_period));
+	 else if (!enable)
+		del_timer(&mdp3_session->vsync_timer);
+
 	mutex_unlock(&mdp3_session->lock);
 	return 0;
+}
+
+void mdp3_vsync_timer_func(unsigned long arg)
+{
+	struct mdp3_session_data *session = (struct mdp3_session_data *)arg;
+	if (session->status == 1 && !session->intf->active) {
+		pr_debug("mdp3_vsync_timer_func trigger\n");
+		vsync_notify_handler(session);
+		mod_timer(&session->vsync_timer,
+			jiffies + msecs_to_jiffies(session->vsync_period));
+	}
 }
 
 static int mdp3_ctrl_async_blit_req(struct msm_fb_data_type *mfd,
@@ -435,10 +452,13 @@ static int mdp3_ctrl_on(struct msm_fb_data_type *mfd)
 		goto on_error;
 	}
 
-	rc = mdp3_session->dma->start(mdp3_session->dma, mdp3_session->intf);
-	if (rc) {
-		pr_err("fail to start the MDP display interface\n");
-		goto on_error;
+	if (mfd->fbi->screen_base) {
+		rc = mdp3_session->dma->start(mdp3_session->dma,
+						mdp3_session->intf);
+		if (rc) {
+			pr_err("fail to start the MDP display interface\n");
+			goto on_error;
+		}
 	}
 
 on_error:
@@ -633,7 +653,8 @@ static int mdp3_ctrl_display_commit_kickoff(struct msm_fb_data_type *mfd)
 	data = mdp3_bufq_pop(&mdp3_session->bufq_in);
 	if (data) {
 		mdp3_session->dma->update(mdp3_session->dma,
-			(void *)data->addr);
+			(void *)data->addr,
+			mdp3_session->intf);
 		mdp3_bufq_push(&mdp3_session->bufq_out, data);
 	}
 
@@ -679,8 +700,14 @@ static void mdp3_ctrl_pan_display(struct msm_fb_data_type *mfd)
 		goto pan_error;
 	}
 
-	mdp3_session->dma->update(mdp3_session->dma,
-				(void *)mfd->iova + offset);
+	if (mfd->fbi->screen_base) {
+		mdp3_session->dma->update(mdp3_session->dma,
+				(void *)mfd->iova + offset,
+				mdp3_session->intf);
+	} else {
+		pr_debug("mdp3_ctrl_pan_display no memory, stop interface");
+		mdp3_session->intf->stop(mdp3_session->intf);
+	}
 pan_error:
 	mutex_unlock(&mdp3_session->lock);
 }
@@ -717,8 +744,6 @@ static int mdp3_ctrl_ioctl_handler(struct msm_fb_data_type *mfd,
 	struct mdp_overlay req;
 	struct msmfb_overlay_data ov_data;
 	int val;
-
-	pr_debug("mdp3_ctrl_ioctl_handler\n");
 
 	mdp3_session = (struct mdp3_session_data *)mfd->mdp.private1;
 	if (!mdp3_session)
@@ -837,6 +862,10 @@ int mdp3_ctrl_init(struct msm_fb_data_type *mfd)
 	mdp3_bufq_init(&mdp3_session->bufq_in);
 	mdp3_bufq_init(&mdp3_session->bufq_out);
 
+	init_timer(&mdp3_session->vsync_timer);
+	mdp3_session->vsync_timer.function = mdp3_vsync_timer_func;
+	mdp3_session->vsync_timer.data = (u32)mdp3_session;
+	mdp3_session->vsync_period = 1000 / mfd->panel_info->mipi.frame_rate;
 	mfd->mdp.private1 = mdp3_session;
 
 	rc = sysfs_create_group(&dev->kobj, &vsync_fs_attr_group);
