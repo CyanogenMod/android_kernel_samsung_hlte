@@ -1106,6 +1106,8 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 		fix->line_length = var->xres * bpp;
 
 	var->yres = panel_info->yres;
+	var->width = panel_info->width;
+	var->height = panel_info->height;
 	var->xres_virtual = var->xres;
 	var->width = panel_info->width;
 	var->height = panel_info->height;
