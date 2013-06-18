@@ -144,6 +144,7 @@ struct mdp3_dma_source {
 	int y;
 	void *buf;
 	int stride;
+	int vsync_count;
 };
 
 struct mdp3_dma_output_config {
