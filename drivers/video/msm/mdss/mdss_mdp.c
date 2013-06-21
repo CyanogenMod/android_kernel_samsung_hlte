@@ -805,14 +805,6 @@ void mdss_mdp_dump_power_clk(void)
 	pr_info(" ============ dump power & mdss clk end ============\n");
 }
 
-
-static int mdss_iommu_fault_handler(struct iommu_domain *domain,
-		struct device *dev, unsigned long iova, int flags, void *token)
-{
-	pr_err("MDP IOMMU page fault: iova 0x%lx\n", iova);
-	return 0;
-}
-
 int mdss_iommu_attach(struct mdss_data_type *mdata)
 {
 	struct iommu_domain *domain;
@@ -900,7 +892,6 @@ int mdss_iommu_init(struct mdss_data_type *mdata)
 				iomap->domain_idx);
 			return -EINVAL;
 		}
-		iommu_set_fault_handler(domain, mdss_iommu_fault_handler, NULL);
 
 		iomap->ctx = msm_iommu_get_ctx(iomap->ctx_name);
 		if (!iomap->ctx) {
