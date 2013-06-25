@@ -1463,9 +1463,14 @@ int voc_set_route_flag(uint32_t session_id, uint8_t path_dir, uint8_t set);
 uint8_t voc_get_route_flag(uint32_t session_id, uint8_t path_dir);
 int voc_enable_dtmf_rx_detection(uint32_t session_id, uint32_t enable);
 void voc_disable_dtmf_det_on_active_sessions(void);
+int voc_alloc_cal_shared_memory(void);
+int voc_alloc_voip_shared_memory(void);
+int is_voc_initialized(void);
+
 int voice_unmap_cal_blocks(void);
 int voc_register_vocproc_vol_table(void);
 int voc_deregister_vocproc_vol_table(void);
+
 uint32_t voc_get_session_id(char *name);
 
 int voc_start_playback(uint32_t set);
