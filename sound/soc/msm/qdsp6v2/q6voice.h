@@ -1391,6 +1391,11 @@ struct common_data {
 	struct voice_data voice[MAX_VOC_SESSIONS];
 };
 
+struct voice_session_itr {
+	int cur_idx;
+	int session_idx;
+};
+
 void voc_register_mvs_cb(ul_cb_fn ul_cb,
 			dl_cb_fn dl_cb,
 			void *private_data);
@@ -1431,6 +1436,7 @@ enum {
 #define VOLTE_SESSION_VSID  0x10C02000
 #define VOIP_SESSION_VSID   0x10004000
 #define ALL_SESSION_VSID    0xFFFFFFFF
+#define VSID_MAX            ALL_SESSION_VSID
 
 #ifdef CONFIG_SEC_DHA_SOL_MAL
 int voice_sec_set_dha_data(uint32_t session_id, short mode,
