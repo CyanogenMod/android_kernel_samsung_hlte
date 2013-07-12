@@ -338,8 +338,9 @@ int es325_set_VEQ_max_gain(int volume);
 #endif
 
 static int msm_voice_gain_put(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_value *ucontrol)
+			      struct snd_ctl_elem_value *ucontrol)
 {
+	int ret = 0;
 #if defined(CONFIG_SEC_DEVIDE_RINGTONE_GAIN)
 	int param = ucontrol->value.integer.value[0];
 	int volume = 0;
@@ -359,9 +360,22 @@ static int msm_voice_gain_put(struct snd_kcontrol *kcontrol,
 #else /* CONFIG_SEC_DEVIDE_RINGTONE_GAIN */
 	int volume = ucontrol->value.integer.value[0];
 	uint32_t session_id = ucontrol->value.integer.value[1];
-	pr_debug("%s: volume: %d session_id: %#x\n", __func__, volume,
-		session_id);
-	voc_set_rx_vol_index(session_id, RX_PATH, volume);
+	int ramp_duration = ucontrol->value.integer.value[2];
+
+	if ((volume < 0) || (ramp_duration < 0)
+		|| (ramp_duration > MAX_RAMP_DURATION)) {
+		pr_err(" %s Invalid arguments", __func__);
+
+		ret = -EINVAL;
+		goto done;
+	}
+
+	pr_debug("%s: volume: %d session_id: %#x ramp_duration: %d\n", __func__,
+		volume, session_id, ramp_duration);
+
+	voc_set_rx_vol_step(session_id, RX_PATH, volume, ramp_duration);
+
+done:
 #endif /* CONFIG_SEC_DEVIDE_RINGTONE_GAIN */
 #ifdef CONFIG_SND_SOC_ES325
 #if !defined(CONFIG_SEC_J_PROJECT) && !defined(CONFIG_SEC_JACTIVE_PROJECT)\
@@ -370,34 +384,59 @@ static int msm_voice_gain_put(struct snd_kcontrol *kcontrol,
 	es325_set_VEQ_max_gain(volume);
 #endif
 #endif
-	return 0;
+
+	return ret;
 }
 
 static int msm_voice_mute_put(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_value *ucontrol)
+			      struct snd_ctl_elem_value *ucontrol)
 {
+	int ret = 0;
 	int mute = ucontrol->value.integer.value[0];
 	uint32_t session_id = ucontrol->value.integer.value[1];
+	int ramp_duration = ucontrol->value.integer.value[2];
 
-	pr_debug("%s: mute=%d session_id=%#x\n", __func__, mute, session_id);
+	if ((mute < 0) || (mute > 1) || (ramp_duration < 0)
+		|| (ramp_duration > MAX_RAMP_DURATION)) {
+		pr_err(" %s Invalid arguments", __func__);
 
-	voc_set_tx_mute(session_id, TX_PATH, mute);
+		ret = -EINVAL;
+		goto done;
+	}
 
-	return 0;
+	pr_debug("%s: mute=%d session_id=%#x ramp_duration=%d\n", __func__,
+		mute, session_id, ramp_duration);
+
+	voc_set_tx_mute(session_id, TX_PATH, mute, ramp_duration);
+
+done:
+	return ret;
 }
 
 
 static int msm_voice_rx_device_mute_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
+	int ret = 0;
 	int mute = ucontrol->value.integer.value[0];
 	uint32_t session_id = ucontrol->value.integer.value[1];
+	int ramp_duration = ucontrol->value.integer.value[2];
 
-	pr_debug("%s: mute=%d session_id=%#x\n", __func__, mute, session_id);
+	if ((mute < 0) || (mute > 1) || (ramp_duration < 0)
+		|| (ramp_duration > MAX_RAMP_DURATION)) {
+		pr_err(" %s Invalid arguments", __func__);
 
-	voc_set_rx_device_mute(session_id, mute);
+		ret = -EINVAL;
+		goto done;
+	}
 
-	return 0;
+	pr_debug("%s: mute=%d session_id=%#x ramp_duration=%d\n", __func__,
+		mute, session_id, ramp_duration);
+
+	voc_set_rx_device_mute(session_id, mute, ramp_duration);
+
+done:
+	return ret;
 }
 
 
@@ -545,11 +584,11 @@ static int msm_voice_fens_get(struct snd_kcontrol *kcontrol,
 
 static struct snd_kcontrol_new msm_voice_controls[] = {
 	SOC_SINGLE_MULTI_EXT("Voice Rx Device Mute", SND_SOC_NOPM, 0, VSID_MAX,
-				0, 2, NULL, msm_voice_rx_device_mute_put),
+				0, 3, NULL, msm_voice_rx_device_mute_put),
 	SOC_SINGLE_MULTI_EXT("Voice Tx Mute", SND_SOC_NOPM, 0, VSID_MAX,
 				0, 2, NULL, msm_voice_mute_put),
 #if defined(CONFIG_MACH_HLTEVZW) || defined(CONFIG_MACH_HLTEUSC)
-	SOC_SINGLE_MULTI_EXT("Voice Rx Gain", SND_SOC_NOPM, 0, VSID_MAX, 0, 2,
+	SOC_SINGLE_MULTI_EXT("Voice Rx Gain", SND_SOC_NOPM, 0, VSID_MAX, 0, 3,
 				NULL, msm_voice_gain_put),
 #else
 #if defined(CONFIG_SEC_DEVIDE_RINGTONE_GAIN)
