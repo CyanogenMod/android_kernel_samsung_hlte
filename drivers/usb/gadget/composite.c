@@ -862,6 +862,11 @@ int usb_remove_config(struct usb_composite_dev *cdev,
 			__func__, cdev->config, config);
 	spin_lock_irqsave(&cdev->lock, flags);
 
+	if (WARN_ON(!config->cdev)) {
+		spin_unlock_irqrestore(&cdev->lock, flags);
+		return 0;
+	}
+
 	if (cdev->config == config)
 		reset_config(cdev);
 	/* Incase the Bind fails we have already deleted the config list */
