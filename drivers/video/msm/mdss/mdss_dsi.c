@@ -921,8 +921,6 @@ static int mdss_dsi_unblank(struct mdss_panel_data *pdata)
 	}
 #endif
 
-	mdss_dsi_op_mode_config(mipi->mode, pdata);
-
 #if defined(CONFIG_DUAL_LCD)
 	dsi_clk_on = 2;
 #endif
@@ -1021,6 +1019,7 @@ int mdss_dsi_cont_splash_on(struct mdss_panel_data *pdata)
 #endif
 	mdss_dsi_sw_reset(pdata);
 	mdss_dsi_host_init(mipi, pdata);
+	mdss_dsi_op_mode_config(mipi->mode, pdata);
 
 #ifdef CONFIG_FB_MSM_MIPI_JDI_TFT_VIDEO_FULL_HD_PT_PANEL
 	// LP11
@@ -1035,8 +1034,7 @@ int mdss_dsi_cont_splash_on(struct mdss_panel_data *pdata)
 	(ctrl_pdata->panel_data).panel_reset_fn(pdata, 1);
 #endif
 
-	if (1) /* (ctrl_pdata->on_cmds.link_state == DSI_LP_MODE)*/{
-		mdss_dsi_op_mode_config(DSI_CMD_MODE, pdata);
+	if (ctrl_pdata->on_cmds.link_state == DSI_LP_MODE) {
 		ret = mdss_dsi_unblank(pdata);
 		if (ret) {
 			pr_err("%s: unblank failed\n", __func__);
@@ -1119,6 +1117,8 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	switch (event) {
 	case MDSS_EVENT_UNBLANK:
 		rc = mdss_dsi_on(pdata);
+		mdss_dsi_op_mode_config(pdata->panel_info.mipi.mode,
+							pdata);
 		if (ctrl_pdata->on_cmds.link_state == DSI_LP_MODE)
 			rc = mdss_dsi_unblank(pdata);
 		break;
