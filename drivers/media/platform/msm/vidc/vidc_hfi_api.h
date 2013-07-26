@@ -794,6 +794,10 @@ struct hal_h264_vui_timing_info {
 	u32 time_scale;
 };
 
+struct hal_h264_vui_bitstream_restrc {
+	u32 enable;
+};
+
 enum vidc_resource_id {
 	VIDC_RESOURCE_OCMEM = 0x00000001,
 	VIDC_UNUSED_RESORUCE = 0x10000000,
