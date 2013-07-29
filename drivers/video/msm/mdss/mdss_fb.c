@@ -729,8 +729,10 @@ void mdss_fb_update_backlight(struct msm_fb_data_type *mfd)
 			mfd->bl_level = unset_bl_level;
 			pdata->set_backlight(pdata, mfd->bl_level);
 			bl_level_old = unset_bl_level;
+			/* only the main display can set bl_updated flag */
+			if (mfd->index == 0)
+				bl_updated = 1;
 			mutex_unlock(&mfd->bl_lock);
-			bl_updated = 1;
 		}
 	}
 }
@@ -783,7 +785,10 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 			mfd->op_enable = false;
 			curr_pwr_state = mfd->panel_power_on;
 			mfd->panel_power_on = false;
-			bl_updated = 0;
+			/* only the main display can reset bl_updated flag */
+			if (mfd->index == 0)
+				bl_updated = 0;
+			mutex_unlock(&mfd->bl_lock);
 
 			ret = mfd->mdp.off_fnc(mfd);
 			if (ret)
