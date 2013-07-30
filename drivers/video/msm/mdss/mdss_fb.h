@@ -80,6 +80,8 @@ struct msm_mdp_interface {
 	int (*init_fnc)(struct msm_fb_data_type *mfd);
 	int (*on_fnc)(struct msm_fb_data_type *mfd);
 	int (*off_fnc)(struct msm_fb_data_type *mfd);
+	/* called to release resources associated to the process */
+	int (*release_fnc)(struct msm_fb_data_type *mfd);
 	int (*kickoff_fnc)(struct msm_fb_data_type *mfd);
 	int (*ioctl_handler)(struct msm_fb_data_type *mfd, u32 cmd, void *arg);
 	void (*dma_fnc)(struct msm_fb_data_type *mfd);
@@ -102,11 +104,17 @@ struct msm_mdp_interface {
 					/ (2 * max_bright);\
 					} while (0)
 
+struct mdss_fb_proc_info {
+	int pid;
+	u32 ref_cnt;
+	struct list_head list;
+};
 
 struct msm_fb_backup_type {
 	struct fb_info info;
 	struct mdp_display_commit disp_commit;
 };
+
 struct msm_fb_data_type {
 	u32 key;
 	u32 index;
@@ -170,6 +178,7 @@ struct msm_fb_data_type {
 	u32 is_power_setting;
 
 	u32 dcm_state;
+	struct list_head proc_list;
 };
 
 static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)
