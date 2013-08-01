@@ -3344,7 +3344,7 @@ static int is_valid_calib_addr(void *addr)
 				ret = 1;
 		else if (ptr >= 0x3220 && ptr <= 0x3228)
 				ret = 1;
-		else if (ptr >= 0x3200 || ptr == 0x100)
+		else if (ptr == 0x3200 || ptr == 0x100)
 				ret = 1;
 	}
 end:
