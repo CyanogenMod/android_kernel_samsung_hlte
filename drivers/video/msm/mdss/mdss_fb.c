@@ -799,7 +799,6 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 			curr_pwr_state = mfd->panel_power_on;
 			mfd->panel_power_on = false;
 			mfd->bl_updated = 0;
-			mutex_unlock(&mfd->bl_lock);
 
 			ret = mfd->mdp.off_fnc(mfd);
 			if (ret)
