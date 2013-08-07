@@ -2213,9 +2213,6 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
 	if (IS_ERR_VALUE(rc)) {
 		pr_err("Failed to turn on fb%d\n", mfd->index);
 		mdss_mdp_overlay_off(mfd);
-	} else if (mdp5_data->vsync_pending) {
-		mdp5_data->vsync_pending = 0;
-		mdss_mdp_overlay_vsync_ctrl(mfd, mdp5_data->vsync_pending);
 	}
 #if defined(CONFIG_FB_MSM_MIPI_TFT_VIDEO_FULL_HD_PT_PANEL)
 

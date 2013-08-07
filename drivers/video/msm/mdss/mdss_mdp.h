@@ -381,10 +381,7 @@ struct mdss_mdp_writeback_arg {
 	void *priv_data;
 };
 
-#define MAX_FREE_LIST_SIZE 12
-
 struct mdss_overlay_private {
-	int vsync_pending;
 	ktime_t vsync_time;
 	struct sysfs_dirent *vsync_event_sd;
 	int borderfill_enable;
