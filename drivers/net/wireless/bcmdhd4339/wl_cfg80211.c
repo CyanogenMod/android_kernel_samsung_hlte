@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfg80211.c 420879 2013-08-29 13:23:20Z $
+ * $Id: wl_cfg80211.c 423265 2013-09-11 16:26:12Z $
  */
 /* */
 #include <typedefs.h>
@@ -431,10 +431,10 @@ static s32 wl_notifier_change_state(struct wl_priv *wl, struct net_info *_net_in
 static s32 wl_tdls_event_handler(struct wl_priv *wl, bcm_struct_cfgdev *cfgdev,
 	const wl_event_msg_t *e, void *data);
 #endif /* WLTDLS */
-
+#ifdef BCMCCX_S69
 static s32 wl_ccx_s69_response(struct wl_priv *wl, bcm_struct_cfgdev *cfgdev,
 	const wl_event_msg_t *e, void *data);
-
+#endif
 /*
  * register/deregister parent device
  */
@@ -825,6 +825,39 @@ static void wl_scan_timeout_dbg_clear(void)
 	wl_scan_timeout_dbg_enabled = 0;
 }
 #endif /* CUSTOMER_HW4 && DHD_DEBUG */
+
+static void wl_add_remove_pm_enable_work(struct wl_priv *wl, bool add_remove,
+	enum wl_handler_del_type type)
+{
+	if (wl->pm_enable_work_on) {
+		if (add_remove) {
+#ifdef CUSTOMER_HW4
+			DHD_OS_WAKE_LOCK(wl->pub);
+#endif /* CUSTOMER_HW4 */
+			schedule_delayed_work(&wl->pm_enable_work,
+				msecs_to_jiffies(WL_PM_ENABLE_TIMEOUT));
+		} else {
+			cancel_delayed_work_sync(&wl->pm_enable_work);
+			switch (type) {
+				case WL_HANDLER_MAINTAIN:
+					schedule_delayed_work(&wl->pm_enable_work,
+						msecs_to_jiffies(WL_PM_ENABLE_TIMEOUT));
+					break;
+				case WL_HANDLER_PEND:
+					schedule_delayed_work(&wl->pm_enable_work,
+						msecs_to_jiffies(WL_PM_ENABLE_TIMEOUT*2));
+					break;
+				case WL_HANDLER_DEL:
+				default:
+					wl->pm_enable_work_on = false;
+					break;
+			}
+#ifdef CUSTOMER_HW4
+			DHD_OS_WAKE_UNLOCK(wl->pub);
+#endif /* CUSTOMER_HW4 */
+		}
+	}
+}
 
 /* Return a new chanspec given a legacy chanspec
  * Returns INVCHANSPEC on error
@@ -1456,11 +1489,8 @@ wl_cfg80211_del_virtual_iface(struct wiphy *wiphy, bcm_struct_cfgdev *cfgdev)
 				wl_notify_escan_complete(wl, dev, true, true);
 			}
 			wldev_iovar_setint(dev, "mpc", 1);
-
-			if (wl->pm_enable_work_on) {
-				cancel_delayed_work_sync(&wl->pm_enable_work);
-				wl->pm_enable_work_on = false;
-			}
+			/* Delete pm_enable_work */
+			wl_add_remove_pm_enable_work(wl, FALSE, WL_HANDLER_DEL);
 
 			/* for GC */
 			if (wl_get_drv_status(wl, DISCONNECTING, dev) &&
@@ -1484,6 +1514,8 @@ wl_cfg80211_del_virtual_iface(struct wiphy *wiphy, bcm_struct_cfgdev *cfgdev)
 					WL_ERR(("Wait for Link Down event for GO !!!\n"));
 					wait_for_completion_timeout(&wl->iface_disable,
 						msecs_to_jiffies(500));
+				} else if (ret != BCME_UNSUPPORTED) {
+					msleep(300);
 				}
 			}
 			wl_cfgp2p_clear_management_ie(wl, index);
@@ -2834,6 +2866,8 @@ wl_cfg80211_ibss_vsie_delete(struct net_device *dev)
 
 		/* change the command from "add" to "del" */
 		strncpy(wl->ibss_vsie->cmd, "del", VNDR_IE_CMD_LEN - 1);
+		wl->ibss_vsie->cmd[VNDR_IE_CMD_LEN - 1] = '\0';
+
 		ret = wldev_iovar_setbuf(dev, "ie",
 			wl->ibss_vsie, wl->ibss_vsie_len,
 			ioctl_buf, WLC_IOCTL_MEDLEN, NULL);
@@ -4605,10 +4639,10 @@ wl_cfg80211_set_power_mgmt(struct wiphy *wiphy, struct net_device *dev,
 	WL_DBG(("%s: Enter power save enabled %d\n", dev->name, enabled));
 
 	/* Delete pm_enable_work */
-	if (wl->pm_enable_work_on) {
-		cancel_delayed_work_sync(&wl->pm_enable_work);
-		wl->pm_enable_work_on = false;
-	}
+#ifdef CUSTOMER_HW4
+	if (enabled)
+#endif /* CUSTOMER_HW4 */
+		wl_add_remove_pm_enable_work(wl, FALSE, WL_HANDLER_PEND);
 
 #if !defined(SUPPORT_PM2_ONLY)
 	/* android has special hooks to change pm when kernel suspended */
@@ -4746,7 +4780,7 @@ wl_update_pmklist(struct net_device *dev, struct wl_pmk_list *pmk_list,
 	}
 	if (likely(!err)) {
 		err = wldev_iovar_setbuf(dev, "pmkid_info", (char *)pmk_list,
-			sizeof(*pmk_list), wl->ioctl_buf, WLC_IOCTL_MAXLEN, NULL);
+			sizeof(*pmk_list), wl->ioctl_buf, WLC_IOCTL_MAXLEN, &wl->ioctl_buf_sync);
 	}
 
 	return err;
@@ -6794,6 +6828,13 @@ wl_cfg80211_stop_ap(
 		wl_clr_drv_status(wl, AP_CREATED, dev);
 		/* Turn on the MPC */
 		wldev_iovar_setint(dev, "mpc", 1);
+		if (wl->ap_info) {
+			kfree(wl->ap_info->wpa_ie);
+			kfree(wl->ap_info->rsn_ie);
+			kfree(wl->ap_info->wps_ie);
+			kfree(wl->ap_info);
+			wl->ap_info = NULL;
+		}
 	} else {
 		WL_DBG(("Stopping P2P GO \n"));
 	}
@@ -9001,7 +9042,9 @@ static void wl_init_event_handler(struct wl_priv *wl)
 #ifdef WLTDLS
 	wl->evt_handler[WLC_E_TDLS_PEER_EVENT] = wl_tdls_event_handler;
 #endif /* WLTDLS */
+#ifdef BCMCCX_S69
 	wl->evt_handler[WLC_E_CCX_S69_RESP_RX] = wl_ccx_s69_response;
+#endif
 }
 
 #if defined(STATIC_WL_PRIV_STRUCT)
@@ -9989,10 +10032,8 @@ static s32 wl_notifier_change_state(struct wl_priv *wl, struct net_info *_net_in
 		}
 		wl_cfg80211_determine_vsdb_mode(wl);
 		if (wl->vsdb_mode || _net_info->pm_block) {
-			if (wl->pm_enable_work_on) {
-				cancel_delayed_work_sync(&wl->pm_enable_work);
-				wl->pm_enable_work_on = false;
-			}
+			/* Delete pm_enable_work */
+			wl_add_remove_pm_enable_work(wl, FALSE, WL_HANDLER_MAINTAIN);
 			/* save PM_FAST in _net_info to restore this
 			 * if _net_info->pm_block is false
 			 */
@@ -10046,8 +10087,7 @@ static s32 wl_notifier_change_state(struct wl_priv *wl, struct net_info *_net_in
 				}
 			}
 			wl->pm_enable_work_on = true;
-			schedule_delayed_work(&wl->pm_enable_work,
-				msecs_to_jiffies(WL_PM_ENABLE_TIMEOUT));
+			wl_add_remove_pm_enable_work(wl, TRUE, WL_HANDLER_NOTUSE);
 		}
 #if defined(CUSTOMER_HW4) && defined(WLTDLS)
 		if (wl->vsdb_mode) {
@@ -11050,10 +11090,8 @@ static s32 __wl_cfg80211_down(struct wl_priv *wl)
 	dhd_pub_t *dhd =  (dhd_pub_t *)(wl->pub);
 #endif /* PROP_TXSTATUS_VSDB */
 	WL_DBG(("In\n"));
-	if (wl->pm_enable_work_on) {
-		cancel_delayed_work_sync(&wl->pm_enable_work);
-		wl->pm_enable_work_on = false;
-	}
+	/* Delete pm_enable_work */
+	wl_add_remove_pm_enable_work(wl, FALSE, WL_HANDLER_DEL);
 
 	if (wl->p2p_supported) {
 		wl_clr_p2p_status(wl, GO_NEG_PHASE);
@@ -12320,7 +12358,9 @@ static void wl_cfg80211_work_handler(struct work_struct * work)
 					iter->ndev->ieee80211_ptr->ps = true;
 			}
 		}
-
+#ifdef CUSTOMER_HW4
+		DHD_OS_WAKE_UNLOCK(wl->pub);
+#endif /* CUSTOMER_HW4 */
 	}
 }
 
@@ -12352,7 +12392,7 @@ wl_get_public_action(void *frame, u32 frame_len, u8 *ret_action)
 	WL_INFO(("Public Action : %d\n", *ret_action));
 	return BCME_OK;
 }
-
+#ifdef BCMCCX_S69
 static s32
 wl_ccx_s69_response(struct wl_priv *wl, bcm_struct_cfgdev *cfgdev,
 	const wl_event_msg_t *e, void *data)
@@ -12367,3 +12407,4 @@ wl_ccx_s69_response(struct wl_priv *wl, bcm_struct_cfgdev *cfgdev,
 
 	return err;
 }
+#endif /* BCMCCX_S69 */

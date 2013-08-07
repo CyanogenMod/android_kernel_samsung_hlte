@@ -45,7 +45,6 @@
 #define QPNP_PON_KPDPWR_S1_TIMER(base)		(base + 0x40)
 #define QPNP_PON_KPDPWR_S2_TIMER(base)		(base + 0x41)
 #define QPNP_PON_KPDPWR_S2_CNTL(base)		(base + 0x42)
-#define QPNP_PON_KPDPWR_S2_CNTL2(base)		(base + 0x43)
 #define QPNP_PON_RESIN_S1_TIMER(base)		(base + 0x44)
 #define QPNP_PON_RESIN_S2_TIMER(base)		(base + 0x45)
 #define QPNP_PON_RESIN_S2_CNTL(base)		(base + 0x46)
@@ -512,40 +511,6 @@ qpnp_config_pull(struct qpnp_pon *pon, struct qpnp_pon_config *cfg)
 
 	return rc;
 }
-
-#ifdef CONFIG_CONTROL_S2_RESET
-static int qpnp_control_s2_reset(bool enable)
-{
-	int rc;
-	struct qpnp_pon *pon = sys_reset_dev;
-	u16 s2_cntl_addr2;
-
-	if (!pon)
-		return -ENODEV;
-
-	s2_cntl_addr2 = QPNP_PON_KPDPWR_S2_CNTL2(pon->base);
-	if(enable) {
-		/* enable S2 reset */
-		rc = qpnp_pon_masked_write(pon, s2_cntl_addr2,
-				QPNP_PON_S2_CNTL_EN, QPNP_PON_S2_CNTL_EN);
-		if (rc) {
-			dev_err(&pon->spmi->dev, "Unable to configure S2 enable\n");
-			return rc;
-		}
-	} else {
-		/* disable S2 reset */
-		rc = qpnp_pon_masked_write(pon, s2_cntl_addr2,
-				QPNP_PON_S2_CNTL_EN, 0);
-		if (rc) {
-			dev_err(&pon->spmi->dev, "Unable to configure S2 disable\n");
-			return rc;
-		}
-	}
-
-	usleep(100);
-	return rc;
-}
-#endif
 
 static int __devinit
 qpnp_config_reset(struct qpnp_pon *pon, struct qpnp_pon_config *cfg)
@@ -1016,11 +981,6 @@ static int __devinit qpnp_pon_probe(struct spmi_device *spmi)
 			"Unable to intialize PON configurations\n");
 		return rc;
 	}
-
-#ifdef CONFIG_CONTROL_S2_RESET
-	if (0 == sec_debug_is_enabled())
-		qpnp_control_s2_reset(0);
-#endif
 
 	sec_powerkey = device_create(sec_class, NULL, 0, NULL, "sec_powerkey");
 	if (IS_ERR(sec_powerkey))

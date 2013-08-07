@@ -140,6 +140,22 @@ static ssize_t back_camera_firmware_store(struct device *dev,
 	return size;
 }
 
+char cam_load_fw[25] = "NULL\n";
+static ssize_t back_camera_firmware_load_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	CDBG("[FW_DBG] cam_load_fw : %s\n", cam_load_fw);
+	return snprintf(buf, sizeof(cam_load_fw), "%s", cam_load_fw);
+}
+
+static ssize_t back_camera_firmware_load_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	CDBG("[FW_DBG] buf : %s\n", buf);
+	snprintf(cam_load_fw, sizeof(cam_load_fw), "%s\n", buf);
+	return size;
+}
+
 static ssize_t front_camera_firmware_show(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
@@ -151,6 +167,8 @@ static ssize_t front_camera_firmware_show(struct device *dev,
 static DEVICE_ATTR(rear_camtype, S_IRUGO, back_camera_type_show, NULL);
 static DEVICE_ATTR(rear_camfw, S_IRUGO|S_IWUSR|S_IWGRP,
     back_camera_firmware_show, back_camera_firmware_store);
+static DEVICE_ATTR(rear_camfw_load, S_IRUGO|S_IWUSR|S_IWGRP,
+    back_camera_firmware_load_show, back_camera_firmware_load_store);
 static DEVICE_ATTR(front_camtype, S_IRUGO, front_camera_type_show, NULL);
 static DEVICE_ATTR(front_camfw, S_IRUGO, front_camera_firmware_show, NULL);
 
@@ -201,6 +219,10 @@ static int __init msm_sensor_init_module(void)
 	if (device_create_file(cam_dev_back, &dev_attr_rear_camfw) < 0) {
 		printk("Failed to create device file!(%s)!\n",
 			dev_attr_rear_camfw.attr.name);
+	}
+	if (device_create_file(cam_dev_back, &dev_attr_rear_camfw_load) < 0) {
+		printk("Failed to create device file!(%s)!\n",
+			dev_attr_rear_camfw_load.attr.name);
 	}
 
 	cam_dev_front = device_create(camera_class, NULL,

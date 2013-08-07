@@ -561,8 +561,11 @@
 
 	spi_0: spi@f9923000 {
 		compatible = "qcom,spi-qup-v2";
-		reg = <0xf9923000 0x1000>;
-		interrupts = <0 95 0>;
+		reg = <0xf9923000 0x1000>,
+			  <0xf9904000 0x19000>;
+		reg-names = "spi_physical", "spi_bam_physical";
+		interrupts = <0 95 0>, <0 238 0>;
+		interrupt-names = "spi_irq", "spi_bam_irq";
 		spi-max-frequency = <19200000>;
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -571,6 +574,10 @@
 			<&msmgpio 0 0>; /* MOSI */
 		cs-gpios = <&msmgpio 2 0>;
 		qcom,master-id = <86>;
+		qcom,use-bam; /*enable BAM-mode*/
+		qcom,bam-consumer-pipe-index = <12>;
+		qcom,bam-producer-pipe-index = <13>;
+		qcom,ver-reg-exists;
 	};
 
 	spi@f9924000 {

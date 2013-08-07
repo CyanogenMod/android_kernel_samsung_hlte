@@ -185,6 +185,7 @@ enum msm_sensor_camera_id_t {
 enum cci_i2c_master_t {
 	MASTER_0,
 	MASTER_1,
+	MASTER_MAX,
 };
 
 struct msm_sensor_info_t {
@@ -238,6 +239,13 @@ struct msm_camera_i2c_seq_reg_setting {
 	uint16_t size;
 	enum msm_camera_i2c_reg_addr_type addr_type;
 	uint16_t delay;
+};
+
+struct msm_camera_i2c_read_config {
+	uint16_t slave_addr;
+	uint16_t reg_addr;
+	enum msm_camera_i2c_data_type data_type;
+	uint16_t *data;
 };
 
 struct msm_camera_csid_vc_cfg {
@@ -377,6 +385,7 @@ struct msm_eeprom_cfg_data {
 
 enum msm_sensor_cfg_type_t {
 	CFG_SET_SLAVE_INFO,
+	CFG_SLAVE_READ_I2C,
 	CFG_WRITE_I2C_ARRAY,
 	CFG_WRITE_I2C_SEQ_ARRAY,
 	CFG_POWER_UP,

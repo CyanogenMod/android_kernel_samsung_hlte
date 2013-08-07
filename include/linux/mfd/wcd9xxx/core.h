@@ -188,7 +188,6 @@ struct wcd9xxx {
 			int bytes, void *dest, bool interface_reg);
 	int (*write_dev)(struct wcd9xxx *wcd9xxx, unsigned short reg,
 			int bytes, void *src, bool interface_reg);
-	int (*dev_down)(struct wcd9xxx *wcd9xxx);
 	int (*post_reset)(struct wcd9xxx *wcd9xxx);
 
 	void *ssr_priv;

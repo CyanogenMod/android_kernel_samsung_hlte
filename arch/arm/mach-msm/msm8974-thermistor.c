@@ -83,7 +83,7 @@ static struct sec_therm_adc_table temper_table_ap[] = {
 	{42149,		-300},
 };
 #elif defined(CONFIG_MACH_HLTESKT) || defined(CONFIG_MACH_HLTEKTT) || \
-	defined(CONFIG_MACH_HLTELGT) || defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI)
+	defined(CONFIG_MACH_HLTELGT)
 static struct sec_therm_adc_table temper_table_ap[] = {
 	{26729,	730},
 	{26784,	720},
@@ -182,7 +182,27 @@ static struct sec_therm_adc_table temper_table_ap[] = {
 };
 #else
 static struct sec_therm_adc_table temper_table_ap[] = {
-	{27188,	 700},
+	{25939,	 900},
+	{25967,	 890},
+	{25994,	 880},
+	{26035,	 870},
+	{26073,	 860},
+	{26120,	 850},
+	{26164,	 840},
+	{26207,	 830},
+	{26253,	 820},
+	{26301,	 810},
+	{26355,	 800},
+	{26432,	 790},
+	{26497,	 780},
+	{26560,	 770},
+	{26609,	 760},
+	{26677,	 750},
+	{26752,	 740},
+	{26830,	 730},
+	{26941,	 720},
+	{27047,	 710},
+	{27167,	 700},
 	{27271,	 690},
 	{27355,	 680},
 	{27438,	 670},
@@ -202,7 +222,7 @@ static struct sec_therm_adc_table temper_table_ap[] = {
 	{28955,	 530},
 	{29058,	 520},
 	{29161,	 510},
-	{28182,	 500},
+	{29286,	 500},
 	{29410,	 490},
 	{29555,	 480},
 	{29700,	 470},

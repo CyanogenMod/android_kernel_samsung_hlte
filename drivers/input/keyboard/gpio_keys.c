@@ -29,6 +29,7 @@
 #include <linux/of_platform.h>
 #include <linux/of_gpio.h>
 #include <linux/spinlock.h>
+#include <linux/wakelock.h>
 #if CONFIG_SEC_DEBUG
 #include <mach/sec_debug.h>
 #endif
@@ -70,6 +71,7 @@ struct gpio_keys_drvdata {
 	int irq_flip_cover;
 	bool flip_cover;
 	struct delayed_work flip_cover_dwork;
+	struct wake_lock flip_wake_lock;
 #endif
 	struct gpio_button_data data[0];
 };
@@ -706,10 +708,23 @@ static void flip_cover_work(struct work_struct *work)
 
 static irqreturn_t flip_cover_detect(int irq, void *dev_id)
 {
+	bool flip_status;
 	struct gpio_keys_drvdata *ddata = dev_id;
 
+	flip_status = gpio_get_value(ddata->gpio_flip_cover);
+
+	printk(KERN_DEBUG "[keys] %s flip_satatus : %d\n",
+		__func__, flip_status);
+
 	cancel_delayed_work_sync(&ddata->flip_cover_dwork);
-	schedule_delayed_work(&ddata->flip_cover_dwork, 0);
+	
+	if(flip_status) {
+		wake_lock_timeout(&ddata->flip_wake_lock, HZ * 5 / 100); /* 50ms */
+		schedule_delayed_work(&ddata->flip_cover_dwork, HZ * 1 / 100); /* 10ms */
+	} else {
+		wake_unlock(&ddata->flip_wake_lock);
+		schedule_delayed_work(&ddata->flip_cover_dwork, 0);
+	}
 	return IRQ_HANDLED;
 }
 #endif // CONFIG_SENSORS_HALL
@@ -1049,8 +1064,10 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	ddata->enable = pdata->enable;
 	ddata->disable = pdata->disable;
 #ifdef CONFIG_SENSORS_HALL
-    ddata->gpio_flip_cover = pdata->gpio_flip_cover;
-    ddata->irq_flip_cover = gpio_to_irq(ddata->gpio_flip_cover);
+	ddata->gpio_flip_cover = pdata->gpio_flip_cover;
+	ddata->irq_flip_cover = gpio_to_irq(ddata->gpio_flip_cover);
+	wake_lock_init(&ddata->flip_wake_lock, WAKE_LOCK_SUSPEND,
+		"flip_wake_lock");
 #endif
 	mutex_init(&ddata->disable_lock);
 
@@ -1162,6 +1179,9 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 		gpio_remove_key(&ddata->data[i]);
 
 	platform_set_drvdata(pdev, NULL);
+#ifdef CONFIG_SENSORS_HALL
+	wake_lock_destroy(&ddata->flip_wake_lock);
+#endif
  fail1:
 	input_free_device(input);
 	kfree(ddata);
@@ -1187,6 +1207,9 @@ static int __devexit gpio_keys_remove(struct platform_device *pdev)
 
 	input_unregister_device(input);
 
+#ifdef CONFIG_SENSORS_HALL
+	wake_lock_destroy(&ddata->flip_wake_lock);
+#endif
 	/*
 	 * If we had no platform_data, we allocated buttons dynamically, and
 	 * must free them here. ddata->data[0].button is the pointer to the

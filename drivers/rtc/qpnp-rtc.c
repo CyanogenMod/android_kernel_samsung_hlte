@@ -569,15 +569,13 @@ static int
 sapa_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alarm)
 {
 	int rc;
-	u8 value[4] = {0,}, ctrl_reg;
+	u8 value[4], ctrl_reg;
 	unsigned long secs, secs_rtc;//, irq_flags;
 	struct qpnp_rtc *rtc_dd = dev_get_drvdata(dev);
 	struct rtc_time rtc_tm;
 	
 	if (!alarm->enabled) {
-		pr_info("[SAPA] Try to clear :  %4d-%02d-%02d %02d:%02d:%02d\n",
-			alarm->time.tm_year, alarm->time.tm_mon, alarm->time.tm_mday,
-			alarm->time.tm_hour, alarm->time.tm_min, alarm->time.tm_sec);
+		pr_info("[SAPA] Try to clear\n");
 
 		if(poweroff_charging && !kparam_loaded && shutdown_loaded){
 			pr_info("%s [SAPA] without loading kparam, it will be shutdown. No need to reset the alarm!! \n",__func__);
@@ -592,40 +590,18 @@ sapa_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alarm)
 			
 			return 0;
 		}
-
-		rc = qpnp_write_wrapper(rtc_dd, value,
-				rtc_dd->alarm_base + REG_OFFSET_ALARM_RW,
-								NUM_8_BIT_RTC_REGS);
-		if (rc < 0) {
-			pr_err("[SAPA] Write to RTC ALARM registers failed\n");
-			goto rtc_rw_fail;
-		}
 		
 		sapa_saved_time.enabled = 0;  // disable pwr on alarm to prevent retrying
 		sapa_store_kparam(alarm);
 
-		ctrl_reg = (alarm->enabled) ?
-			(rtc_dd->alarm_ctrl_reg1 | BIT_RTC_ALARM_ENABLE) :
-			(rtc_dd->alarm_ctrl_reg1 & ~BIT_RTC_ALARM_ENABLE);
+		ctrl_reg = (rtc_dd->rtc_ctrl_reg & ~BIT_RTC_ALARM_ENABLE);
 
-		rc = qpnp_write_wrapper(rtc_dd, &ctrl_reg,rtc_dd->alarm_base + REG_OFFSET_ALARM_CTRL1, 1);
-
-		if (rc) {
-		dev_err(dev, "Write to ALARM cntrol reg failed\n");
-			goto rtc_rw_fail;
-		}
-
-		rtc_dd->alarm_ctrl_reg1 = ctrl_reg;
-
-		/* read boot alarm */
-		rc = qpnp_rtc_read_alarm(dev, alarm);
-		if ( rc < 0 ) {
-			pr_err("[SAPA] read failed.\n");
+		rc = qpnp_write_wrapper(rtc_dd, &ctrl_reg, rtc_dd->rtc_base, 1);
+		if (rc < 0) {
+			pr_err("[SAPA] clear failed!\n");
 			return rc;
 		}
-		pr_info("[SAPA] -> %4d-%02d-%02d %02d:%02d:%02d\n",
-			alarm->time.tm_year, alarm->time.tm_mon, alarm->time.tm_mday,
-			alarm->time.tm_hour, alarm->time.tm_min, alarm->time.tm_sec);
+		rtc_dd->rtc_ctrl_reg = ctrl_reg;
 	}
 	else
 	{

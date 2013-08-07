@@ -130,10 +130,4 @@ config SSM
 	  This driver uses Secure Channel Manager interface for trustzone
 	  communication and communicates with modem over SMD channel.
 
-config CONTROL_S2_RESET
-	tristate "Control s2 reset"
-	depends on OF_SPMI && SPMI && MSM_QPNP_INT
-	help
-	  This feature supports s2 reset
-
 endmenu

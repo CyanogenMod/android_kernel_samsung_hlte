@@ -349,7 +349,8 @@ static const struct file_operations smd_pkt_fops = {
 	.release = smd_pkt_release,
 	.read = smd_pkt_read,
 	.write = smd_pkt_write,
-    
+	.poll = smd_pkt_poll,
+};
 
 static int __init smd_pkt_init(void)
 {

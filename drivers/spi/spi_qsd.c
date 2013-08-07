@@ -2642,6 +2642,8 @@ __init msm_spi_dt_to_pdata(struct platform_device *pdev)
 		}
 	}
 
+	dev_warn(&pdev->dev,
+    	"%s pdata->use_bam: %d", __func__, pdata->use_bam);
 	if (pdata->use_bam) {
 		if (!pdata->bam_consumer_pipe_index) {
 			dev_warn(&pdev->dev,

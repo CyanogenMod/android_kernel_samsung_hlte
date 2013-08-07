@@ -238,7 +238,6 @@ void sync_sensor_state(struct ssp_data *data)
 	unsigned char uBuf[2] = {0,};
 	unsigned int uSensorCnt;
 	int iRet = 0;
-	proximity_open_calibration(data);
 	iRet = set_hw_offset(data);
 	if (iRet < 0) {
 		pr_err("[SSP]: %s - set_hw_offset failed\n", __func__);
@@ -395,10 +394,13 @@ static void debug_work_func(struct work_struct *work)
 		pr_err("[SSP] : %s MCU sensor probe fail\n", __func__);
 		return;
 	}
-	if(sanity_check(data)>0) data->uSanityCnt++;
+	wake_lock(&data->ssp_wake_lock);
+	if  (data->uLastResumeState != MSG2SSP_AP_STATUS_SUSPEND) {
+		if(sanity_check(data)>0) data->uSanityCnt++;
 
-	if (set_sensor_position(data) < 0) {
-		pr_err("[SSP]: %s :set_sensor_position delayed \n", __func__);
+		if (set_sensor_position(data) < 0) {
+			pr_err("[SSP]: %s :set_sensor_position delayed \n", __func__);
+		}
 	}
 
 	for (uSensorCnt = 0; uSensorCnt < (SENSOR_MAX - 1); uSensorCnt++)
@@ -415,17 +417,16 @@ static void debug_work_func(struct work_struct *work)
 		|| (data->uInstFailCnt >= LIMIT_INSTRUCTION_FAIL_CNT)
 		|| (data->uIrqFailCnt >= LIMIT_IRQ_FAIL_CNT)
 		|| ((data->uTimeOutCnt + data->uBusyCnt) > LIMIT_TIMEOUT_CNT))
-		&& (data->bSspShutdown == false)) {
+		&& (data->bSspShutdown == false)
+		&& (data->uLastResumeState != MSG2SSP_AP_STATUS_SUSPEND)) {
 
 		if (data->uResetCnt < LIMIT_RESET_CNT) {
-			wake_lock(&data->ssp_wake_lock);
 			pr_info("[SSP] : %s - uSsdFailCnt(%u), uInstFailCnt(%u),"\
 				"uIrqFailCnt(%u), uTimeOutCnt(%u), uBusyCnt(%u), pending(%u)\n",
 				__func__, data->uSsdFailCnt, data->uInstFailCnt, data->uIrqFailCnt,
 				data->uTimeOutCnt, data->uBusyCnt, !list_empty(&data->pending_list));
 			reset_mcu(data);
 			data->uResetCnt++;
-			wake_unlock(&data->ssp_wake_lock);
 		} else
 			ssp_enable(data, false);
 
@@ -437,6 +438,7 @@ static void debug_work_func(struct work_struct *work)
 	}
 
 	data->uIrqCnt = 0;
+	wake_unlock(&data->ssp_wake_lock);
 }
 
 static void debug_timer_func(unsigned long ptr)

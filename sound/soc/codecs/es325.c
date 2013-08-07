@@ -2643,7 +2643,7 @@ int es325_set_VEQ_max_gain(int volume)
 	static char VEQ_max_gain[6] = {3, 5, 7, 9, 7, 4}; /* index 0 means max volume */
 	static char VEQ_adj_gain[6] = {25, 2, 2, 2, 2, 2};
 #elif defined(CONFIG_MACH_HLTESPR)
-	static char VEQ_max_gain[6] = {5, 5, 7, 9, 7, 4}; /* index 0 means max volume */
+	static char VEQ_max_gain[6] = {4, 5, 7, 9, 7, 4}; /* index 0 means max volume */
 	static char VEQ_adj_gain[6] = {30, 2, 2, 2, 2, 2};	
 #else
 	static char VEQ_max_gain[6] = {3, 5, 7, 9, 7, 4}; /* index 0 means max volume */

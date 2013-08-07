@@ -18,7 +18,7 @@
 #ifdef CONFIG_SENSORS_SSP_BOUNCE_FIRMWARE
 #define SSP_FIRMWARE_REVISION_STM	13082700 /* Latest, 88922*/
 #else
-#define SSP_FIRMWARE_REVISION_STM	13090300 /* Latest, 88922*/
+#define SSP_FIRMWARE_REVISION_STM	13091100 /* Latest, 88922*/
 #endif
 #define SSP_FIRMWARE_REVISION_STM_88921	13072401 /* 88921 */
 #define SSP_FIRMWARE_REVISION_STM_RVS	13051500
@@ -843,6 +843,7 @@ int forced_to_download_binary(struct ssp_data *data, int iBinType)
 	}
 
 	proximity_open_lcd_ldi(data);
+	proximity_open_calibration(data);
 	accel_open_calibration(data);
 	gyro_open_calibration(data);
 	pressure_open_calibration(data);

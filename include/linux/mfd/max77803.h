@@ -156,4 +156,13 @@ extern struct max77803_led_platform_data max77803_led_pdata;
 #ifdef CONFIG_VIDEO_MHL_V2
 int acc_register_notifier(struct notifier_block *nb);
 #endif
+
+#ifdef CONFIG_SEC_H_PROJECT
+#define MAX_SPEAKER_CHECK     60
+#define USB_CONNECTION_READY     0
+#define USB_CONNECTION_DISCONNECTED     1
+extern int speaker_status; // Check speak on/off
+extern void usb_status_send_event(int val); // send uevent
+#endif
+
 #endif				/* __LINUX_MFD_MAX77803_H */

@@ -28,6 +28,7 @@
 #include <mach/rpm-smd.h>
 #include <mach/rpm-regulator-smd.h>
 #include <mach/socinfo.h>
+#include <linux/rtmutex.h>
 
 #ifdef CONFIG_SEC_PM
 #undef PM_FORCE_SEND_SLEEP
@@ -164,7 +165,7 @@ struct rpm_vreg {
 	int			hpm_min_load;
 	int			enable_time;
 	struct spinlock		slock;
-	struct mutex		mlock;
+	struct rt_mutex		mlock;
 	unsigned long		flags;
 	bool			sleep_request_sent;
 	struct msm_rpm_request	*handle_active;
@@ -224,7 +225,7 @@ static inline void rpm_vreg_lock(struct rpm_vreg *rpm_vreg)
 	if (rpm_vreg->allow_atomic)
 		spin_lock_irqsave(&rpm_vreg->slock, rpm_vreg->flags);
 	else
-		mutex_lock(&rpm_vreg->mlock);
+		rt_mutex_lock(&rpm_vreg->mlock);
 }
 
 static inline void rpm_vreg_unlock(struct rpm_vreg *rpm_vreg)
@@ -232,7 +233,7 @@ static inline void rpm_vreg_unlock(struct rpm_vreg *rpm_vreg)
 	if (rpm_vreg->allow_atomic)
 		spin_unlock_irqrestore(&rpm_vreg->slock, rpm_vreg->flags);
 	else
-		mutex_unlock(&rpm_vreg->mlock);
+		rt_mutex_unlock(&rpm_vreg->mlock);
 }
 
 static inline bool rpm_vreg_active_or_sleep_enabled(struct rpm_vreg *rpm_vreg)
@@ -1626,7 +1627,7 @@ static int __devinit rpm_vreg_resource_probe(struct platform_device *pdev)
 	if (rpm_vreg->allow_atomic)
 		spin_lock_init(&rpm_vreg->slock);
 	else
-		mutex_init(&rpm_vreg->mlock);
+		rt_mutex_init(&rpm_vreg->mlock);
 
 	platform_set_drvdata(pdev, rpm_vreg);
 

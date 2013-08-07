@@ -915,17 +915,48 @@ int max77803_muic_get_charging_type(void)
 }
 
 #if defined(CONFIG_SEC_H_PROJECT)
-void max77803_muic_send_event(int val)
+void usb_status_send_event(int val)
 {
-	char *envp[2];
+	char **uevent_envp = NULL;
+	char *cable_ready[2] = { "USB_CONNECTION=READY", NULL };
+	char *cable_disconnected[2]    = { "USB_STATE=DISCONNECTED", NULL };
 
 	if (val == 0)
-		envp[0] = "USB_CONNECTION=READY";
+		uevent_envp = cable_ready;
 	else
-		envp[0] = "USB_CONNECTION=DISCONNECTED";
-	envp[1] = NULL;
-	dev_info(gInfo->dev, "%s\n", __func__);
-	kobject_uevent_env(&gInfo->dev->kobj, KOBJ_CHANGE, envp);
+		uevent_envp = cable_disconnected;
+
+	if (gInfo != NULL && gInfo->dev != NULL ) {
+		dev_info(gInfo->dev, "%s\n", __func__);
+		kobject_uevent_env(&gInfo->dev->kobj, KOBJ_CHANGE, uevent_envp);
+	}
+}
+EXPORT_SYMBOL(usb_status_send_event);
+
+void max77803_muic_usbdelay_attach_work(struct max77803_muic_info *info)
+{
+	if (info == NULL) return;
+
+	pr_info("%s  \n",__func__);
+	info->speaker_check_count = 0;
+	if (work_busy(&info->usb_connection_work.work)) {
+		cancel_delayed_work(&info->usb_connection_work);
+		pr_info("%s cancel_delayed_work  \n",__func__);
+	}
+	usb_status_send_event (USB_CONNECTION_READY); // USB Ready
+	schedule_delayed_work(&info->usb_connection_work, msecs_to_jiffies(1));
+}
+
+void max77803_muic_usbdelay_detach_work(struct max77803_muic_info *info)
+{
+	if (info == NULL) return;
+
+	pr_info("%s  \n",__func__);
+	if (work_busy(&info->usb_connection_work.work)) {
+		cancel_delayed_work(&info->usb_connection_work);
+		printk(KERN_ERR"max77803_muic_handle_detach canceling the work\n");
+	}
+	usb_status_send_event (USB_CONNECTION_DISCONNECTED); // USB Disconnected
 }
 #endif
 
@@ -1186,15 +1217,9 @@ static int max77803_muic_attach_usb_type(struct max77803_muic_info *info,
 #endif				/* CONFIG_USBHUB_USB3803 */
 
 #if defined(CONFIG_SEC_H_PROJECT)
-			info->speaker_check_count = 0;
-			if (work_busy(&info->usb_connection_work.work)) {
-				cancel_delayed_work(&info->usb_connection_work);
-				pr_info("%s cancel_delayed_work  \n",__func__);
-			}
-			max77803_muic_send_event (0); // USB Ready
-			schedule_delayed_work(&info->usb_connection_work, msecs_to_jiffies(1));
+			max77803_muic_usbdelay_attach_work(info);
 #else
-		mdata->usb_cb(USB_CABLE_ATTACHED);
+			mdata->usb_cb(USB_CABLE_ATTACHED);
 #endif
 	}
 
@@ -1754,8 +1779,12 @@ static void max77803_muic_detach_smart_dock(struct max77803_muic_info *info)
 	case CABLE_TYPE_SMARTDOCK_USB_MUIC:
 		pr_info("%s:%s SMARTDOCK+USB\n", DEV_NAME, __func__);
 
-		if (mdata->usb_cb && info->is_usb_ready)
+		if (mdata->usb_cb && info->is_usb_ready) {
+#if defined(CONFIG_SEC_H_PROJECT)
+			max77803_muic_usbdelay_detach_work(info);
+#endif
 			mdata->usb_cb(USB_CABLE_DETACHED);
+		}
 		break;
 	case CABLE_TYPE_SMARTDOCK_MUIC:
 		/* clear CDDelay 500ms */
@@ -1793,8 +1822,13 @@ static void max77803_muic_attach_smart_dock(struct max77803_muic_info *info,
 			pr_info("%s:%s SMART_DOCK+USB=USB Enable\n", DEV_NAME,
 					__func__);
 
-			if (mdata->usb_cb && info->is_usb_ready)
+			if (mdata->usb_cb && info->is_usb_ready) {
+#if defined(CONFIG_SEC_H_PROJECT)
+				max77803_muic_usbdelay_attach_work(info);
+#else
 				mdata->usb_cb(USB_CABLE_ATTACHED);
+#endif
+			}
 
 			info->cable_type = CABLE_TYPE_SMARTDOCK_USB_MUIC;
 		} else
@@ -1848,8 +1882,13 @@ static void max77803_muic_attach_smart_dock(struct max77803_muic_info *info,
 				pr_info("%s:%s SMART_DOCK+USB=USB Enable\n", DEV_NAME,
 						__func__);
 
-				if (mdata->usb_cb && info->is_usb_ready)
+				if (mdata->usb_cb && info->is_usb_ready) {
+#if defined(CONFIG_SEC_H_PROJECT)
+					max77803_muic_usbdelay_attach_work(info);
+#else
 					mdata->usb_cb(USB_CABLE_ATTACHED);
+#endif
+				}
 			}
 		} else {
 			/* set CDDelay 500ms */
@@ -2246,11 +2285,7 @@ static int max77803_muic_handle_detach(struct max77803_muic_info *info, int irq)
 
 		if (mdata->usb_cb && info->is_usb_ready) {
 #if defined(CONFIG_SEC_H_PROJECT)
-			if (work_busy(&info->usb_connection_work.work)) {
-				cancel_delayed_work(&info->usb_connection_work);
-				printk(KERN_ERR"max77803_muic_handle_detach canceling the work\n");
-			}
-			max77803_muic_send_event (1); // USB Disconnected
+			max77803_muic_usbdelay_detach_work(info);
 #endif
 			mdata->usb_cb(USB_CABLE_DETACHED);
 		}
@@ -2693,7 +2728,6 @@ static void max77803_muic_usb_detect(struct work_struct *work)
 
 	if (mdata->usb_cb) {
 		switch (info->cable_type) {
-		case CABLE_TYPE_CDP_MUIC:
 		case CABLE_TYPE_USB_MUIC:
 		case CABLE_TYPE_JIG_USB_OFF_MUIC:
 		case CABLE_TYPE_JIG_USB_ON_MUIC:
@@ -2741,8 +2775,11 @@ static void max77803_muic_dock_usb_detect(struct work_struct *work)
 				"D+,D- line to AP_USB\n", DEV_NAME,
 				__func__);
 			max77803_muic_set_usb_path(info, AP_USB_MODE);
-
+#if defined(CONFIG_SEC_H_PROJECT)
+			max77803_muic_usbdelay_attach_work(info);
+#else
 			mdata->usb_cb(USB_CABLE_ATTACHED);
+#endif
 			break;
 		case CABLE_TYPE_AUDIODOCK_MUIC:
 			pr_info("%s:%s now usb ready, turn"\
@@ -2783,8 +2820,6 @@ static void max77803_muic_mhl_detect(struct work_struct *work)
 
 
 #if defined(CONFIG_SEC_H_PROJECT)
-#define MAX_SPEAKER_CHECK 50
-extern int speaker_status; // Check speak on/off
 void max77803_muic_usb_connection_delay(struct work_struct *work)
 {
 	struct max77803_muic_info *info =
@@ -2803,15 +2838,17 @@ void max77803_muic_usb_connection_delay(struct work_struct *work)
 // Delay the usb connection during speaker on
 	if (speaker_status > 0) {
 		info->speaker_check_count++;
-		if (info->speaker_check_count < MAX_SPEAKER_CHECK) {  // Total 4.5s delay
-			schedule_delayed_work(&info->usb_connection_work, msecs_to_jiffies(100));
+		if (info->speaker_check_count < MAX_SPEAKER_CHECK) {  // Total 3s delay
+			schedule_delayed_work(&info->usb_connection_work, msecs_to_jiffies(50));
 			return;
 		}
 	}
 
 // Do usb connection
 	if (mdata->usb_cb) {
-		if ( info->cable_type == CABLE_TYPE_USB_MUIC)
+		if ( info->cable_type == CABLE_TYPE_USB_MUIC ||
+			info->cable_type == CABLE_TYPE_CDP_MUIC ||
+			info->cable_type == CABLE_TYPE_SMARTDOCK_USB_MUIC)
 			mdata->usb_cb(USB_CABLE_ATTACHED);
 	}
 }
@@ -3224,6 +3261,7 @@ static int max77803_muic_suspend(struct platform_device *pdev,
 			return ret;
 		}
 	}
+
 	return 0;
 }
 
@@ -3265,6 +3303,7 @@ static int max77803_muic_resume(struct platform_device *pdev)
 			}
 		}
 	}
+
 	return 0;
 }
 #endif

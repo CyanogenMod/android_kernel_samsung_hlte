@@ -354,7 +354,9 @@ static int eeprom_config_read_compressed_data(struct msm_eeprom_ctrl_t *e_ctrl,
 	struct msm_eeprom_cfg_data *cdata)
 {
 	int rc = 0;
+#if 0 //  just once to power up when load lib
 	bool down;
+#endif
 
 	uint8_t *buf_comp = NULL;
 	uint8_t *buf_decomp = NULL;
@@ -372,11 +374,13 @@ static int eeprom_config_read_compressed_data(struct msm_eeprom_ctrl_t *e_ctrl,
     goto FREE;
 	}
 
+#if 0 //  just once to power up when load lib
 	rc = msm_eeprom_power_up(e_ctrl, &down);
 	if (rc < 0) {
     pr_err("%s: failed to power on eeprom\n", __func__);
     goto FREE;
 	}
+#endif
 
   rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_read_seq(
     &(e_ctrl->i2c_client), cdata->cfg.read_data.addr,
@@ -414,7 +418,10 @@ static int eeprom_config_read_compressed_data(struct msm_eeprom_ctrl_t *e_ctrl,
 	pr_info("%s: done", __func__);
 
 POWER_DOWN:
+#if 0 //  just once to power up when load lib
 	msm_eeprom_power_down(e_ctrl, down);
+#endif
+
 	FREE:
 	if (buf_comp) kfree(buf_comp);
 	if (buf_decomp) kfree(buf_decomp);

@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_android.c 417976 2013-08-13 11:12:34Z $
+ * $Id: wl_android.c 422577 2013-09-08 05:47:41Z $
  */
 
 #include <linux/module.h>
@@ -228,9 +228,11 @@ typedef struct android_wifi_af_params {
 #define CMD_CHANGE_RL 	"CHANGE_RL"
 #define CMD_RESTORE_RL  "RESTORE_RL"
 
+#ifdef BCMCCX_S69
 /* CISCO S69 commands */
 #define CMD_CCX_S69_ENABLE			"CCX_S69_ENABLE"
 #define CMD_CCX_S69_REQUEST			"CCX_S69_REQUEST"
+#endif
 
 #define CMD_SET_RMC_ENABLE			"SETRMCENABLE"
 #define CMD_SET_RMC_TXRATE			"SETRMCTXRATE"
@@ -2548,6 +2550,7 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		acktimeout *= 1000;
 		bytes_written = wldev_iovar_setint(net, "rmc_acktmo", acktimeout);
 	}
+#ifdef BCMCCX_S69
 	else if (strnicmp(command, CMD_CCX_S69_ENABLE, strlen(CMD_CCX_S69_ENABLE)) == 0) {
 		uint enable = *(command + strlen(CMD_CCX_S69_ENABLE) + 1) - '0';
 		bytes_written = wldev_iovar_setint(net, "ccx_s69_enable", enable);
@@ -2557,6 +2560,7 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		uint16 req = (uint16)bcm_strtoul(command + skip, NULL, 16);
 		bytes_written = wldev_iovar_setint(net, "ccx_s69_req", req);
 	}
+#endif /* BCMCCX_S69 */
 #endif /* CUSTOMER_HW4 */
 	else if (strnicmp(command, CMD_HAPD_MAC_FILTER, strlen(CMD_HAPD_MAC_FILTER)) == 0) {
 		int skip = strlen(CMD_HAPD_MAC_FILTER) + 1;
@@ -2713,9 +2717,11 @@ s32 wl_event_to_bcm_event(u16 event_type)
 		case WLC_E_P2PO_DEL_DEVICE:
 			event = BCM_E_DEV_LOST;
 			break;
+#ifdef BCMCCX_S69
 		case WLC_E_CCX_S69_RESP_RX:
 			event = BCM_E_DEV_S69RESP;
 			break;
+#endif
 	/* Above events are supported from BCM Supp ver 47 Onwards */
 
 		default:
