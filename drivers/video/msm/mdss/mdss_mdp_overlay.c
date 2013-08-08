@@ -1432,15 +1432,6 @@ pan_display_error:
 	mutex_unlock(&mdp5_data->ov_lock);
 }
 
-static void mdss_mdp_overlay_dispatch_vsync(struct work_struct *work)
-{
-	struct mdss_overlay_private *mdp5_data;
-	mdp5_data = container_of(work, struct mdss_overlay_private, vsync_work);
-	if (mdp5_data->ctl && mdp5_data->ctl->mfd)
-		sysfs_notify(&mdp5_data->ctl->mfd->fbi->dev->kobj, NULL,
-				"vsync_event");
-}
-
 /* function is called in irq context should have minimum processing */
 static void mdss_mdp_overlay_handle_vsync(struct mdss_mdp_ctl *ctl,
 						ktime_t t)
@@ -1457,7 +1448,7 @@ static void mdss_mdp_overlay_handle_vsync(struct mdss_mdp_ctl *ctl,
 	pr_debug("vsync on fb%d play_cnt=%d\n", mfd->index, ctl->play_cnt);
 
 	mdp5_data->vsync_time = t;
-	schedule_work(&mdp5_data->vsync_work);
+	sysfs_notify_dirent(mdp5_data->vsync_event_sd);
 }
 
 int mdss_mdp_overlay_vsync_ctrl(struct msm_fb_data_type *mfd, int en)
@@ -2332,7 +2323,6 @@ int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd)
 
 	INIT_LIST_HEAD(&mdp5_data->pipes_used);
 	INIT_LIST_HEAD(&mdp5_data->pipes_cleanup);
-	INIT_WORK(&mdp5_data->vsync_work, mdss_mdp_overlay_dispatch_vsync);
 	mutex_init(&mdp5_data->ov_lock);
 	mdp5_data->hw_refresh = true;
 	mdp5_data->overlay_play_enable = true;
@@ -2368,6 +2358,15 @@ int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd)
 			&mdp5_data->mdata->pdev->dev.kobj, "mdp");
 	if (rc)
 		pr_warn("problem creating link to mdp sysfs\n");
+
+
+	mdp5_data->vsync_event_sd = sysfs_get_dirent(dev->kobj.sd, NULL,
+						     "vsync_event");
+	if (!mdp5_data->vsync_event_sd) {
+		pr_err("vsync_event sysfs lookup failed\n");
+		rc = -ENODEV;
+		goto init_fail;
+	}
 
 	pm_runtime_set_suspended(&mfd->pdev->dev);
 	pm_runtime_enable(&mfd->pdev->dev);

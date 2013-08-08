@@ -42,10 +42,10 @@ struct mdp3_session_data {
 	struct msm_fb_data_type *mfd;
 	ktime_t vsync_time;
 	int vsync_period;
+	struct sysfs_dirent *vsync_event_sd;
 	struct mdp_overlay overlay;
 	struct mdp3_buffer_queue bufq_in;
 	struct mdp3_buffer_queue bufq_out;
-	struct work_struct vsync_work;
 };
 
 int mdp3_ctrl_init(struct msm_fb_data_type *mfd);
