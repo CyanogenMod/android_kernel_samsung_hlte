@@ -1411,15 +1411,10 @@ int mdss_mdp_overlay_vsync_ctrl(struct msm_fb_data_type *mfd, int en)
 	if (!ctl->add_vsync_handler || !ctl->remove_vsync_handler)
 		return -ENOTSUPP;
 
-	rc = mutex_lock_interruptible(&ctl->lock);
-	if (rc)
-		return rc;
-
 	if (!ctl->power_on) {
 		pr_debug("fb%d vsync pending first update en=%d\n",
 				mfd->index, en);
 		mdp5_data->vsync_pending = en;
-		mutex_unlock(&ctl->lock);
 		return 0;
 	}
 
@@ -1431,8 +1426,6 @@ int mdss_mdp_overlay_vsync_ctrl(struct msm_fb_data_type *mfd, int en)
 	else
 		rc = ctl->remove_vsync_handler(ctl, &ctl->vsync_handler);
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
-
-	mutex_unlock(&ctl->lock);
 
 	return rc;
 }
