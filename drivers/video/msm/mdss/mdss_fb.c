@@ -1,4 +1,4 @@
-/*
+ /*
  * Core MDSS framebuffer driver.
  *
  * Copyright (C) 2007 Google Incorporated
@@ -453,7 +453,6 @@ static int mdss_fb_probe(struct platform_device *pdev)
 		mfd->mdp_sync_pt_data.threshold = 1;
 	else
 		mfd->mdp_sync_pt_data.threshold = 2;
-
 
 	mdss_fb_send_panel_event(mfd, MDSS_EVENT_FB_REGISTERED, fbi);
 	return rc;
