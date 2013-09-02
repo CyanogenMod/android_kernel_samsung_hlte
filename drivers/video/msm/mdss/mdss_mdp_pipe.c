@@ -85,7 +85,7 @@ static u32 mdss_mdp_smp_mmb_reserve(struct mdss_mdp_pipe_smp_map *smp_map,
 	 */
 	mdss_mdp_smp_mmb_free(smp_map->reserved, false);
 
-	/* Reserve mmb blocks*/
+	/* reserve more blocks if needed, but can't free mmb at this point */
 	for (; i < n; i++) {
 		if (bitmap_full(mdata->mmb_alloc_map, SMP_MB_CNT))
 			break;
