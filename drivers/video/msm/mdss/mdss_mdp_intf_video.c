@@ -18,6 +18,7 @@
 #include <linux/dma-mapping.h>
 
 #include "mdss_mdp.h"
+#include "mdss_panel.h"
 
 #include "mdss_dsi.h"
 

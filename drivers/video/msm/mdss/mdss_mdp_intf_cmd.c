@@ -16,8 +16,8 @@
 #include "mdss_mdp.h"
 #include "mdss_dsi.h"
 #include "mdss_fb.h"
-
 #include "mdss_panel.h"
+
 #define VSYNC_EXPIRE_TICK 4
 
 #define START_THRESHOLD 4
@@ -529,11 +529,10 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 #else
 			WARN(1, "mdss_mdp_cmd_wait4pingpong timeout");
 #endif
-                
-                WARN(1, "cmd kickoff timed out (%d) ctl=%d\n",
-                     rc, ctl->num);
-                mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_TIMEOUT);
-            rc = -EPERM;
+			WARN(1, "cmd kickoff timed out (%d) ctl=%d\n",
+						rc, ctl->num);
+			rc = -EPERM;
+			mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_TIMEOUT);
 		} else {
 			mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_DONE);
 			rc = 0;

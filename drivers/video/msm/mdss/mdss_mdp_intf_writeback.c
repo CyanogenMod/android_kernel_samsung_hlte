@@ -364,7 +364,7 @@ static int mdss_mdp_wb_wait4comp(struct mdss_mdp_ctl *ctl, void *arg)
 		mdss_dsi_dump_power_clk(ctl->panel_data, 0);
 		mdss_mdp_dump_power_clk();
 #endif
-        mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_TIMEOUT);
+		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_TIMEOUT);
 		rc = -ENODEV;
 		WARN(1, "writeback kickoff timed out (%d) ctl=%d\n",
              rc, ctl->num);

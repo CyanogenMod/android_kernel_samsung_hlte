@@ -187,6 +187,8 @@ struct mdss_mdp_ctl {
 	int (*config_fps_fnc) (struct mdss_mdp_ctl *ctl, int new_fps);
 	struct blocking_notifier_head notifier_head;
 
+	struct blocking_notifier_head notifier_head;
+
 	void *priv_data;
 	u32 wb_type;
 };

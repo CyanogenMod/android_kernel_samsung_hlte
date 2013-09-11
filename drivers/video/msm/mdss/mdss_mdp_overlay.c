@@ -812,6 +812,7 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd)
 	mdss_dbg_tick_save(KICKOFF);
 #endif
 	struct mdss_mdp_ctl *tmp;
+	int ret = 0;
 
 	if (ctl->shared_lock)
 		mutex_lock(ctl->shared_lock);
