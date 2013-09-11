@@ -18,6 +18,7 @@
 #include <linux/io.h>
 #include <linux/msm_mdp.h>
 #include <linux/platform_device.h>
+#include <linux/notifier.h>
 
 #include "mdss.h"
 #include "mdss_mdp_hwio.h"
@@ -172,6 +173,8 @@ struct mdss_mdp_ctl {
 	int (*remove_vsync_handler) (struct mdss_mdp_ctl *,
 					struct mdss_mdp_vsync_handler *);
 	int (*config_fps_fnc) (struct mdss_mdp_ctl *ctl, int new_fps);
+	struct blocking_notifier_head notifier_head;
+
 	void *priv_data;
 };
 
@@ -454,6 +457,11 @@ int mdss_mdp_ctl_stop(struct mdss_mdp_ctl *ctl);
 int mdss_mdp_ctl_intf_event(struct mdss_mdp_ctl *ctl, int event, void *arg);
 int mdss_mdp_perf_calc_pipe(struct mdss_mdp_pipe *pipe,
 		struct mdss_mdp_perf_params *perf);
+int mdss_mdp_ctl_notify(struct mdss_mdp_ctl *ctl, int event);
+void mdss_mdp_ctl_notifier_register(struct mdss_mdp_ctl *ctl,
+	struct notifier_block *notifier);
+void mdss_mdp_ctl_notifier_unregister(struct mdss_mdp_ctl *ctl,
+	struct notifier_block *notifier);
 
 struct mdss_mdp_mixer *mdss_mdp_wb_mixer_alloc(int rotator);
 int mdss_mdp_wb_mixer_destroy(struct mdss_mdp_mixer *mixer);

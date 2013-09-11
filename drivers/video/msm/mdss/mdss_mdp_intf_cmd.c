@@ -12,12 +12,12 @@
  */
 
 #include <linux/kernel.h>
-#include "mdss_panel.h"
+
 #include "mdss_mdp.h"
 #include "mdss_dsi.h"
 #include "mdss_fb.h"
 
-
+#include "mdss_panel.h"
 #define VSYNC_EXPIRE_TICK 4
 
 #define START_THRESHOLD 4
@@ -522,17 +522,22 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 				mdss_mdp_debug_bus();
 				xlog_dump();
 #endif
-				panic("mdss_mdp_cmd_wait4pingpong timeout");
+				//panic("mdss_mdp_cmd_wait4pingpong timeout");
 			}
-			else
-				rc = -EPERM;
+
 #endif
 #else
 			WARN(1, "mdss_mdp_cmd_wait4pingpong timeout");
 #endif
-		}
-		else
+                
+                WARN(1, "cmd kickoff timed out (%d) ctl=%d\n",
+                     rc, ctl->num);
+                mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_TIMEOUT);
+            rc = -EPERM;
+		} else {
+			mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_DONE);
 			rc = 0;
+		}
 	}
 #if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
 	xlog(__func__, ctx->koff_cnt, ctx->clk_enabled, ctx->rdptr_enabled, 0, rc);

@@ -13,10 +13,10 @@
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
-#include "mdss_fb.h"
 #include "mdss_mdp.h"
 #include "mdss_dsi.h"
 #include "mdss_mdp_rotator.h"
+#include "mdss_panel.h"
 
 enum mdss_mdp_writeback_type {
 	MDSS_MDP_WRITEBACK_TYPE_ROTATOR,
@@ -359,12 +359,13 @@ static int mdss_mdp_wb_wait4comp(struct mdss_mdp_ctl *ctl, void *arg)
 		mdp5_dump_regs();
 		mdss_dsi_dump_power_clk(ctl->panel_data, 0);
 		mdss_mdp_dump_power_clk();
-		panic("writeback kickoff timed out");
-#else
-		WARN(1, "writeback kickoff timed out (%d) ctl=%d\n", rc, ctl->num);
 #endif
-
+        mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_TIMEOUT);
+		rc = -ENODEV;
+		WARN(1, "writeback kickoff timed out (%d) ctl=%d\n",
+             rc, ctl->num);
 	} else {
+		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_DONE);
 		rc = 0;
 	}
 
@@ -372,8 +373,8 @@ static int mdss_mdp_wb_wait4comp(struct mdss_mdp_ctl *ctl, void *arg)
 
 	ctx->comp_cnt--;
 
-	//return rc;
-	return 0;
+	return rc;
+    
 }
 
 static int mdss_mdp_writeback_display(struct mdss_mdp_ctl *ctl, void *arg)
