@@ -453,12 +453,19 @@ static int mdss_fb_probe(struct platform_device *pdev)
 			__mdss_fb_sync_buf_done_callback;
 	}
 
-	if (mfd->panel.type == WRITEBACK_PANEL) {
+	switch (mfd->panel.type) {
+	case WRITEBACK_PANEL:
+		mfd->mdp_sync_pt_data.threshold = 1;
+		mfd->mdp_sync_pt_data.retire_threshold = 0;
+		break;
+	case MIPI_CMD_PANEL:
 		mfd->mdp_sync_pt_data.threshold = 1;
 		mfd->mdp_sync_pt_data.retire_threshold = 1;
-	} else {
+		break;
+	default:
 		mfd->mdp_sync_pt_data.threshold = 2;
 		mfd->mdp_sync_pt_data.retire_threshold = 0;
+		break;
 	}
 
 	mdss_fb_send_panel_event(mfd, MDSS_EVENT_FB_REGISTERED, fbi);
