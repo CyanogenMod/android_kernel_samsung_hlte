@@ -73,9 +73,11 @@ static bool suspended;
 static long power_on_alarm;
 struct alarm *wakeup_alarm;
 
+static void alarm_shutdown(struct platform_device *dev);
 void set_power_on_alarm(long secs)
 {
 	power_on_alarm = secs;
+	alarm_shutdown(NULL);
 }
 
 
