@@ -875,8 +875,6 @@ static int dsi_pll_lock_status(void)
 	u32 status;
 	int pll_locked = 0;
 
-	dsi_pll_toggle_lock_detect();
-
 	/* poll for PLL ready status */
 	if (readl_poll_timeout_noirq((mdss_dsi_base +
 			DSI_0_PHY_PLL_UNIPHY_PLL_STATUS),
@@ -895,6 +893,12 @@ static int dsi_pll_lock_status(void)
 
 
 	return pll_locked;
+}
+
+static inline int dsi_pll_toggle_lock_detect_and_check_status(void)
+{
+	dsi_pll_toggle_lock_detect();
+	return dsi_pll_lock_status();
 }
 
 static void dsi_pll_software_reset(void)
@@ -974,7 +978,7 @@ static int dsi_pll_enable_seq_d(void)
 	DSS_REG_W(mdss_dsi_base, DSI_0_PHY_PLL_UNIPHY_PLL_GLB_CFG, 0x0f);
 	udelay(1);
 
-	pll_locked = dsi_pll_lock_status();
+	pll_locked = dsi_pll_toggle_lock_detect_and_check_status();
 	pr_debug("%s: PLL status = %s\n", __func__,
 		pll_locked ? "Locked" : "Unlocked");
 
@@ -1003,7 +1007,7 @@ static int dsi_pll_enable_seq_f1(void)
 	DSS_REG_W(mdss_dsi_base, DSI_0_PHY_PLL_UNIPHY_PLL_GLB_CFG, 0x0f);
 	udelay(1000);
 
-	pll_locked = dsi_pll_lock_status();
+	pll_locked = dsi_pll_toggle_lock_detect_and_check_status();
 	pr_debug("%s: PLL status = %s\n", __func__,
 		pll_locked ? "Locked" : "Unlocked");
 
@@ -1028,7 +1032,7 @@ static int dsi_pll_enable_seq_c(void)
 	DSS_REG_W(mdss_dsi_base, DSI_0_PHY_PLL_UNIPHY_PLL_GLB_CFG, 0x0f);
 	udelay(1000);
 
-	pll_locked = dsi_pll_lock_status();
+	pll_locked = dsi_pll_toggle_lock_detect_and_check_status();
 	pr_debug("%s: PLL status = %s\n", __func__,
 		pll_locked ? "Locked" : "Unlocked");
 
@@ -1054,7 +1058,7 @@ static int dsi_pll_enable_seq_e(void)
 	DSS_REG_W(mdss_dsi_base, DSI_0_PHY_PLL_UNIPHY_PLL_GLB_CFG, 0x0f);
 	udelay(1000);
 
-	pll_locked = dsi_pll_lock_status();
+	pll_locked = dsi_pll_toggle_lock_detect_and_check_status();
 	pr_debug("%s: PLL status = %s\n", __func__,
 		pll_locked ? "Locked" : "Unlocked");
 
