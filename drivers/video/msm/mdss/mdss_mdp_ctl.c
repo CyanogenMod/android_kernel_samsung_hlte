@@ -17,6 +17,7 @@
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
 #include <linux/delay.h>
+#include <linux/sort.h>
 
 #include "mdss_fb.h"
 #include "mdss_mdp.h"
@@ -24,17 +25,8 @@
 extern bool first_update;
 /* truncate at 1k */
 #define MDSS_MDP_BUS_FACTOR_SHIFT 10
-/* 1.5 ib bus fudge factor */
-#define MDSS_MDP_BUS_FUDGE_FACTOR_IB(val) ((val / 2) * 3)
-#define MDSS_MDP_BUS_FUDGE_FACTOR_HIGH_IB(val) (val << 1)
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) \
-     || defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL)
-/* 1.0 ab bus fudge factor */
-#define MDSS_MDP_BUS_FUDGE_FACTOR_AB(val) (val)
-#else
-/* 2.0 ab bus fudge factor */
-#define MDSS_MDP_BUS_FUDGE_FACTOR_AB(val) (val << 1)
-#endif
+/* 1.5 bus fudge factor */
+#define MDSS_MDP_BUS_FUDGE_FACTOR_AB(val) mult_frac(val, 5, 4)
 #define MDSS_MDP_BUS_FLOOR_BW (1600000000ULL >> MDSS_MDP_BUS_FACTOR_SHIFT)
 
 /* 1.25 clock fudge factor */
@@ -113,13 +105,7 @@ static void __mdss_mdp_ctrl_perf_ovrd(struct mdss_data_type *mdata,
 		ovrd |= __mdss_mdp_ctrl_perf_ovrd_helper(
 				ctl->mixer_right, &npipe);
 	}
-
 	*ab_quota = MDSS_MDP_BUS_FUDGE_FACTOR_AB(*ab_quota);
-	if (npipe > 1)
-		*ib_quota = MDSS_MDP_BUS_FUDGE_FACTOR_HIGH_IB(*ib_quota);
-	else
-		*ib_quota = MDSS_MDP_BUS_FUDGE_FACTOR_IB(*ib_quota);
-
 	if (ovrd && (*ib_quota < MDSS_MDP_BUS_FLOOR_BW)) {
 		*ib_quota = MDSS_MDP_BUS_FLOOR_BW;
 		pr_debug("forcing the BIMC clock to 200 MHz : %llu bytes",
@@ -157,7 +143,6 @@ static int mdss_mdp_ctl_perf_commit(struct mdss_data_type *mdata, u32 flags)
 		}
 	}
 	if (flags & MDSS_MDP_PERF_UPDATE_BUS) {
-		bus_ab_quota = bus_ib_quota;
 		if (!is_hdmi_using) {
 #if !(defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) \
      || defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL))
@@ -264,9 +249,11 @@ int mdss_mdp_perf_calc_pipe(struct mdss_mdp_pipe *pipe,
 		rate /= 4; /* block mode fetch at 4 pix/clk */
 		quota *= 2; /* bus read + write */
 		perf->ib_quota = quota;
-	} else {
-		perf->ib_quota = (quota / pipe->dst.h) * v_total;
-	}
+	} else
+		perf->ib_quota = (src_h > pipe->dst.h) ?
+			(quota / pipe->dst.h) * v_total :
+			(quota / src_h) * v_total;
+
 	perf->ab_quota = quota;
 	perf->mdp_clk_rate = rate;
 
@@ -288,6 +275,16 @@ int mdss_mdp_perf_calc_pipe(struct mdss_mdp_pipe *pipe,
 	return 0;
 }
 
+static inline int mdss_mdp_perf_is_overlap(u32 y00, u32 y01, u32 y10, u32 y11)
+{
+	return (y10 < y00 && y11 >= y01) || (y10 >= y00 && y10 <= y01);
+}
+
+static inline int cmpu32(const void *a, const void *b)
+{
+	return (*(u32 *)a < *(u32 *)b) ? -1 : 0;
+}
+
 static void mdss_mdp_perf_mixer_update(struct mdss_mdp_mixer *mixer,
 				       u32 *bus_ab_quota, u32 *bus_ib_quota,
 				       u32 *clk_rate)
@@ -297,10 +294,10 @@ static void mdss_mdp_perf_mixer_update(struct mdss_mdp_mixer *mixer,
 	int fps = DEFAULT_FRAME_RATE;
 	u32 v_total;
 	int i;
-	u32 max_clk_rate = 0, ab_total = 0, ib_total = 0;
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_WVGA_S6E88A0_PT_PANEL)
-	int pipe_cnt = 0, backend_cnt = 0; // QCT_0822
-#endif
+	u32 max_clk_rate = 0, ab_total = 0;
+	u32 ib_max = 0, ib_max_smp = 0;
+	u32 ib_quota[MDSS_MDP_MAX_STAGE];
+	u32 v_region[MDSS_MDP_MAX_STAGE * 2];
 
 	*bus_ab_quota = 0;
 	*bus_ib_quota = 0;
@@ -329,6 +326,9 @@ static void mdss_mdp_perf_mixer_update(struct mdss_mdp_mixer *mixer,
 		}
 	}
 
+	memset(ib_quota, 0, sizeof(u32) * MDSS_MDP_MAX_STAGE);
+	memset(v_region, 0, sizeof(u32) * MDSS_MDP_MAX_STAGE * 2);
+
 	for (i = 0; i < MDSS_MDP_MAX_STAGE; i++) {
 		struct mdss_mdp_perf_params perf;
 
@@ -340,29 +340,67 @@ static void mdss_mdp_perf_mixer_update(struct mdss_mdp_mixer *mixer,
 			continue;
 
 		ab_total += perf.ab_quota >> MDSS_MDP_BUS_FACTOR_SHIFT;
-		ib_total += perf.ib_quota >> MDSS_MDP_BUS_FACTOR_SHIFT;
+		ib_quota[i] = perf.ib_quota >> MDSS_MDP_BUS_FACTOR_SHIFT;
+		v_region[2*i] = pipe->dst.y;
+		v_region[2*i + 1] = pipe->dst.y + pipe->dst.h;
 		if (perf.mdp_clk_rate > max_clk_rate)
 			max_clk_rate = perf.mdp_clk_rate;
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_WVGA_S6E88A0_PT_PANEL)
-		// QCT_0822 [
-		pipe_cnt++;
-		if (pipe->flags & MDP_BACKEND_COMPOSITION)
-			backend_cnt++;
-		// QCT_0822 ]
-#endif
 	}
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_WVGA_S6E88A0_PT_PANEL)
-	//QCT_0822 [
-	if (pipe_cnt == 1 && backend_cnt == 0) {
-		pr_debug("GPU fall-back case, ab/ib will be increased to 10 percent \n");
-		ab_total = (ab_total*11)/10;
-		ib_total = (ib_total*11)/10;
+
+	/*
+	 * Sort the v_region array so the total display area can be
+	 * divided into individual regions. Check how many pipes fetch
+	 * data for each region and sum them up , then the worst case
+	 * of all regions is ib request.
+	 */
+	sort(v_region, MDSS_MDP_MAX_STAGE * 2, sizeof(u32), cmpu32, NULL);
+	for (i = 1; i < MDSS_MDP_MAX_STAGE * 2; i++) {
+		int j;
+		u32 ib_max_region = 0;
+		u32 y0, y1;
+		pr_debug("v_region[%d]%d\n", i, v_region[i]);
+		if (v_region[i] == v_region[i-1])
+			continue;
+		y0 = (v_region[i-1]) ? v_region[i-1] + 1 : 0 ;
+		y1 = v_region[i];
+		for (j = 0; j < MDSS_MDP_MAX_STAGE; j++) {
+			if (!ib_quota[j])
+				continue;
+			pipe = mixer->stage_pipe[j];
+			if (mdss_mdp_perf_is_overlap
+			    (y0, y1, pipe->dst.y, (pipe->dst.y + pipe->dst.h)))
+				ib_max_region += ib_quota[j];
+			pr_debug("v[%d](%d, %d)pipe[%d](%d,%d)quota=%d max=%d\n",
+				i, y0, y1, j, pipe->dst.y,
+				pipe->dst.y + pipe->dst.h, ib_quota[j],
+				ib_max_region);
+		}
+		ib_max = max(ib_max, ib_max_region);
 	}
-	//QCT_0822 ]
-#endif
+
+	/*
+	 * bw due to the smp concurrent fetching. Since this is the
+	 * time that all pipes fetching lines, scaling is not a factor.
+	 */
+	for (i = 0; i < MDSS_MDP_MAX_STAGE; i++) {
+		u32 src_h, dst_h;
+		u32 ib_smp = 0;
+		if (!ib_quota[i])
+			continue;
+		pipe = mixer->stage_pipe[i];
+		src_h = pipe->src.h >> pipe->vert_deci;
+		dst_h = pipe->dst.h;
+		ib_smp = (src_h && src_h > dst_h) ?
+			mult_frac(ib_quota[i], dst_h, src_h) : ib_quota[i];
+		ib_max_smp += ib_smp;
+		pr_debug("src_h=%d dst_h=%d ib_q=%d ib_s=%d ib_max_smp=%d\n",
+			src_h, dst_h, ib_quota[i], ib_smp, ib_max_smp);
+	}
+	pr_debug("ib_max_region=%d ib_max_smp=%d\n", ib_max, ib_max_smp);
+	ib_max = max(ib_max, ib_max_smp);
 
 	*bus_ab_quota += ab_total;
-	*bus_ib_quota += ib_total;
+	*bus_ib_quota += ib_max;
 	if (max_clk_rate > *clk_rate)
 		*clk_rate = max_clk_rate;
 
