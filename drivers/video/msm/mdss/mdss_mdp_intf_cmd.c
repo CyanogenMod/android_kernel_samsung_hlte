@@ -636,6 +636,10 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl)
 #if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
 	xlog(__func__, ctx->koff_cnt, ctx->clk_enabled, ctx->rdptr_enabled, 0, 0x11111);
 #endif
+
+	list_for_each_entry_safe(handle, tmp, &ctx->vsync_handlers, list)
+		mdss_mdp_cmd_remove_vsync_handler(ctl, handle);
+
 	spin_lock_irqsave(&ctx->clk_lock, flags);
 	if (ctx->rdptr_enabled) {
 		INIT_COMPLETION(ctx->stop_comp);
@@ -654,9 +658,6 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl)
 	mdss_mdp_cmd_clk_off(ctx);
 
 	ctx->panel_on = 0;
-
-	list_for_each_entry_safe(handle, tmp, &ctx->vsync_handlers, list)
-		mdss_mdp_cmd_remove_vsync_handler(ctl, handle);
 
 	mdss_mdp_set_intr_callback(MDSS_MDP_IRQ_PING_PONG_RD_PTR, ctx->pp_num,
 				   NULL, NULL);
