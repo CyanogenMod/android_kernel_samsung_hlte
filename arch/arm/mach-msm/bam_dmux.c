@@ -30,6 +30,7 @@
 #include <linux/of.h>
 #include <linux/srcu.h>
 #include <mach/msm_ipc_logging.h>
+#include <linux/srcu.h>
 #include <mach/sps.h>
 #include <mach/bam_dmux.h>
 #include <mach/msm_smsm.h>
