@@ -1,0 +1,165 @@
+/* Copyright (c) 2012, Samsung Electronics Corporation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/ {
+
+	qcom,mdss_dsi_samsung_octa_720p_video {
+		compatible = "samsung,mdss-amoled-dsi-panel";
+		label = "samsung amoled 720p video mode dsi S6E8AA3X01 panel";
+		status = "disable";
+		qcom,dsi-ctrl-phandle = <&mdss_dsi0>;
+		qcom,rst-gpio = <&pm8941_gpios 19 0>;
+		qcom,mdss-pan-res = <720 1280>;
+		qcom,mdss-pan-bpp = <24>;
+		qcom,mdss-pan-dest = "display_1";
+		qcom,mdss-pan-porch-values = <50 3 250 1 2 13>;
+		qcom,mdss-pan-underflow-clr = <0xff>;
+		qcom,mdss-pan-bl-ctrl = "bl_ctrl_dcs_cmds";
+		qcom,mdss-pan-bl-levels = <1 255>;
+		qcom,mdss-pan-dsi-mode = <0>;
+		qcom,mdss-pan-dsi-h-pulse-mode = <0>;
+		qcom,mdss-pan-dsi-h-power-stop = <0 0 0>;
+		qcom,mdss-pan-dsi-bllp-power-stop = <1 1>;
+		qcom,mdss-pan-dsi-traffic-mode = <2>;
+		qcom,mdss-pan-dsi-dst-format = <3>;
+		qcom,mdss-pan-dsi-vc = <0>;
+		qcom,mdss-pan-dsi-rgb-swap = <0>;
+		qcom,mdss-force-clk-lane-hs = <1>;
+		samsung,mdss-early-lcd-on = <1>;
+		qcom,mdss-pan-dsi-data-lanes = <1 1 1 1>;
+		qcom,mdss-pan-dsi-dlane-swap = <0>;
+		qcom,mdss-pan-dsi-t-clk = <0x1b 0x04>;
+		qcom,mdss-pan-dsi-stream = <0>;
+		qcom,mdss-pan-dsi-mdp-tr = <0x0>;
+		qcom,mdss-pan-dsi-dma-tr = <0x04>;
+		qcom,mdss-pan-frame-rate = <58>;
+		qcom,panel-phy-regulatorSettings = [03 01 01 00  /* Regualotor settings */
+						    20 00 01];
+		qcom,panel-phy-timingSettings = [82 1D 13 00 42 45
+						    18 20 21 03 04 00];
+		qcom,panel-phy-strengthCtrl = [77 06];
+		qcom,panel-phy-bistCtrl = [00 00 b1 ff           /* BIST Ctrl settings */
+					   00 00];
+		qcom,panel-phy-laneConfig = [00 c2 45 00 00 00 00 01 75 /* lane0 config */
+					     00 c2 45 00 00 00 00 01 75 /* lane1 config */
+					     00 c2 45 00 00 00 00 01 75 /* lane2 config */
+					     00 c2 45 00 00 00 00 01 75 /* lane3 config */
+					     00 02 45 00 00 00 00 01 97]; /* Clk ln config */
+
+		qcom,panel-on-cmds = [29 01 00 00 00 03 f0 5a 5a /* Tesk key ON */
+					05 01 00 00 14 02 11 00  /* Sleep out */
+					29 01 00 00 00 22                   /* Brightness Cond Set 1 */
+                                                ca 01 00 01 00 01 00 80
+						80 80 80 80 80 80 80 80
+						80 80 80 80 80 80 80 80
+						80 80 80 80 80 80 80 02
+						03 02
+					23 01 00 00 00 02 f7 03		/* Brightness Cond Set 2 */
+					23 01 00 00 00 02 53 20		/* Brightness Control ON */
+					23 01 00 00 00 02 51 ff		/* Brightness Control AOR 0 */
+					29 01 00 00 00 03 b6 08 0b /* ELVSS  */
+					23 01 00 00 72 02 55 00	   /* Etc Cond Set */
+					05 01 00 00 32 02 29 00];
+		qcom,on-cmds-dsi-state = "DSI_LP_MODE";
+		qcom,panel-off-cmds = [05 01 00 00 32 02 28 00
+					05 01 00 00 78 02 10 00];
+		qcom,off-cmds-dsi-state = "DSI_HS_MODE";
+
+		/*
+			the last byte in read commands  represent READ LENGH,
+			like below  READ LENGH = 0x21
+		 */
+		samsung,panel-nv-read-cmds = [ 06 01 00 00 00 01 c8 21 ];
+		samsung,panel-nv-read-enable-cmds = [ 29 01 00 00 00 03 f0 5a 5a
+							29 01 00 00 00 03 fc 5a 5a ];
+		samsung,panel-nv-read-disable-cmds = [ 29 01 00 00 00 03 f0 a5 a5 ];
+
+		/* the last byte in all read commands will represent READ LENGH */
+		samsung,panel-manufacture-id-read-cmds = [ 06 01 00 00 00 01 da 01
+							   06 01 00 00 00 01 db 01
+							   06 01 00 00 00 01 dc 01];
+
+               qcom,panel-display-on-cmds = [05 01 00 00 32 02 29 00];
+               qcom,panel-display-off-cmds = [05 01 00 00 32 02 29 00];
+               samsung,panel-acl-off-cmds = [23 01 00 00 72 02 55 00];
+               samsung,panel-acl-cmds-list = [23 01 00 00 72 02 55 00 /* 0 */
+                                               23 01 00 00 72 02 55 01 /* 1 */
+                                               23 01 00 00 72 02 55 02 /* 2 */
+                                               23 01 00 00 72 02 55 03]; /* 3 */
+
+
+               samsung,panel-elvss-cmds-list = [29 01 00 00 00 03 b6 08 20 /* 0 */
+                                               29 01 00 00 00 03 b6 08 20   /* 1 */
+                                               29 01 00 00 00 03 b6 08 20   /* 2 */
+                                               29 01 00 00 00 03 b6 08 20   /* 3 */
+                                               29 01 00 00 00 03 b6 08 1f   /* 4 */
+                                               29 01 00 00 00 03 b6 08 1f   /* 5 */
+                                               29 01 00 00 00 03 b6 08 1f   /* 6 */
+                                               29 01 00 00 00 03 b6 08 1e   /* 7 */
+                                               29 01 00 00 00 03 b6 08 1e   /* 8 */
+                                               29 01 00 00 00 03 b6 08 1c   /* 9 */
+                                               29 01 00 00 00 03 b6 08 1b   /* 10 */
+                                               29 01 00 00 00 03 b6 08 19   /* 11 */
+                                               29 01 00 00 00 03 b6 08 17   /* 12 */
+                                               29 01 00 00 00 03 b6 08 16   /* 13 */
+                                               29 01 00 00 00 03 b6 08 14   /* 14 */
+                                               29 01 00 00 00 03 b6 08 12   /* 15 */
+                                               29 01 00 00 00 03 b6 08 10   /* 16*/
+                                               29 01 00 00 00 03 b6 08 0f   /* 17 */
+                                               29 01 00 00 00 03 b6 08 15   /* 18 */
+                                               29 01 00 00 00 03 b6 08 14   /* 19 */
+                                               29 01 00 00 00 03 b6 08 13   /* 20 */
+                                               29 01 00 00 00 03 b6 08 12   /* 21 */
+                                               29 01 00 00 00 03 b6 08 11   /* 22 */
+                                               29 01 00 00 00 03 b6 08 10   /* 23 */
+                                               29 01 00 00 00 03 b6 08 10   /* 24 */
+                                               29 01 00 00 00 03 b6 08 0f   /* 25 */
+                                               29 01 00 00 00 03 b6 08 0e   /* 26 */
+                                               29 01 00 00 00 03 b6 08 0d   /* 27 */
+                                               29 01 00 00 00 03 b6 08 0c   /* 28 */
+                                               29 01 00 00 00 03 b6 08 0b];   /* 29 */
+
+		/* bl_level(Hex) , Index in acl command list */
+	       samsung,panel-acl-map-table = 	[0a00 0200	/* 10 , 0 */		1400 0200	/* 20 ,  1 */
+						1e00 0200	/* 30 , 2 */ 		2800 0200	/* 40 ,  3 */
+						3200 0200	/* 50 , 4 */		3c00 0200	/* 60 ,  5 */
+						4600 0200	/* 70 , 6 */		5000 0200	/* 80 ,  7 */
+						5a00 0200	/* 90 , 8 */		6400 0200	/* 100 , 9 */
+						6e00 0200	/* 110 , 10 */		7800 0200	/* 120 , 11 */
+						8200 0200	/* 130 , 12 */		8c00 0200	/* 140 , 13 */
+						9600 0200	/* 150 , 14 */		a000 0200	/* 160 , 15 */
+						aa00 0200	/* 170 , 16 */		b400 0200	/* 180,  17 */
+						be00 0200	/* 190 , 18 */		c800 0200	/* 200 , 19 */
+						d200 0200	/* 210 , 20 */		dc00 0200	/* 220 , 21 */
+						e600 0200	/* 230 , 22 */		f000 0200	/* 240 , 23 */
+						fa00 0200	/* 250 , 24 */		0401 0200	/* 260 , 25 */
+						0e01 0200	/* 270 , 26 */		1801 0200 	/* 280 , 27 */
+						2201 0200	/* 290 , 28 */		2c01 0300];	/* 300 , 29 */
+
+		/* bl_level(Hex) , Index in elvss command list */
+	       samsung,panel-elvss-map-table = 	[0a00 0000	/* 10 , 0 */		1400 0100	/* 20 , 1 */
+						1e00 0100	/* 30 , 2 */		2800 0300	/* 40 , 3 */
+						3200 0300	/* 50 , 4 */		3c00 0500	/* 60 , 5 */
+						4600 0500	/* 70 , 6 */		5000 0700	/* 80 , 7 */
+						5a00 0700	/* 90 , 8 */		6400 0900	/* 100 , 9 */
+						6e00 0900	/* 110 , 10 */		7800 0b00	/* 120 , 11 */
+						8200 0b00	/* 130 , 12 */		8c00 0d00	/* 140 , 13 */
+						9600 0d00	/* 150 , 14 */		a000 0f00	/* 160 , 15 */
+						aa00 0f00	/* 170 , 16 */		b400 1100	/* 180 , 17 */
+						be00 1100	/* 190 , 18 */		c800 1300	/* 200 , 19 */
+						d200 1300	/* 210 , 20 */		dc00 1500	/* 220 , 21 */
+						e600 1500	/* 230 , 22 */		f000 1700	/* 240 , 23 */
+						fa00 1700	/* 250 , 24 */		0401 1900	/* 260 , 25 */
+						0e01 1900	/* 270 , 26 */		1801 1b00	/* 280 , 27 */
+						2201 1b00	/* 290 , 28 */		2c01 1d00];  	/* 300 , 29 */
+	};
+};
