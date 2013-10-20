@@ -1,0 +1,109 @@
+/* Copyright (c) 2012, Samsung Electronics Corporation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/ {
+
+	qcom,mdss_dsi_novatek_tft_hd_video {
+		compatible = "novatek,mdss-tft-dsi-panel";
+		label = "novatek tft hd video mode dsi nt35596 panel";
+		status = "disable";
+		qcom,dsi-ctrl-phandle = <&mdss_dsi0>;
+		qcom,rst-gpio = <&pm8941_gpios 19 0>;
+		qcom,boost-gpio = <&pm8941_gpios 16 0>;
+		qcom,lcd_en = <&pm8941_gpios 17 0>;
+		qcom,vddi_en = <&pm8941_gpios 32 0>;
+		qcom,mdss-pan-res = <720 1280>;
+		qcom,mdss-pan-bpp = <24>;
+		qcom,mdss-pan-dest = "display_1";
+		qcom,mdss-clk-rate=<499000000>;
+		qcom,mdss-pan-porch-values = <133 7 213 6 2 8>; /* <HBP> <HPW> <HFP> <VBP> <VPW> <VFP> */
+		qcom,mdss-pan-underflow-clr = <0x0>;
+		qcom,mdss-pan-bl-ctrl = "bl_ctrl_dcs_cmds";
+		qcom,mdss-pan-bl-levels = <1 255>;
+		qcom,mdss-pan-dsi-mode = <0>;
+		qcom,mdss-pan-dsi-h-pulse-mode = <0>;
+		qcom,mdss-pan-dsi-h-power-stop = <0 0 0>;
+		qcom,mdss-pan-dsi-bllp-power-stop = <1 1>;
+		qcom,mdss-pan-dsi-traffic-mode = <2>;
+		qcom,mdss-pan-dsi-dst-format = <3>;
+		qcom,mdss-pan-dsi-vc = <0>;
+		qcom,mdss-pan-dsi-rgb-swap = <0>;
+		qcom,mdss-force-clk-lane-hs = <1>;
+		samsung,mdss-early-lcd-on = <0>;
+		qcom,mdss-pan-dsi-data-lanes = <1 1 1 1>;
+		qcom,mdss-pan-dsi-dlane-swap = <0>;
+		qcom,mdss-pan-dsi-t-clk = <0x1c 0x04>;
+		qcom,mdss-pan-dsi-stream = <0>;
+		qcom,mdss-pan-dsi-mdp-tr = <0x0>;
+		qcom,mdss-pan-dsi-dma-tr = <0x04>;
+		qcom,mdss-pan-dsi-frame-rate = <60>;
+		qcom,panel-phy-regulatorSettings = [07 09 03 00  /* Regualotor settings */
+						    20 00 01];
+		qcom,panel-phy-timingSettings = [6F 24 1C 00 33 34
+						    1D 26 2D 03 04 00];
+		qcom,panel-phy-strengthCtrl = [ff 06];		/*!!!! */
+		qcom,panel-phy-bistCtrl = [00 00 b1 ff           /*!!!! BIST Ctrl settings */
+					   00 00];
+		qcom,panel-phy-laneConfig = [ 
+		00 00 00 00 00 00 00 01 97 /* lane0 config */ 
+		00 00 00 00 05 00 00 01 97 /* lane1 config */ 
+		00 00 00 00 0a 00 00 01 97 /* lane2 config */ 
+		00 00 00 00 0f 00 00 01 97 /* lane3 config */ 
+		00 c0 00 00 00 00 00 01 bb]; /* Clk ln config */ 
+
+		qcom,panel-on-cmds = [	
+					29 01 00 00 00 00 04 ff 05 00 00 /* WRCMD2 */
+					29 01 00 00 00 00 04 fb 01 00 00 /* WRMTP */
+					29 01 00 00 00 00 04 92 ff 00 00 /* ESD_X3_0 */
+					29 01 00 00 00 00 04 c5 70 00 00 /* ESD_X3_1 */
+					29 01 00 00 00 00 04 c8 10 00 00 /* ESD_X3_2 */
+					29 01 00 00 00 00 04 cf 00 00 00 /* ESD_X3_3 */
+					29 01 00 00 00 00 04 d0 7f 00 00 /* ESD_X3_4 */
+					29 01 00 00 00 00 04 ff 01 00 00 /* PAGESEL_01 */
+					29 01 00 00 00 00 04 fb 01 00 00 /* RELOADCMD2_P0 */
+					29 01 00 00 00 00 04 b1 03 b2 ff /* REDV255_POS */
+					29 01 00 00 00 00 04 ed 03 ee ff /* REDV255_NEG */
+					29 01 00 00 00 00 04 ff 02 00 00 /* PAGESEL_02 */
+					29 01 00 00 00 00 04 fb 01 00 00 /* RELOADCMD2_P0 */
+					29 01 00 00 00 00 04 30 03 31 ff /* GREENV255_POS */
+					29 01 00 00 00 00 04 6f 03 70 ff /* GREENV255_NEG */
+					29 01 00 00 00 00 04 ad 03 ae ff /* BLUEV255_POS */
+					29 01 00 00 00 00 04 e9 03 ea ff /* BLUEV255_NEG */
+					29 01 00 00 00 00 04 ff 00 00 00 /* PAGESEL_00 */
+					29 01 00 00 00 00 04 ff 00 00 00 /* WRCMD1 */
+					29 01 00 00 00 00 04 d3 08 00 00 /* WRCMDCMB */
+					29 01 00 00 00 00 04 d4 08 00 00 /* WRCMDCMB_1 */
+					05 01 00 00 14 00 02 11 00  /* Sleep out */
+					05 01 00 00 32 00 02 29 00];
+		qcom,on-cmds-dsi-state = "DSI_LP_MODE";
+		qcom,panel-off-cmds = [
+					05 01 00 00 78 00 02 10 00
+					05 01 00 00 32 00 02 28 00];
+		qcom,off-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,panel-backlightcontrol-cmds = [39 01 00 00 00 04 51 ff 00 00]; /* backlight control */
+
+		/*
+			the last byte in read commands  represent READ LENGH,
+			like below  READ LENGH = 0x21
+		 */
+
+			/* the last byte in all read commands will represent READ LENGH */
+			samsung,panel-manufacture-id-read-cmds = [
+								06 01 00 00 00 00 01 da 01 00
+								06 01 00 00 00 00 01 db 01 00
+								06 01 00 00 00 00 01 dc 01 00];
+
+			qcom,panel-display-on-cmds = [05 01 00 00 32 00 02 29 00];
+			qcom,panel-display-off-cmds = [05 01 00 00 32 00 02 28 00];
+	};
+
+};

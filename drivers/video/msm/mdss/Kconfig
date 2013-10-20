@@ -1,0 +1,124 @@
+config FB_MSM_MDSS_WRITEBACK
+	bool "MDSS Writeback Panel"
+	---help---
+	The MDSS Writeback Panel provides support for routing the output of
+	MDSS frame buffer driver and MDP processing to memory.
+
+config FB_MSM_MDSS_HDMI_PANEL
+	depends on FB_MSM_MDSS
+	bool "MDSS HDMI Tx Panel"
+	default n
+	---help---
+	The MDSS HDMI Panel provides support for transmitting TMDS signals of
+	MDSS frame buffer data to connected hdmi compliant TVs, monitors etc.
+
+config FB_MSM_MDSS_HDMI_MHL_SII8334
+	depends on FB_MSM_MDSS_HDMI_PANEL
+	bool 'MHL SII8334 support '
+	default n
+	---help---
+	  Support the HDMI to MHL conversion.
+	  MHL (Mobile High-Definition Link) technology
+	  uses USB connector to output HDMI content
+
+config FB_MSM_MDSS_DBG_SEQ_TICK
+	bool "SEQ tick dbg support"
+	default n
+
+config FB_MSM_MDSS_DSI_DBG
+	bool "DSI dbg support"
+	default n	
+
+config SAMSUNG_CMC624
+	bool "Support for integrated LCD controller in msm89XX"
+	depends on FB && ARCH_MSM
+	default n
+
+config FB_EBOOK_PANEL_SCENARIO
+	bool "Samsung EBOOK PANEL SCENARIO"
+	depends on FB_MSM
+	depends on SAMSUNG_CMC624
+	default n
+
+config FB_MSM_MIPI_DSI_NOVATEK_NT35596
+	bool
+	select FB_MSM_MIPI_DSI
+	default n
+	
+config FB_MSM_MIPI_NOVATEK_VIDEO_HD_PT
+	bool
+	select FB_MSM_MIPI_DSI_NOVATEK_NT35596
+	default n
+
+config FB_MSM_MIPI_NOVATEK_VIDEO_HD_PT_PANEL
+	bool "MIPI NOVATEK VIDEO HD PT Panel"
+	select FB_MSM_MIPI_NOVATEK_VIDEO_HD_PT
+	default n
+	
+config MDNIE_LITE_TUNING
+	bool "MDNIe lite panel tuning"
+	default n
+
+config FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_FULL_HD_PT_PANEL
+	bool "Support SAMSUNG OCTA Video Full-HD Panel"
+	default n
+
+config FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL
+	bool "Support SAMSUNG OCTA Command Full-HD Panel"
+	default n
+
+config FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL
+	bool "Support SAMSUNG YOUM Command Full-HD Panel"
+	default n
+
+config MIPI_LCD_S6E3FA0_FORCE_VIDEO_MODE
+	bool "Enforce DSI VIDEO Mode on S6E3FA0 panel"
+	default n
+
+config FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_WVGA_S6E88A0_PT_PANEL
+	bool "Support SAMSUNG OCTA Video WVGA Panel"
+	default n
+
+config REGULATOR_LP8720
+	bool "Support Regulator LP8720"
+	default n
+
+config DUAL_LCD
+	bool "Support DUAL LCD"
+	default n
+
+config FB_MSM_MIPI_JDI_TFT_VIDEO_FULL_HD_PT_PANEL
+	bool "Support JDI TFT VIDEO FULL HD Panel"
+	select FB_MSM_MIPI_DSI
+	default n
+
+config SUPPORT_DISPLAY_OCTA_TFT
+	bool "support OCTA and TFT panel"
+	default n
+
+config FB_MSM_CAMERA_CSC
+	default n
+	bool "Support SAMSUNG CAMERA CSC"
+	---help---
+		Support for camera CSC tuning
+
+config FB_MSM_EDP_SAMSUNG
+	bool "Support SAMSUNG EDP TCON"
+	default n
+
+config EDP_ESD_FUNCTION
+	bool "Support EDP esd function"
+	default n
+
+config EDP_TCON_MDNIE
+	bool "Support EDP mdnie function"
+	default n
+
+config FB_MSM_MIPI_TFT_VIDEO_FULL_HD_PT_PANEL
+	bool "Support TFT VIDEO FULL HD Panel"
+	select FB_MSM_MIPI_DSI
+	default n
+
+config ESD_ERR_FG_RECOVERY
+	bool "ESD Feature"
+	default n
