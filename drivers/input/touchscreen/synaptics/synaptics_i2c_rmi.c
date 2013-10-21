@@ -598,7 +598,7 @@ static struct device_attribute attrs[] = {
 			synaptics_rmi4_suspend_store),
 };
 
-extern int system_rev;
+extern unsigned int system_rev;
 
 static struct list_head exp_fn_list;
 
