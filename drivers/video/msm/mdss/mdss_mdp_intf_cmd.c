@@ -507,6 +507,7 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 	struct mdss_panel_data *pdata;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	pdata = ctl->panel_data;
+	int flush_wq = (int) arg;
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata, panel_data);
 	ctx = (struct mdss_mdp_cmd_ctx *) ctl->priv_data;
@@ -569,6 +570,9 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 #if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
 	xlog(__func__, ctx->koff_cnt, ctx->clk_enabled, ctx->rdptr_enabled, 0, rc);
 #endif
+
+	if (flush_wq)
+		flush_work_sync(&ctx->pp_done_work);
 
 	return rc;
 }
