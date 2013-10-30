@@ -1813,6 +1813,9 @@ int mdss_mdp_display_wait4pingpong(struct mdss_mdp_ctl *ctl)
 {
 	int ret;
 
+	if (!ctl)
+		return -ENODEV;
+
 	ret = mutex_lock_interruptible(&ctl->lock);
 	if (ret)
 		return ret;
