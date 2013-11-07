@@ -1552,6 +1552,20 @@ static struct kernel_param_ops module_ops = {
 module_param_cb(enabled, &module_ops, &enabled, 0644);
 MODULE_PARM_DESC(enabled, "enforce thermal limit on cpu");
 
+module_param_named(limit_temp, msm_thermal_info.limit_temp_degC,
+		   uint, 0644);
+module_param_named(temp_hysteresis, msm_thermal_info.temp_hysteresis_degC,
+		   uint, 0644);
+module_param_named(freq_step, msm_thermal_info.bootup_freq_step, uint, 0644);
+module_param_named(core_limit_temp, msm_thermal_info.core_limit_temp_degC,
+		   uint, 0644);
+module_param_named(core_temp_hysteresis,
+		   msm_thermal_info.core_temp_hysteresis_degC, uint, 0644);
+module_param_named(psm_temp,
+		   msm_thermal_info.psm_temp_degC, uint, 0644);
+module_param_named(psm_temp_hysteresis,
+		   msm_thermal_info.psm_temp_hyst_degC, uint, 0644);
+
 static ssize_t show_cc_enabled(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
