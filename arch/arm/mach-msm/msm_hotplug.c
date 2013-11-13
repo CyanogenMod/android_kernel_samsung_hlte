@@ -69,7 +69,6 @@ static struct cpu_hotplug {
 
 static struct workqueue_struct *hotplug_wq;
 static struct delayed_work hotplug_work;
-static DEFINE_MUTEX(hotplug_lock);
 
 static struct cpu_stats {
 	unsigned int update_rate;
@@ -280,13 +279,11 @@ static void msm_hotplug_suspend(struct cpu_hotplug *hp, struct cpu_stats *st,
 
 	hp->screen_on = 0;
 
-	mutex_lock(&hotplug_lock);
 	flush_workqueue(hotplug_wq);
 	cancel_delayed_work_sync(&hotplug_work);
 
 	atomic_set(&hp->down_lock, 0);
 	offline_cpu(st->min_cpus);
-	mutex_unlock(&hotplug_lock);
 
 	msm_cpufreq_set_freq_limits(cpu, MSM_CPUFREQ_NO_LIMIT, hp->suspend_freq);
 	pr_info("%s: Early suspend - max freq: %dMHz\n", MSM_HOTPLUG,
