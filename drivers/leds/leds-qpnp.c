@@ -534,9 +534,16 @@ static int num_kpbl_leds_on;
 static struct device *led_dev;
 #ifdef SAMSUNG_LED_PATTERN
 #define RGB_LED_MAX_BRIGHTNESS  255
+#define RGB_LED_NORM_BRIGHTNESS  100
 #define CURRENT_DIVIDER 12
 int low_powermode;
 int on_patt;
+
+/* Yank555.lu : Extended LED controls */
+unsigned int led_speed_on;
+unsigned int led_speed_off;
+unsigned int led_intensity;
+
 struct mutex    leds_mutex_lock;
 struct patt_config blue[] = {
 	{
@@ -749,8 +756,6 @@ static struct patt_registry led_blink_patt[] = {
                 ARRAY_SIZE(blink),
         },
 };
-
-
 
 #endif
 
@@ -3469,6 +3474,7 @@ static int __devinit qpnp_get_config_mpp(struct qpnp_led_data *led,
 
 #ifdef SAMSUNG_LED_PATTERN
 /* Pattern Start*/
+
 static void samsung_led_set(struct qpnp_led_data *info,
                                                 enum led_brightness value){
     int rc;
@@ -3501,15 +3507,25 @@ static void led_pat_on(struct qpnp_led_data *info, struct patt_registry *patt_re
                         info[led_num].rgb_cfg->pwm_cfg->duty_cycles->duty_pcts =  devm_kzalloc(&(info[led_num].spmi_dev->dev),
                                                                                                                 sizeof(int) * patt_led->num_duty_pcts,GFP_KERNEL);
                         for(i = 0;i < patt_led->num_duty_pcts; i++){
-                            if(low_powermode && patt_led->low_pow_duty_pcts)
-                                info[led_num].rgb_cfg->pwm_cfg->duty_cycles->duty_pcts[i] = (int) ((patt_led->low_pow_duty_pcts[i]*info[led_num].max_current)/CURRENT_DIVIDER);
-                            else
-                                info[led_num].rgb_cfg->pwm_cfg->duty_cycles->duty_pcts[i] = (int) ((patt_led->duty_pcts[i]*info[led_num].max_current)/CURRENT_DIVIDER);
+                            if(low_powermode && patt_led->low_pow_duty_pcts) {
+				// Yank555.lu LED Extended Controls
+                                //info[led_num].rgb_cfg->pwm_cfg->duty_cycles->duty_pcts[i] = (int) ((patt_led->low_pow_duty_pcts[i]*info[led_num].max_current)/CURRENT_DIVIDER);
+				info[led_num].rgb_cfg->pwm_cfg->duty_cycles->duty_pcts[i] =
+					(int) (((patt_led->low_pow_duty_pcts[i]*led_intensity/RGB_LED_NORM_BRIGHTNESS)*info[led_num].max_current)/CURRENT_DIVIDER);
+                            } else {
+				// Yank555.lu LED Extended Controls
+                                //info[led_num].rgb_cfg->pwm_cfg->duty_cycles->duty_pcts[i] = (int) ((patt_led->duty_pcts[i]*info[led_num].max_current)/CURRENT_DIVIDER);
+                                info[led_num].rgb_cfg->pwm_cfg->duty_cycles->duty_pcts[i] =
+					(int) (((patt_led->duty_pcts[i]*led_intensity/RGB_LED_NORM_BRIGHTNESS)*info[led_num].max_current)/CURRENT_DIVIDER);
+			    }
                         }
                     }
                     info[led_num].rgb_cfg->pwm_cfg->pwm_period_us = patt_led->pwm_period_us;
-                    info[led_num].rgb_cfg->pwm_cfg->lut_params.lut_pause_hi = patt_led->hi_pause;
-                    info[led_num].rgb_cfg->pwm_cfg->lut_params.lut_pause_lo = patt_led->lo_pause;
+		    // Yank555.lu LED Extended Controls
+                    //info[led_num].rgb_cfg->pwm_cfg->lut_params.lut_pause_hi = patt_led->hi_pause;
+                    //info[led_num].rgb_cfg->pwm_cfg->lut_params.lut_pause_lo = patt_led->lo_pause;
+                    info[led_num].rgb_cfg->pwm_cfg->lut_params.lut_pause_hi = (int) (patt_led->hi_pause / led_speed_on );
+                    info[led_num].rgb_cfg->pwm_cfg->lut_params.lut_pause_lo = (int) (patt_led->lo_pause / led_speed_off);
                     if(!cnt)
                         info[led_num].rgb_cfg->pwm_cfg->lut_params.start_idx = 0;
                     else
@@ -3601,7 +3617,7 @@ static ssize_t led_r_store(struct device *dev, struct device_attribute *devattr,
         info[RGB_RED].rgb_cfg->enable = RGB_LED_ENABLE_RED;
         pat_reg = &led_rgb[RGB_RED];
 	for(i = 0; i< pat_reg->patt->num_duty_pcts; i++)
-		pat_reg->patt->duty_pcts[i] = (brightness * 100)/RGB_LED_MAX_BRIGHTNESS;
+		pat_reg->patt->duty_pcts[i] = (brightness * RGB_LED_NORM_BRIGHTNESS)/RGB_LED_MAX_BRIGHTNESS;
 
 	led_pat_on(info, pat_reg,brightness);
         mutex_unlock(&leds_mutex_lock);
@@ -3639,7 +3655,7 @@ static ssize_t led_g_store(struct device *dev, struct device_attribute *devattr,
         info[RGB_GREEN].rgb_cfg->enable = RGB_LED_ENABLE_GREEN;
         pat_reg = &led_rgb[RGB_GREEN];
 	for(i = 0; i< pat_reg->patt->num_duty_pcts; i++)
-		pat_reg->patt->duty_pcts[i] = (brightness * 100)/RGB_LED_MAX_BRIGHTNESS;
+		pat_reg->patt->duty_pcts[i] = (brightness * RGB_LED_NORM_BRIGHTNESS)/RGB_LED_MAX_BRIGHTNESS;
 
 	led_pat_on(info, pat_reg, brightness);
         mutex_unlock(&leds_mutex_lock);
@@ -3678,7 +3694,7 @@ static ssize_t led_b_store(struct device *dev, struct device_attribute *devattr,
         info[RGB_BLUE].rgb_cfg->enable = RGB_LED_ENABLE_BLUE;
         pat_reg = &led_rgb[RGB_BLUE];
 	for(i = 0; i< pat_reg->patt->num_duty_pcts; i++)
-		pat_reg->patt->duty_pcts[i] = (brightness * 100)/RGB_LED_MAX_BRIGHTNESS;
+		pat_reg->patt->duty_pcts[i] = (brightness * RGB_LED_NORM_BRIGHTNESS)/RGB_LED_MAX_BRIGHTNESS;
 
 	led_pat_on(info, pat_reg,brightness);
         mutex_unlock(&leds_mutex_lock);
@@ -3780,11 +3796,11 @@ static ssize_t led_blink_store(struct device *dev, struct device_attribute *deva
 	for(i=0; i< pat_reg->len; i++){
                 for(j=1; j < pat_reg->patt[i].num_duty_pcts; j++){
                         if(pat_reg->patt[i].id == QPNP_ID_RGB_RED)
-                                pat_reg->patt[i].duty_pcts[j] = ((brightness_r*100)/RGB_LED_MAX_BRIGHTNESS);
+                                pat_reg->patt[i].duty_pcts[j] = ((brightness_r*RGB_LED_NORM_BRIGHTNESS)/RGB_LED_MAX_BRIGHTNESS);
                         else if(pat_reg->patt[i].id == QPNP_ID_RGB_GREEN)
-                                pat_reg->patt[i].duty_pcts[j] = ((brightness_g*100)/RGB_LED_MAX_BRIGHTNESS);
+                                pat_reg->patt[i].duty_pcts[j] = ((brightness_g*RGB_LED_NORM_BRIGHTNESS)/RGB_LED_MAX_BRIGHTNESS);
                         else
-                                pat_reg->patt[i].duty_pcts[j] = ((brightness_b*100)/RGB_LED_MAX_BRIGHTNESS);
+                                pat_reg->patt[i].duty_pcts[j] = ((brightness_b*RGB_LED_NORM_BRIGHTNESS)/RGB_LED_MAX_BRIGHTNESS);
                 }
                 pat_reg->patt[i].hi_pause = delayon;
                 pat_reg->patt[i].lo_pause = delayoff;
@@ -3813,6 +3829,125 @@ static ssize_t led_lowpower_store(struct device *dev,
         low_powermode = (buf[0] == '1')?1:0;
         return count;
 }
+
+/* Yank555.lu : LED eXtended ConTRoLs
+ *
+ * Allow for customized brightness and delayon / delayoff control by user
+ *
+ * SysFs interface :
+ * -----------------
+ *
+ * /sys/class/sec/led/led_intensity : 0 - 255 (100 = stock)
+ *
+ *     Set the relative intensity of the LED respecting the userspace's request
+ *
+ * /sys/class/sec/led/led_speed_on  : 1 - 5 (1 = stock)
+ *
+ *     Devider for delayon  (1 - 5 times shorter than requested by userspace)
+ *
+ * /sys/class/sec/led/led_speed_off  : 1 - 5 (1 = stock)
+ *
+ *     Devider for delayoff (1 - 5 times shorter than requested by userspace)
+ *
+ * /sys/class/sec/led/led_xctrl_version :
+ *
+ *     Display the current version of the eXtended ConTRoLs
+ *
+ * /sys/class/sec/led/led_xctrl_info :
+ *
+ *     Display the current settings in human readable format
+ *
+ */
+
+static ssize_t led_speed_on_show(struct device *dev,
+                    struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", led_speed_on);
+}
+
+static ssize_t led_speed_on_store(struct device *dev,
+					struct device_attribute *devattr,
+					const char *buf, size_t count)
+{
+	unsigned int new_led_speed_on;
+
+	sscanf(buf, "%u", &new_led_speed_on);
+
+	switch(new_led_speed_on) { /* Accept only if 1 - 5 */
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		case 5:		led_speed_on = new_led_speed_on;
+		default:	return count;
+	}
+}
+
+static ssize_t led_speed_off_show(struct device *dev,
+                    struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", led_speed_off);
+}
+
+static ssize_t led_speed_off_store(struct device *dev,
+					struct device_attribute *devattr,
+					const char *buf, size_t count)
+{
+	unsigned int new_led_speed_off;
+
+	sscanf(buf, "%u", &new_led_speed_off);
+
+	switch(new_led_speed_off) { /* Accept only if 1 - 5 */
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		case 5:		led_speed_off = new_led_speed_off;
+		default:	return count;
+	}
+}
+
+static ssize_t led_intensity_show(struct device *dev,
+                    struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", led_intensity);
+}
+
+static ssize_t led_intensity_store(struct device *dev,
+					struct device_attribute *devattr,
+					const char *buf, size_t count)
+{
+	unsigned int new_led_intensity;
+
+	sscanf(buf, "%u", &new_led_intensity);
+
+	/* Accept only values between 0 and 255 */
+	if (new_led_intensity >= 0 || new_led_intensity <= 255) {
+		led_intensity = new_led_intensity;
+		return count;
+	}
+
+	return -EINVAL;
+}
+
+static ssize_t led_xctrl_info_show(struct device *dev,
+                    struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "Extended LED Control v1.1 by Yank555.lu\n\n"
+			    "  LED  on speed : %ux\n"
+			    "  LED off speed : %ux\n"
+			    "  LED intensity : %u/255\n",
+			    led_speed_on,
+			    led_speed_off,
+			    led_intensity);
+}
+
+static ssize_t led_xctrl_version_show(struct device *dev,
+                    struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "v1.1 by Yank555.lu\n");
+}
+
 static DEVICE_ATTR(led_pattern, S_IRUGO | S_IWUSR | S_IWGRP, show_patt,
 								store_patt);
 static DEVICE_ATTR(led_r, S_IRUGO | S_IWUSR | S_IWGRP, led_r_show,led_r_store );
@@ -3820,13 +3955,24 @@ static DEVICE_ATTR(led_g, S_IRUGO | S_IWUSR | S_IWGRP, led_g_show,led_g_store );
 static DEVICE_ATTR(led_b, S_IRUGO | S_IWUSR | S_IWGRP, led_b_show,led_b_store );
 static DEVICE_ATTR(led_blink, S_IRUGO | S_IWUSR | S_IWGRP, NULL, led_blink_store );
 static DEVICE_ATTR(led_lowpower, S_IRUGO | S_IWUSR | S_IWGRP, led_lowpower_show, led_lowpower_store );
+static DEVICE_ATTR(led_speed_on, S_IRUGO | S_IWUSR | S_IWGRP, led_speed_on_show, led_speed_on_store);
+static DEVICE_ATTR(led_speed_off, S_IRUGO | S_IWUSR | S_IWGRP, led_speed_off_show, led_speed_off_store);
+static DEVICE_ATTR(led_intensity, S_IRUGO | S_IWUSR | S_IWGRP, led_intensity_show, led_intensity_store);
+static DEVICE_ATTR(led_xctrl_info, S_IRUGO, led_xctrl_info_show, NULL);
+static DEVICE_ATTR(led_xctrl_version, S_IRUGO, led_xctrl_version_show, NULL);
+
 static struct attribute *sec_led_attributes[] = {
 	&dev_attr_led_pattern.attr,
 	&dev_attr_led_r.attr,
 	&dev_attr_led_g.attr,
 	&dev_attr_led_b.attr,
 	&dev_attr_led_blink.attr,
-       &dev_attr_led_lowpower.attr,
+        &dev_attr_led_lowpower.attr,
+        &dev_attr_led_speed_on.attr,
+        &dev_attr_led_speed_off.attr,
+        &dev_attr_led_intensity.attr,
+        &dev_attr_led_xctrl_info.attr,
+        &dev_attr_led_xctrl_version.attr,
 	NULL,
 };
 
@@ -4173,6 +4319,14 @@ static struct spmi_driver qpnp_leds_driver = {
 
 static int __init qpnp_led_init(void)
 {
+
+#ifdef SAMSUNG_LED_PATTERN
+	/* Yank555.lu : Extended LED controls */
+	led_speed_on  = 1;
+	led_speed_off = 1;
+	led_intensity = RGB_LED_NORM_BRIGHTNESS; /* 100 = default Samsung value */
+#endif
+
 	return spmi_driver_register(&qpnp_leds_driver);
 }
 module_init(qpnp_led_init);
