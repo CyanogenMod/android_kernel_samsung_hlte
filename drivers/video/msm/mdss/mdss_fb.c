@@ -2158,8 +2158,8 @@ int mdss_panel_force_update(struct mdss_panel_data *pdata)
 
 	if (i == fbi_list_index || !mfd)
 		return -ENOENT;
-
-	mdss_fb_pan_display_ex(mfd->fbi, mfd->msm_fb_backup);
+    
+	mdss_fb_pan_display_ex(mfd->fbi, &(mfd->msm_fb_backup.disp_commit));
 
 	return 0;
 }
