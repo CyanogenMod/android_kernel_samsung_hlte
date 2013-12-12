@@ -1123,7 +1123,6 @@ static struct device_node *mdss_dsi_find_panel_of_node(
 
 	pr_info("%s : panel_cfg -> %s\n",__func__,panel_cfg);
 	l = strlen(panel_cfg);
-//	if (!l) {
 	if (1) {
 		/* no panel cfg chg, parse dt */
 		pr_info("%s:%d: no cmd line cfg present\n",
