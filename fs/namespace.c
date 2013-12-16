@@ -1870,7 +1870,7 @@ static int do_new_mount(struct path *path, char *type, int flags,
 	if (err)
 		mntput(mnt);
 #ifdef CONFIG_ASYNC_FSYNC
-	if (!err && ((!strcmp(type, "ext4") &&
+	if (!err && ((((!strcmp(type, "ext4")) || (!strcmp(type, "f2fs"))) &&
 	    !strcmp(path->dentry->d_name.name, "data")) ||
 	    (!strcmp(type, "fuse") &&
 	    !strcmp(path->dentry->d_name.name, "emulated"))))
