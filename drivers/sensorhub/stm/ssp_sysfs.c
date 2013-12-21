@@ -102,7 +102,7 @@ static void change_sensor_delay(struct ssp_data *data,
 
 		break;
 	default:
-		data->aiCheckStatus[iSensorType] = ADD_SENSOR_STATE;
+        break;
 	}
 }
 
@@ -114,46 +114,13 @@ static int ssp_remove_sensor(struct ssp_data *data,
 	unsigned int uChangedSensor, unsigned int uNewEnable)
 {
 	u8 uBuf[2];
-	int iRet = 0;
 	int64_t dSensorDelay = data->adDelayBuf[uChangedSensor];
 	ssp_dbg("[SSP]: %s - remove sensor = %d, current state = %d\n",
 		__func__, (1 << uChangedSensor), uNewEnable);
 
 	data->adDelayBuf[uChangedSensor] = DEFUALT_POLLING_DELAY;
 
-	if (data->aiCheckStatus[uChangedSensor] == INITIALIZATION_STATE) {
-		data->aiCheckStatus[uChangedSensor] = NO_SENSOR_STATE;
-		if (uChangedSensor == ACCELEROMETER_SENSOR) {
-			accel_open_calibration(data);
-			iRet = set_accel_cal(data);
-			if (iRet < 0)
-				pr_err("[SSP]: %s - set_accel_cal failed %d\n", __func__, iRet);
-		}
-		else if (uChangedSensor == GYROSCOPE_SENSOR) {
-			gyro_open_calibration(data);
-			iRet = set_gyro_cal(data);
-			if (iRet < 0)
-				pr_err("[SSP]: %s - set_gyro_cal failed %d\n", __func__,  iRet);
-		}
-		else if (uChangedSensor == PRESSURE_SENSOR)
-			pressure_open_calibration(data);
-		else if (uChangedSensor == PROXIMITY_SENSOR) {
-			proximity_open_lcd_ldi(data);
-			proximity_open_calibration(data);
-		} else if (uChangedSensor == GEOMAGNETIC_SENSOR) {
-			iRet = mag_open_hwoffset(data);
-			if (iRet < 0)
-				pr_err("[SSP]: %s - mag_open_hw_offset"
-				" failed, %d\n", __func__, iRet);
-
-			iRet = set_hw_offset(data);
-			if (iRet < 0) {
-				pr_err("[SSP]: %s - set_hw_offset failed\n",
-					__func__);
-			}
-		}
-		return 0;
-	} else if (uChangedSensor == ORIENTATION_SENSOR) {
+    if (uChangedSensor == ORIENTATION_SENSOR) {
 		if (!(atomic_read(&data->aSensorEnable)
 			& (1 << ACCELEROMETER_SENSOR))) {
 			uChangedSensor = ACCELEROMETER_SENSOR;
@@ -248,7 +215,7 @@ static ssize_t set_sensors_enable(struct device *dev,
 	unsigned int uNewEnable = 0, uChangedSensor = 0;
 	struct ssp_data *data = dev_get_drvdata(dev);
 
-	if (kstrtoll(buf, 10, &dTemp) < 0)
+    if (kstrtoll(buf, 10, &dTemp) < 0)
 		return -EINVAL;
 
 	uNewEnable = (unsigned int)dTemp;
@@ -265,22 +232,41 @@ static ssize_t set_sensors_enable(struct device *dev,
 	if (uNewEnable == atomic_read(&data->aSensorEnable))
 		return size;
 
-	for (uChangedSensor = 0; uChangedSensor < SENSOR_MAX; uChangedSensor++) {
-		if ((atomic_read(&data->aSensorEnable) & (1 << uChangedSensor))
-			!= (uNewEnable & (1 << uChangedSensor))) {
-
-			if (!(uNewEnable & (1 << uChangedSensor)))
-				ssp_remove_sensor(data, uChangedSensor,
-					uNewEnable); /* disable */
-			/* In case of enabling */
-			/* we will sensor instruction on change_sensor_delay. */
-			else if (!((uNewEnable & (1 << uChangedSensor)) & data->uSensorState)) {
-				pr_err("[SSP] %s - Sensor was not connected(%u)!!\n", __func__, uChangedSensor);
-				return -ENODEV; //-19
-			}
-			break;
-		}
-	}
+    for (uChangedSensor = 0; uChangedSensor < SENSOR_MAX; uChangedSensor++)
+        if ((atomic_read(&data->aSensorEnable) & (1 << uChangedSensor))
+            != (uNewEnable & (1 << uChangedSensor))) {
+            
+            if (!(uNewEnable & (1 << uChangedSensor)))
+                ssp_remove_sensor(data, uChangedSensor,
+                                  uNewEnable); /* disable */
+            else { /* Change to ADD_SENSOR_STATE from KitKat */
+                if (data->aiCheckStatus[uChangedSensor] == INITIALIZATION_STATE) {
+                    if (uChangedSensor == ACCELEROMETER_SENSOR)
+                        accel_open_calibration(data);
+                    else if (uChangedSensor == GYROSCOPE_SENSOR)
+                        gyro_open_calibration(data);
+                    else if (uChangedSensor == PRESSURE_SENSOR)
+                        pressure_open_calibration(data);
+                    else if (uChangedSensor == PROXIMITY_SENSOR) {
+                        proximity_open_lcd_ldi(data);
+                        proximity_open_calibration(data);
+                    } else if (uChangedSensor == GEOMAGNETIC_SENSOR) {
+                        int iRet = mag_open_hwoffset(data);
+                        if (iRet < 0)
+                            pr_err("[SSP]: %s - mag_open_hw_offset"
+                                   " failed, %d\n", __func__, iRet);
+                        
+                        iRet = set_hw_offset(data);
+                        if (iRet < 0) {
+                            pr_err("[SSP]: %s - set_hw_offset failed\n",
+                                   __func__);
+                        }
+                    }
+                }
+                data->aiCheckStatus[uChangedSensor] = ADD_SENSOR_STATE;
+            }
+            break;
+        }
 	atomic_set(&data->aSensorEnable, uNewEnable);
 
 	return size;
