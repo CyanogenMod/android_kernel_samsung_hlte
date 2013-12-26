@@ -40,6 +40,7 @@ struct mdp3_session_data {
 	struct mdss_panel_data *panel;
 	struct mdp3_intf *intf;
 	struct msm_fb_data_type *mfd;
+	struct timer_list vsync_timer;
 	ktime_t vsync_time;
 	int vsync_period;
 	struct sysfs_dirent *vsync_event_sd;

@@ -812,11 +812,12 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd)
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 	struct mdss_mdp_pipe *pipe;
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
+	struct mdss_mdp_ctl *tmp;
+	int i = 0, ret = 0;
+
 #if defined (CONFIG_FB_MSM_MDSS_DBG_SEQ_TICK)
 	mdss_dbg_tick_save(KICKOFF);
 #endif
-	struct mdss_mdp_ctl *tmp;
-	int ret = 0;
 	if (ctl->shared_lock)
 		mutex_lock(ctl->shared_lock);
 
@@ -2176,7 +2177,6 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
 		rc = mdss_mdp_overlay_start(mfd);
 		if (!IS_ERR_VALUE(rc) && (mfd->panel_info->type != DTV_PANEL) &&
 			(mfd->panel_info->type != WRITEBACK_PANEL)) {
-		{
 			first_update = true;
 			pr_info("..lm..first_update = %d \n", first_update);
 			rc = mdss_mdp_overlay_kickoff(mfd);
