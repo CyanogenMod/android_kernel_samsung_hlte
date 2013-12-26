@@ -410,13 +410,13 @@ static int mdss_fb_probe(struct platform_device *pdev)
 
 	rc = mdss_fb_register(mfd);
 	if (rc)
-		goto error;
+		return rc;
 
 	if (mfd->mdp.init_fnc) {
 		rc = mfd->mdp.init_fnc(mfd);
 		if (rc) {
 			pr_err("init_fnc failed\n");
-			goto error;
+			return rc;
 		}
 	}
 
@@ -438,6 +438,8 @@ static int mdss_fb_probe(struct platform_device *pdev)
 #ifdef CONFIG_FB_MSM_CAMERA_CSC
 	mdp4_reg_csc_fs(mfd);
 #endif
+
+	mdss_fb_send_panel_event(mfd, MDSS_EVENT_FB_REGISTERED, fbi);
 
 	mfd->mdp_sync_pt_data.fence_name = "mdp-fence";
 	if (mfd->mdp_sync_pt_data.timeline == NULL) {
@@ -468,10 +470,6 @@ static int mdss_fb_probe(struct platform_device *pdev)
 		break;
 	}
 
-	mdss_fb_send_panel_event(mfd, MDSS_EVENT_FB_REGISTERED, fbi);
-	return rc;
-error:
-	framebuffer_release(fbi);
 	return rc;
 }
 
@@ -869,9 +867,6 @@ static int mdss_fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 		return -ENOMEM;
 	}
 
-	if ((vma->vm_end <= vma->vm_start) || (off >= len) ||
-		((vma->vm_end - vma->vm_start) > (len - off)))
-		return -EINVAL;
 	mdss_fb_pan_idle(mfd);
 
 	/* Set VM flags. */
@@ -950,6 +945,13 @@ static int mdss_fb_alloc_fbmem_iommu(struct msm_fb_data_type *mfd, int dom)
 						 "qcom,memory-alt-reservation-size",
 						 &size);
 		}
+	}
+
+	if (!size) {
+		mfd->fbi->screen_base = NULL;
+		mfd->fbi->fix.smem_start = 0;
+		mfd->fbi->fix.smem_len = 0;
+		return 0;
 	}
 
 	pr_info("%s frame buffer reserve_size=0x%x\n", __func__, size);

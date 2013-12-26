@@ -2188,9 +2188,6 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
 						mdss_mdp_overlay_handle_vsync;
 		ctl->vsync_handler.cmd_post_flush = false;
 
-		ctl->vsync_handler.vsync_handler =
-					mdss_mdp_overlay_handle_vsync;
-
 		if (mfd->split_display && pdata->next) {
 			/* enable split display */
 			rc = mdss_mdp_ctl_split_display_setup(ctl, pdata->next);
@@ -2493,12 +2490,6 @@ int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd)
 			goto init_fail;
 		}
 	}
-
-	rc = sysfs_create_link_nowarn(&dev->kobj,
-			&mdp5_data->mdata->pdev->dev.kobj, "mdp");
-	if (rc)
-		pr_warn("problem creating link to mdp sysfs\n");
-
 
 	mdp5_data->vsync_event_sd = sysfs_get_dirent(dev->kobj.sd, NULL,
 						     "vsync_event");
