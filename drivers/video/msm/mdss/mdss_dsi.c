@@ -1175,7 +1175,7 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		mdss_dsi_cmdlist_commit(ctrl_pdata, 1);
 		break;
 	case MDSS_EVENT_CONT_SPLASH_BEGIN:
-		if (ctrl_pdata->dsi_on_state == DSI_HS_MODE) {
+		if (ctrl_pdata->on_cmds.link_state == DSI_HS_MODE) {
 			/* Panel is Enabled in Bootloader */
 			rc = mdss_dsi_blank(pdata);
 		}
@@ -1184,7 +1184,7 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		pr_debug("MDSS_FIRST_FRAME_UPDATE\n");
 		ctrl_pdata->mdp_tg_on = 1;
 	/*Event is send only if cont_splash feature is enabled */
-		if (ctrl_pdata->dsi_off_state == DSI_HS_MODE) {
+		if (ctrl_pdata->off_cmds.link_state == DSI_HS_MODE) {
 			/* Panel is Enabled in Bootloader */
 			ctrl_pdata->ctrl_state |= CTRL_STATE_PANEL_INIT;
 			rc = mdss_dsi_blank(pdata);

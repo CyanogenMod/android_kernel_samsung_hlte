@@ -2853,25 +2853,25 @@ static int mdss_panel_parse_dt(struct platform_device *pdev,
 	on_cmds_state = of_get_property(pdev->dev.of_node,
 				"qcom,on-cmds-dsi-state", NULL);
 	if (!strncmp(on_cmds_state, "DSI_LP_MODE", 11)) {
-		panel_data->dsi_on_state = DSI_LP_MODE;
+		panel_data->on_cmds.link_state = DSI_LP_MODE;
 	} else if (!strncmp(on_cmds_state, "DSI_HS_MODE", 11)) {
-		panel_data->dsi_on_state = DSI_HS_MODE;
+		panel_data->on_cmds.link_state = DSI_HS_MODE;
 	} else {
 		pr_debug("%s: ON cmds state not specified. Set Default\n",
 							__func__);
-		panel_data->dsi_on_state = DSI_LP_MODE;
+		panel_data->on_cmds.link_state = DSI_LP_MODE;
 	}
 
 	off_cmds_state = of_get_property(pdev->dev.of_node,
 				"qcom,off-cmds-dsi-state", NULL);
 	if (!strncmp(off_cmds_state, "DSI_LP_MODE", 11)) {
-		panel_data->dsi_off_state = DSI_LP_MODE;
+		panel_data->off_cmds.link_state = DSI_LP_MODE;
 	} else if (!strncmp(off_cmds_state, "DSI_HS_MODE", 11)) {
-		panel_data->dsi_off_state = DSI_HS_MODE;
+		panel_data->off_cmds.link_state = DSI_HS_MODE;
 	} else {
 		pr_debug("%s: ON cmds state not specified. Set Default\n",
 							__func__);
-		panel_data->dsi_off_state = DSI_LP_MODE;
+		panel_data->off_cmds.link_state = DSI_LP_MODE;
 	}
 
 

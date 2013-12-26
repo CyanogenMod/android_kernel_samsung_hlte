@@ -275,14 +275,6 @@ struct dsi_panel_cmds {
 	int link_state;
 };
 
-struct dsi_panel_cmds {
-	char *buf;
-	int blen;
-	struct dsi_cmd_desc *cmds;
-	int cmd_cnt;
-	int link_state;
-};
-
 #define CMD_REQ_MAX     4
 
 typedef void (*fxn)(u32 data);
