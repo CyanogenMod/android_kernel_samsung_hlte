@@ -1841,8 +1841,8 @@ adreno_probe(struct platform_device *pdev)
 	 * It isn't fatal if we cannot register the input handler.  Sad,
 	 * perhaps, but not fatal
 	 */
-	if (input_register_handler(&adreno_input_handler))
-		KGSL_DRV_ERR(device, "Unable to register the input handler\n");
+	//if (input_register_handler(&adreno_input_handler))
+	//	KGSL_DRV_ERR(device, "Unable to register the input handler\n");
 
 	return 0;
 
