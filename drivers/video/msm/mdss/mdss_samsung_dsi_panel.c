@@ -2511,6 +2511,11 @@ error2:
 
 }
 
+bool mdss_dsi_panel_flip_ud(void)
+{
+	return false;
+}
+
 static int mdss_panel_parse_dt(struct platform_device *pdev,
 			       struct mdss_panel_common_pdata *panel_data)
 {

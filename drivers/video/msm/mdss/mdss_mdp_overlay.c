@@ -757,8 +757,6 @@ static void mdss_mdp_overlay_cleanup(struct msm_fb_data_type *mfd)
 	mutex_unlock(&mfd->lock);
 	list_for_each_entry_safe(pipe, tmp, &destroy_pipes, cleanup_list)
 		mdss_mdp_pipe_destroy(pipe);
-
-	return 0;
 }
 
 static int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)

@@ -17,6 +17,7 @@
 #include <linux/errno.h>
 #include <linux/mutex.h>
 
+#include "mdss_fb.h"
 #include "mdss_mdp.h"
 #include "mdss_dsi.h"
 

@@ -1150,29 +1150,6 @@ int mdss_mdp_ctl_destroy(struct mdss_mdp_ctl *ctl)
 
 	return 0;
 }
-void mdss_mdp_ctl_splash_start(struct mdss_panel_data *pdata)
-{
-       switch (pdata->panel_info.type) {
-       case MIPI_VIDEO_PANEL:
-               mdss_mdp_video_copy_splash_screen(pdata);
-               break;
-       case MIPI_CMD_PANEL:
-       default:
-               break;
-       }
-}
-
-int mdss_mdp_ctl_splash_finish(struct mdss_mdp_ctl *ctl)
-{
-       switch (ctl->panel_data->panel_info.type) {
-       case MIPI_VIDEO_PANEL:
-			return mdss_mdp_video_reconfigure_splash_done(ctl);
-       case MIPI_CMD_PANEL:
-			return mdss_mdp_cmd_reconfigure_splash_done(ctl);
-       default:
-               return 0;
-       }
-}
 
 int mdss_mdp_ctl_intf_event(struct mdss_mdp_ctl *ctl, int event, void *arg)
 {
