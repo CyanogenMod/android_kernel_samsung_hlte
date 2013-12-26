@@ -349,7 +349,6 @@ struct hfi_uncompressed_plane_actual_constraints_info {
 #define HFI_MSG_SYS_OX_START			\
 (HFI_DOMAIN_BASE_COMMON + HFI_ARCH_OX_OFFSET + HFI_MSG_START_OFFSET + 0x0000)
 #define HFI_MSG_SYS_PING_ACK	(HFI_MSG_SYS_OX_START + 0x2)
-#define HFI_MSG_SYS_PROPERTY_INFO	(HFI_MSG_SYS_OX_START + 0x3)
 #define HFI_MSG_SYS_SESSION_ABORT_DONE	(HFI_MSG_SYS_OX_START + 0x4)
 
 #define HFI_MSG_SESSION_OX_START		\
@@ -422,7 +421,7 @@ struct hfi_cmd_session_empty_buffer_compressed_packet {
 	u32 input_tag;
 	u8 *packet_buffer;
 	u8 *extra_data_buffer;
-	u32 rgData[0];
+	u32 rgData[1];
 };
 
 struct hfi_cmd_session_empty_buffer_uncompressed_plane0_packet {
@@ -441,7 +440,7 @@ struct hfi_cmd_session_empty_buffer_uncompressed_plane0_packet {
 	u32 input_tag;
 	u8 *packet_buffer;
 	u8 *extra_data_buffer;
-	u32 rgData[0];
+	u32 rgData[1];
 };
 
 struct hfi_cmd_session_empty_buffer_uncompressed_plane1_packet {
@@ -450,7 +449,7 @@ struct hfi_cmd_session_empty_buffer_uncompressed_plane1_packet {
 	u32 filled_len;
 	u32 offset;
 	u8 *packet_buffer2;
-	u32 rgData[0];
+	u32 rgData[1];
 };
 
 struct hfi_cmd_session_empty_buffer_uncompressed_plane2_packet {
@@ -459,7 +458,7 @@ struct hfi_cmd_session_empty_buffer_uncompressed_plane2_packet {
 	u32 filled_len;
 	u32 offset;
 	u8 *packet_buffer3;
-	u32 rgData[0];
+	u32 rgData[1];
 };
 
 struct hfi_cmd_session_fill_buffer_packet {
@@ -473,7 +472,7 @@ struct hfi_cmd_session_fill_buffer_packet {
 	u32 output_tag;
 	u8 *packet_buffer;
 	u8 *extra_data_buffer;
-	u32 rgData[0];
+	u32 rgData[1];
 };
 
 struct hfi_cmd_session_flush_packet {

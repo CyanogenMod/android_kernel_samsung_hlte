@@ -192,7 +192,7 @@ int create_pkt_set_cmd_sys_resource(
 			(struct ocmem_buf *) resource_value;
 
 		pkt->resource_type = HFI_RESOURCE_OCMEM;
-		pkt->size += sizeof(struct hfi_resource_ocmem);
+		pkt->size += sizeof(struct hfi_resource_ocmem) - sizeof(u32);
 		hfioc_mem->size = (u32) ocmem->len;
 		hfioc_mem->mem = (u8 *) ocmem->addr;
 		break;
@@ -692,8 +692,8 @@ int create_pkt_cmd_session_set_property(
 		else
 			return -EINVAL;
 		hfi->format = hal_to_hfi_type(
-			HAL_PARAM_UNCOMPRESSED_FORMAT_SELECT,
-			prop->format);
+				HAL_PARAM_UNCOMPRESSED_FORMAT_SELECT,
+				prop->format);
 		pkt->size += sizeof(u32) +
 			sizeof(struct hfi_uncompressed_format_select);
 		break;
@@ -1166,18 +1166,6 @@ int create_pkt_cmd_session_set_property(
 		pkt->size += sizeof(u32) * 2;
 		break;
 	}
-
-	case HAL_PARAM_VDEC_CONCEAL_COLOR:
-	{
-		struct hfi_conceal_color *hfi;
-		pkt->rg_property_data[0] =
-			HFI_PROPERTY_PARAM_VDEC_CONCEAL_COLOR;
-		hfi = (struct hfi_conceal_color *) &pkt->rg_property_data[1];
-		hfi->conceal_color =
-			((struct hfi_conceal_color *) pdata)->conceal_color;
-		pkt->size += sizeof(u32) * 2;
-		break;
-	}	
 	case HAL_CONFIG_VPE_OPERATIONS:
 		break;
 	case HAL_PARAM_VENC_INTRA_REFRESH:
@@ -1435,5 +1423,19 @@ int create_pkt_ssr_cmd(enum hal_ssr_trigger_type type,
 	pkt->size = sizeof(struct hfi_cmd_sys_test_ssr_packet);
 	pkt->packet_type = HFI_CMD_SYS_TEST_SSR;
 	pkt->trigger_type = get_hfi_ssr_type(type);
+	return 0;
+}
+
+int create_pkt_cmd_sys_image_version(
+		struct hfi_cmd_sys_get_property_packet *pkt)
+{
+	if (!pkt) {
+		dprintk(VIDC_ERR, "%s invalid param :%p\n", __func__, pkt);
+		return -EINVAL;
+	}
+	pkt->size = sizeof(struct hfi_cmd_sys_get_property_packet);
+	pkt->packet_type = HFI_CMD_SYS_GET_PROPERTY;
+	pkt->num_properties = 1;
+	pkt->rg_property_data[0] = HFI_PROPERTY_SYS_IMAGE_VERSION;
 	return 0;
 }

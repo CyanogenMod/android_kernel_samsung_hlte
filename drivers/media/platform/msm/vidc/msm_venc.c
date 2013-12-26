@@ -144,6 +144,18 @@ enum msm_venc_ctrl_cluster {
 
 static struct msm_vidc_ctrl msm_venc_ctrls[] = {
 	{
+		.id = V4L2_CID_MPEG_VIDC_VIDEO_FRAME_RATE,
+		.name = "Frame Rate",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.minimum = MIN_FRAME_RATE,
+		.maximum = MAX_FRAME_RATE,
+		.default_value = MIN_FRAME_RATE,
+		.step = 1,
+		.menu_skip_mask = 0,
+		.qmenu = NULL,
+		.cluster = MSM_VENC_CTRL_CLUSTER_TIMING,
+	},
+	{
 		.id = V4L2_CID_MPEG_VIDC_VIDEO_IDR_PERIOD,
 		.name = "IDR Period",
 		.type = V4L2_CTRL_TYPE_INTEGER,
@@ -1256,6 +1268,7 @@ unknown_value:
 static int try_set_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 {
 	int rc = 0;
+	struct hal_frame_rate frame_rate;
 	struct hal_request_iframe request_iframe;
 	struct hal_bitrate bitrate;
 	struct hal_profile_level profile_level;
@@ -1300,6 +1313,13 @@ static int try_set_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 	})
 
 	switch (ctrl->id) {
+	case V4L2_CID_MPEG_VIDC_VIDEO_FRAME_RATE:
+		property_id =
+			HAL_CONFIG_FRAME_RATE;
+		frame_rate.frame_rate = ctrl->val;
+		frame_rate.buffer_type = HAL_BUFFER_OUTPUT;
+		pdata = &frame_rate;
+		break;
 	case V4L2_CID_MPEG_VIDC_VIDEO_IDR_PERIOD:
 		property_id =
 			HAL_CONFIG_VENC_IDR_PERIOD;
@@ -2223,7 +2243,6 @@ int msm_venc_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 				"Failed to set framesize for Output port\n");
 			goto exit;
 		}
-
 		frame_sz.buffer_type = HAL_BUFFER_OUTPUT;
 		rc = call_hfi_op(hdev, session_set_property, (void *)
 			inst->session, HAL_PARAM_FRAME_SIZE, &frame_sz);
@@ -2232,7 +2251,6 @@ int msm_venc_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 				"Failed to set hal property for framesize\n");
 			goto exit;
 		}
-
 		fmt = msm_comm_get_pixel_fmt_fourcc(venc_formats,
 			ARRAY_SIZE(venc_formats), f->fmt.pix_mp.pixelformat,
 			OUTPUT_PORT);

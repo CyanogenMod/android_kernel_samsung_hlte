@@ -68,7 +68,6 @@ static int msm_v4l2_close(struct file *filp)
 	vidc_inst = get_vidc_inst(filp, NULL);
 	rc = msm_vidc_release_buffers(vidc_inst,
 			V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE);
-
 	if (rc)
 		dprintk(VIDC_WARN,
 			"Failed in %s for release output buffers\n", __func__);
@@ -135,7 +134,7 @@ int msm_v4l2_reqbufs(struct file *file, void *fh,
 int msm_v4l2_prepare_buf(struct file *file, void *fh,
 				struct v4l2_buffer *b)
 {
-    return msm_vidc_prepare_buf(get_vidc_inst(file, fh), b);
+	return msm_vidc_prepare_buf(get_vidc_inst(file, fh), b);
 }
 
 int msm_v4l2_qbuf(struct file *file, void *fh,
@@ -188,7 +187,6 @@ static int msm_v4l2_decoder_cmd(struct file *file, void *fh,
 	if (dec->cmd == V4L2_DEC_CMD_STOP)
 		rc = msm_vidc_release_buffers(vidc_inst,
 				V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE);
-
 	if (rc)
 		dprintk(VIDC_WARN,
 			"Failed to release dec output buffers: %d\n", rc);
@@ -203,7 +201,6 @@ static int msm_v4l2_encoder_cmd(struct file *file, void *fh,
 	if (enc->cmd == V4L2_ENC_CMD_STOP)
 		rc = msm_vidc_release_buffers(vidc_inst,
 				V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE);
-
 	if (rc)
 		dprintk(VIDC_WARN,
 			"Failed to release enc output buffers: %d\n", rc);
