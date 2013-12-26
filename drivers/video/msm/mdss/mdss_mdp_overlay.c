@@ -835,6 +835,13 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd)
 	}
 #endif
 
+#ifdef CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_FULL_HD_PT_PANEL
+	list_for_each_entry(pipe, &mdp5_data->pipes_cleanup, cleanup_list) {
+		mdss_mdp_pipe_queue_data(pipe, NULL);
+		mdss_mdp_mixer_pipe_unstage(pipe);
+	} 
+#endif
+
 	list_for_each_entry(pipe, &mdp5_data->pipes_used, used_list) {
 		struct mdss_mdp_data *buf;
 
@@ -921,6 +928,13 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd)
 	ret = mdss_mdp_display_wait4comp(mdp5_data->ctl);
 
 	mdss_fb_update_notify_update(mfd);
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) \
+		|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL) \
+		|| defined(CONFIG_MIPI_LCD_S6E3FA0_FORCE_VIDEO_MODE) \
+		|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_WVGA_S6E88A0_PT_PANEL)
+	mdss_mdp_ctl_intf_event(mdp5_data->ctl, MDSS_EVENT_FRAME_UPDATE, NULL);
+#endif
+
 commit_fail:
 	mdss_mdp_overlay_cleanup(mfd);
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
@@ -958,6 +972,9 @@ static int mdss_mdp_overlay_release(struct msm_fb_data_type *mfd, int ndx)
 					&mdp5_data->pipes_cleanup);
 			}
 			mutex_unlock(&mfd->lock);
+#if !defined(CONFIG_FB_MSM_EDP_SAMSUNG) && !defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_FULL_HD_PT_PANEL)
+			mdss_mdp_mixer_pipe_unstage(pipe);
+#endif
 			mdss_mdp_pipe_unmap(pipe);
 		}
 	}
