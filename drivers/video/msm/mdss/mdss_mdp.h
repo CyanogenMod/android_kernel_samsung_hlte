@@ -126,7 +126,6 @@ struct mdss_mdp_vsync_handler {
 	bool enabled;
 	bool cmd_post_flush;
 	mdp_vsync_handler_t vsync_handler;
-	u32 ref_cnt;
 	struct list_head list;
 };
 
@@ -356,7 +355,6 @@ struct mdss_mdp_pipe {
 	u8 blend_op;
 	u8 overfetch_disable;
 	u32 transp;
-	u32 bw_ov;
 	struct msm_fb_data_type *mfd;
 	struct mdss_mdp_mixer *mixer;
 
