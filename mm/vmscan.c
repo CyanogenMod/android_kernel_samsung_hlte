@@ -2490,7 +2490,6 @@ loop_again:
 		int has_under_min_watermark_zone = 0;
 
 		unbalanced_zone = NULL;
-		all_zones_ok = 1;
 		balanced = 0;
 
 		/*
