@@ -593,30 +593,6 @@ static const struct file_operations clock_debug_fops = {
 	.release	= seq_release,
 };
 
-/**
- * clock_debug_init() - Initialize clock debugfs
- */
-int __init clock_debug_init(void)
-{
-	debugfs_base = debugfs_create_dir("clk", NULL);
-	if (!debugfs_base)
-		return -ENOMEM;
-	if (!debugfs_create_u32("debug_suspend", S_IRUGO | S_IWUSR,
-				debugfs_base, &debug_suspend)) {
-		debugfs_remove_recursive(debugfs_base);
-		return -ENOMEM;
-	}
-
-	measure = clk_get_sys("debug", "measure");
-	if (IS_ERR(measure))
-		measure = NULL;
-
-	debugfs_create_file("showenable", S_IRUGO,
-			debugfs_base, NULL, &clock_debug_fops);
-
-	return 0;
-}
-
 static int clock_debug_print_clock(struct clk_lookup *cl)
 {
 	char *start = "";
