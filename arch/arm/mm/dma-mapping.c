@@ -833,7 +833,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
 		if (PageHighMem(page)) {
 			if (len + offset > PAGE_SIZE)
 				len = PAGE_SIZE - offset;
-			if (cache_is_vipt_nonalising()) {
+			if (cache_is_vipt_nonaliasing()) {
 #ifdef CONFIG_TIMA_RKP_DMA_MVA_TO_SETWAY
                 tima_cache_maint_page(page,dir);
 #else
