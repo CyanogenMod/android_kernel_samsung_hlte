@@ -26,22 +26,6 @@
 			qcom,ion-heap-type = "SYSTEM_CONTIG";
 		};
 
-		qcom,ion-heap@16 { /* Camera*/
-			compatible = "qcom,msm-ion-reserve";
-			reg = <16>;
-			qcom,heap-align = <0x1000>;
-			qcom,memory-reservation-type = "EBI1"; /* reserve EBI memory */
-			qcom,memory-reservation-size = <0x1E00000>;
-		};
-
-		qcom,ion-heap@20 { /* Camera*/
-			compatible = "qcom,msm-ion-reserve";
-			reg = <20>;
-			qcom,heap-align = <0x1000>;
-			qcom,memory-reservation-type = "EBI1"; /* reserve EBI memory */
-			qcom,memory-reservation-size = <0xA300000>;
-		};
-
 		qcom,ion-heap@8 { /* CP_MM HEAP */
 			compatible = "qcom,msm-ion-reserve";
 			reg = <8>;
@@ -62,7 +46,6 @@
 		qcom,ion-heap@27 { /* QSECOM HEAP */
 			compatible = "qcom,msm-ion-reserve";
 			reg = <27>;
-			qcom,heap-align = <0x1000>;
 			linux,contiguous-region = <&qsecom_mem>;
 			qcom,ion-heap-type = "DMA";
 		};
