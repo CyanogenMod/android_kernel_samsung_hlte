@@ -1366,6 +1366,11 @@ static unsigned int es325_read(struct snd_soc_codec *codec, unsigned int reg)
 	unsigned int value;
 	int rc;
 
+	if (FW_not_ready) {
+		dev_err(&sbdev->dev, "=[ES325]= %s: Firmware not ready", __func__);
+		return -EINVAL;
+	}
+
 	switch (access) {
 	case ES325_ALGO_ACCESS:
 		rc = es325_build_algo_read_msg(msg, &msg_len, reg);
@@ -1405,6 +1410,11 @@ static int es325_write(struct snd_soc_codec *codec, unsigned int reg, unsigned i
 	int msg_len = 0;
 	int i;
 	int rc;
+
+	if (FW_not_ready) {
+		dev_err(&sbdev->dev, "=[ES325]= %s: Firmware not ready", __func__);
+		return -EINVAL;
+	}
 
 	switch (access) {
 	case ES325_ALGO_ACCESS:
