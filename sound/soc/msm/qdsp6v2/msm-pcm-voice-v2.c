@@ -440,7 +440,7 @@ done:
 }
 
 
-
+#if 0
 static int msm_loopback_put(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
@@ -458,6 +458,7 @@ static int msm_loopback_get(struct snd_kcontrol *kcontrol,
 	ucontrol->value.integer.value[0] = voc_get_loopback_enable();
 	 return 0;
 }
+#endif
 
 static const char const *tty_mode[] = {"OFF", "HCO", "VCO", "FULL"};
 static const struct soc_enum msm_tty_mode_enum[] = {
@@ -587,17 +588,12 @@ static struct snd_kcontrol_new msm_voice_controls[] = {
 				0, 3, NULL, msm_voice_rx_device_mute_put),
 	SOC_SINGLE_MULTI_EXT("Voice Tx Mute", SND_SOC_NOPM, 0, VSID_MAX,
 				0, 2, NULL, msm_voice_mute_put),
-#if defined(CONFIG_MACH_HLTEVZW) || defined(CONFIG_MACH_HLTEUSC)
-	SOC_SINGLE_MULTI_EXT("Voice Rx Gain", SND_SOC_NOPM, 0, VSID_MAX, 0, 3,
+#if defined(CONFIG_SEC_DEVIDE_RINGTONE_GAIN)
+	SOC_SINGLE_EXT("Voice Rx Gain", SND_SOC_NOPM, 0, 65535, 0,
 				NULL, msm_voice_gain_put),
 #else
-#if defined(CONFIG_SEC_DEVIDE_RINGTONE_GAIN)
-	SOC_SINGLE_EXT("Voice Rx Volume", SND_SOC_NOPM, 0, 65535, 0,
-				msm_voice_volume_get, msm_voice_volume_put),
-#else
-	SOC_SINGLE_EXT("Voice Rx Volume", SND_SOC_NOPM, 0, 5, 0,
-				msm_voice_volume_get, msm_voice_volume_put),
-#endif
+	SOC_SINGLE_MULTI_EXT("Voice Rx Gain", SND_SOC_NOPM, 0, VSID_MAX, 0, 3,
+				NULL, msm_voice_gain_put),
 #endif 
 	SOC_ENUM_EXT("TTY Mode", msm_tty_mode_enum[0], msm_voice_tty_mode_get,
 				msm_voice_tty_mode_put),
