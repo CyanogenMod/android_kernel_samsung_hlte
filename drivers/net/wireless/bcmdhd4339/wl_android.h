@@ -2,7 +2,7 @@
  * Linux cfg80211 driver - Android related functions
  *
  * Copyright (C) 1999-2013, Broadcom Corporation
- * 
+ *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_android.h 422577 2013-09-08 05:47:41Z $
+ * $Id: wl_android.h 429124 2013-10-11 09:47:05Z $
  */
 
 #include <linux/module.h>
@@ -111,3 +111,6 @@ enum {
 s32 wl_genl_send_msg(struct net_device *ndev, u32 event_type,
 	u8 *string, u16 len, u8 *hdr, u16 hdrlen);
 #endif /* WL_GENL */
+#if defined(CUSTOMER_HW4) && defined(SUPPORT_AIBSS)
+s32 wl_netlink_send_msg(int pid, int seq, void *data, int size);
+#endif /* CUSTOMER_HW4 && SUPPORT_AIBSS */

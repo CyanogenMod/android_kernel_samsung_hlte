@@ -2,7 +2,7 @@
  * Misc system wide definitions
  *
  * Copyright (C) 1999-2013, Broadcom Corporation
- * 
+ *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmdefs.h 416231 2013-08-02 07:38:34Z $
+ * $Id: bcmdefs.h 424298 2013-09-17 06:38:13Z $
  */
 
 #ifndef	_bcmdefs_h_
@@ -54,11 +54,8 @@
 #define	BCMNMIATTACHDATA(_data)	_data
 #define CONST	const
 
-
 #undef BCM47XX_CA9
-#ifdef __ARM_ARCH_7A__
-#define BCM47XX_CA9
-#endif 
+
 #ifndef BCMFASTPATH
 #if defined(BCM47XX_CA9)
 #define BCMFASTPATH		__attribute__ ((__section__ (".text.fastpath")))
@@ -67,7 +64,7 @@
 #define BCMFASTPATH
 #define BCMFASTPATH_HOST
 #endif
-#endif 
+#endif
 
 
 
@@ -189,13 +186,13 @@ typedef struct {
 #if defined(BCM_RPC_NOCOPY) || defined(BCM_RCP_TXNOCOPY)
 
 #define BCMEXTRAHDROOM 260
-#else 
+#else
 #if defined(BCM47XX_CA9)
 #define BCMEXTRAHDROOM 224
 #else
 #define BCMEXTRAHDROOM 204
-#endif 
-#endif 
+#endif
+#endif
 
 
 #ifndef SDALIGN

@@ -2,7 +2,7 @@
  * Common function shared by Linux WEXT, cfg80211 and p2p drivers
  *
  * Copyright (C) 1999-2013, Broadcom Corporation
- * 
+ *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
@@ -108,5 +108,6 @@ int wldev_get_ssid(struct net_device *dev, wlc_ssid_t *pssid);
 int wldev_get_band(struct net_device *dev, uint *pband);
 
 int wldev_set_band(struct net_device *dev, uint band);
+
 
 #endif /* __WLDEV_COMMON_H__ */

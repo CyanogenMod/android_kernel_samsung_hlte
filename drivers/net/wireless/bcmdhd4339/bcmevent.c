@@ -2,7 +2,7 @@
  * bcmevent read-only data shared by kernel or app layers
  *
  * Copyright (C) 1999-2013, Broadcom Corporation
- * 
+ *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
@@ -20,7 +20,7 @@
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
- * $Id: bcmevent.c 389384 2013-03-06 12:20:17Z $
+ * $Id: bcmevent.c 429124 2013-10-11 09:47:05Z $
  */
 
 #include <typedefs.h>
@@ -110,7 +110,7 @@ const bcmevent_name_t bcmevent_names[] = {
 	{ WLC_E_ACTION_FRAME_RX_NDIS, "WLC_E_ACTION_FRAME_RX_NDIS" },
 	{ WLC_E_AUTH_REQ, "WLC_E_AUTH_REQ" },
 	{ WLC_E_IBSS_COALESCE, "IBSS COALESCE" },
-#endif 
+#endif
 #ifdef BCMWAPI_WAI
 	{ WLC_E_WAI_STA_EVENT, "WAI_STA_EVENT" },
 	{ WLC_E_WAI_MSG, "WAI_MSG" },
@@ -160,6 +160,9 @@ const bcmevent_name_t bcmevent_names[] = {
 	{ WLC_E_PROXD, "WLC_E_PROXD" },
 #endif
 	{ WLC_E_CCA_CHAN_QUAL, "CCA_BASED_CHANNEL_QUALITY" },
+#if defined(CUSTOMER_HW4) && defined(SUPPORT_AIBSS)
+	{ WLC_E_AIBSS_TXFAIL, "WLC_E_AIBSS_TXFAIL"},
+#endif /* CUSTOMER_HW4 && SUPPORT_AIBSS */
 	{ WLC_E_CCX_S69_RESP_RX, "CCX_S69_RESPONSE"},
 };
 
