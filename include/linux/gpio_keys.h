@@ -1,7 +1,7 @@
 #ifndef _GPIO_KEYS_H
 #define _GPIO_KEYS_H
 /* DVFS feature : HOME_KEY BOOSTER */
-#define KEY_BOOSTER
+//#define KEY_BOOSTER
 #ifdef KEY_BOOSTER
 #include <linux/cpufreq.h>
 #define KEY_BOOSTER_OFF_TIME	500 /* Changed from 3000 to 500 for optimization  */ 

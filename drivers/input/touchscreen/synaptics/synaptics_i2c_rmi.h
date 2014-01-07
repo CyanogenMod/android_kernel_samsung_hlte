@@ -34,7 +34,7 @@
 
 #define SYNAPTICS_DEVICE_NAME	"GT-I95XX"
 /* DVFS feature : TOUCH BOOSTER */
-#define TSP_BOOSTER
+//#define TSP_BOOSTER
 #ifdef TSP_BOOSTER
 #define DVFS_STAGE_TRIPLE	3
 #define DVFS_STAGE_DUAL		2
