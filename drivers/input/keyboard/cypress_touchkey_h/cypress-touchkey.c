@@ -69,7 +69,7 @@
 
 #define CYPRESS_FW_ID_REG	0X05
 
-#define USE_OPEN_CLOSE
+//#define USE_OPEN_CLOSE
 #undef DO_NOT_USE_FUNC_PARAM
 
 #define KEYCODE_REG		0x00
@@ -93,7 +93,9 @@ static void cypress_input_close(struct input_dev *dev);
 static void cypress_touchkey_early_suspend(struct early_suspend *h);
 static void cypress_touchkey_late_resume(struct early_suspend *h);
 #endif
-
+static int fb_notifier_callback(struct notifier_block *self,
+                         unsigned long event, void *data);
+static void configure_sleep(struct cypress_touchkey_info *info);
 #ifdef TK_INFORM_CHARGER
 extern void touchkey_register_callback(void *cb);
 #endif
@@ -123,6 +125,7 @@ static struct pm_gpio tkey_sleep_int = {
 };
 #endif
 
+
 #ifdef TSP_BOOSTER
 static void cypress_change_dvfs_lock(struct work_struct *work)
 {
@@ -140,6 +143,7 @@ static void cypress_change_dvfs_lock(struct work_struct *work)
 	info->dvfs_lock_status = false;
 	mutex_unlock(&info->dvfs_lock);
 }
+
 
 static void cypress_set_dvfs_off(struct work_struct *work)
 {
@@ -1862,6 +1866,10 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 		register_early_suspend(&info->early_suspend);
 #endif /* CONFIG_HAS_EARLYSUSPEND */
 
+#ifdef CONFIG_FB
+	configure_sleep(info);
+#endif
+
 #if defined(CONFIG_GLOVE_TOUCH)
 	info->glove_wq = create_singlethread_workqueue("cypress_touchkey");
 	if (!info->glove_wq)
@@ -2017,6 +2025,39 @@ static int cypress_touchkey_resume(struct device *dev)
 	info->is_powering_on = false;
 	return ret;
 }
+#endif
+
+#if defined(CONFIG_FB)
+static int fb_notifier_callback(struct notifier_block *self,
+                                    unsigned long event, void *data)
+    {
+        struct fb_event *evdata = data;
+        int *blank;
+        struct cypress_touchkey_info *info =
+        container_of(self, struct cypress_touchkey_info, fb_notif);
+
+        if (evdata && evdata->data && event == FB_EVENT_BLANK &&
+            info && info->client) {
+            blank = evdata->data;
+            if (*blank == FB_BLANK_UNBLANK)
+                cypress_touchkey_resume(&info->client->dev);
+            else if (*blank == FB_BLANK_POWERDOWN)
+                cypress_touchkey_suspend(&info->client->dev);
+        }
+
+        return 0;
+    }
+
+static void configure_sleep(struct cypress_touchkey_info *info)
+    {
+        int retval = 0;
+        info->fb_notif.notifier_call = fb_notifier_callback;
+        retval = fb_register_client(&info->fb_notif);
+        if (retval)
+            dev_err(&info->client->dev,
+                    "Unable to register fb_notifier: %d\n", retval);
+        return;
+    }
 #endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
