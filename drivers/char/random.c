@@ -616,8 +616,6 @@ static void set_timer_rand_state(unsigned int irq,
 }
 #endif
 
-static struct timer_rand_state input_timer_state;
-
 /*
  * This function adds entropy to the entropy "pool" by using timing
  * delays.  It uses the timer_rand_state structure to make an estimate
