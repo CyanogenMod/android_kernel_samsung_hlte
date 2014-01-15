@@ -72,6 +72,7 @@
 #define SYNC_IO_MODE	0x0001
 #define ASYNC_IO_MODE	0x0002
 #define COMPRESSED_IO	0x0040
+#define COMPRESSED_STREAM_IO	0x0080
 #define NT_MODE        0x0400
 
 #define NO_TIMESTAMP    0xFF00
@@ -404,5 +405,9 @@ int q6asm_set_dha(struct audio_client *ac,int *param);
 int q6asm_set_lrsm(struct audio_client *ac,int *param);
 int q6asm_set_sa_ep(struct audio_client *ac,int *param);
 int q6asm_get_sa_ep(struct audio_client *ac);
+
+/* Send the stream meta data to remove initial and trailing silence */
+int q6asm_stream_send_meta_data(struct audio_client *ac, uint32_t stream_id,
+		uint32_t initial_samples, uint32_t trailing_samples);
 
 #endif /* __Q6_ASM_H__ */
