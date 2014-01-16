@@ -32,10 +32,6 @@ extern int poweroff_charging;
 #include <linux/input.h>
 #include <linux/earlysuspend.h>
 #include <linux/mutex.h>
-#ifdef CONFIG_FB
-#include <linux/notifier.h>
-#include <linux/fb.h>
-#endif
 
 #if defined(CONFIG_GLOVE_TOUCH)
 #define TK_BIT_GLOVE 0x40
@@ -131,9 +127,6 @@ struct cypress_touchkey_info {
 	struct i2c_client			*client;
 	struct cypress_touchkey_platform_data	*pdata;
 	struct input_dev			*input_dev;
-#ifdef CONFIG_FB
-    struct notifier_block fb_notif;
-#endif
 	struct early_suspend			early_suspend;
 	char			phys[32];
 	unsigned char			keycode[NUM_OF_KEY];
