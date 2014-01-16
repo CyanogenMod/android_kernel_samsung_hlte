@@ -2110,13 +2110,13 @@ static void cypress_input_close(struct input_dev *dev)
 
 }
 #endif
-/*
+
 #if defined(CONFIG_PM) && !defined(CONFIG_HAS_EARLYSUSPEND) && !defined(USE_OPEN_CLOSE)
 static const struct dev_pm_ops cypress_touchkey_pm_ops = {
 	.suspend	= cypress_touchkey_suspend,
 	.resume		= cypress_touchkey_resume,
 };
-#endif*/
+#endif
 
 struct i2c_driver cypress_touchkey_driver = {
 	.probe = cypress_touchkey_probe,
@@ -2125,12 +2125,10 @@ struct i2c_driver cypress_touchkey_driver = {
 		.name = "cypress_touchkey",
 		.owner = THIS_MODULE,
 		.of_match_table = cypress_match_table,
-/*
 #if defined(CONFIG_PM) && !defined(CONFIG_HAS_EARLYSUSPEND) && !defined(USE_OPEN_CLOSE)
 		.pm	= &cypress_touchkey_pm_ops,
 #endif
-*/
-    },
+		   },
 	.id_table = cypress_touchkey_id,
 };
 /*
