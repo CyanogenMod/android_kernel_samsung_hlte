@@ -197,6 +197,12 @@ struct mmc_hotplug {
 	void *handler_priv;
 };
 
+enum dev_state {
+	DEV_SUSPENDING = 1,
+	DEV_SUSPENDED,
+	DEV_RESUMED,
+};
+
 struct mmc_host {
 	struct device		*parent;
 	struct device		class_dev;
@@ -325,6 +331,7 @@ struct mmc_host {
 
 	/* private data */
 	spinlock_t		lock;		/* lock for claim and bus ops */
+	spinlock_t		mrq_lock;	/* lock for mrq usage */
 
 	struct mmc_ios		ios;		/* current io bus settings */
 	u32			ocr;		/* the current OCR setting */
@@ -420,6 +427,7 @@ struct mmc_host {
 		struct delayed_work work;
 		enum mmc_load	state;
 	} clk_scaling;
+	enum dev_state dev_status;
 	unsigned long		private[0] ____cacheline_aligned;
 };
 

@@ -80,18 +80,11 @@ static struct msm_isp_buffer *msm_isp_get_buf_ptr(
 }
 
 static uint32_t msm_isp_get_buf_handle(
-	struct msm_isp_buf_mgr *buf_mgr,
-	uint32_t session_id, uint32_t stream_id)
+	struct msm_isp_buf_mgr *buf_mgr)
 {
 	int i;
 	if ((buf_mgr->buf_handle_cnt << 8) == 0)
 		buf_mgr->buf_handle_cnt++;
-
-	for (i = 0; i < buf_mgr->num_buf_q; i++) {
-		if (buf_mgr->bufq[i].session_id == session_id &&
-			buf_mgr->bufq[i].stream_id == stream_id)
-			return 0;
-	}
 
 	for (i = 0; i < buf_mgr->num_buf_q; i++) {
 		if (buf_mgr->bufq[i].bufq_handle == 0) {
@@ -142,6 +135,7 @@ static int msm_isp_prepare_v4l2_buf(struct msm_isp_buf_mgr *buf_mgr,
 			goto ion_map_error;
 		}
 		mapped_info->paddr += v4l2_buf->m.planes[i].data_offset;
+		mapped_info->offset = v4l2_buf->m.planes[i].data_offset;
 		CDBG("%s: plane: %d addr:%lu\n",
 			__func__, i, mapped_info->paddr);
 	}
@@ -286,10 +280,6 @@ static int msm_isp_get_buf(struct msm_isp_buf_mgr *buf_mgr, uint32_t id,
 	bufq = msm_isp_get_bufq(buf_mgr, bufq_handle);
 	if (!bufq) {
 		pr_err("%s: Invalid bufq\n", __func__);
-		return rc;
-	}
-	if (!bufq->bufq_handle) {
-		pr_err("%s: Invalid bufq handle\n", __func__);
 		return rc;
 	}
 
@@ -572,18 +562,11 @@ static int msm_isp_buf_enqueue(struct msm_isp_buf_mgr *buf_mgr,
 	if (buf_state == MSM_ISP_BUFFER_STATE_DIVERTED) {
 		buf_info = msm_isp_get_buf_ptr(buf_mgr,
 						info->handle, info->buf_idx);
-		if (info->dirty_buf) {
-			rc = msm_isp_put_buf(buf_mgr,
-				info->handle, info->buf_idx);
-		} else {
-			if (BUF_SRC(bufq->stream_id))
-				pr_err("%s: Invalid native buffer state\n",
-					__func__);
-			else
-				rc = msm_isp_buf_done(buf_mgr,
-					info->handle, info->buf_idx,
-					buf_info->tv, buf_info->frame_id, 0);
-		}
+		if (info->dirty_buf)
+			msm_isp_put_buf(buf_mgr, info->handle, info->buf_idx);
+		else
+			msm_isp_buf_done(buf_mgr, info->handle, info->buf_idx,
+				buf_info->tv, buf_info->frame_id, 0);
 	} else {
 		bufq = msm_isp_get_bufq(buf_mgr, info->handle);
 		if (BUF_SRC(bufq->stream_id)) {
@@ -623,8 +606,7 @@ static int msm_isp_request_bufq(struct msm_isp_buf_mgr *buf_mgr,
 		return rc;
 	}
 
-	buf_request->handle = msm_isp_get_buf_handle(buf_mgr,
-		buf_request->session_id, buf_request->stream_id);
+	buf_request->handle = msm_isp_get_buf_handle(buf_mgr);
 	if (!buf_request->handle) {
 		pr_err("Invalid buffer handle\n");
 		return rc;

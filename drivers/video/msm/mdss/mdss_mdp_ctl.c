@@ -18,7 +18,6 @@
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/delay.h>
-
 #include "mdss_fb.h"
 #include "mdss_mdp.h"
 
@@ -42,7 +41,9 @@ enum {
 #define MDSS_MDP_PERF_UPDATE_CLK BIT(0)
 #define MDSS_MDP_PERF_UPDATE_BUS BIT(1)
 #define MDSS_MDP_PERF_UPDATE_ALL -1
-
+#ifdef CONFIG_VIDEO_MHL_V2
+extern int hdmi_hpd_status(void);
+#endif
 static DEFINE_MUTEX(mdss_mdp_ctl_lock);
 
 static int mdss_mdp_mixer_free(struct mdss_mdp_mixer *mixer);
@@ -116,12 +117,23 @@ static void __mdss_mdp_ctrl_perf_ovrd(struct mdss_data_type *mdata,
 				ctl->mixer_right, &npipe);
 	}
 
+#if !defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) && !defined (CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)\
+	&& !defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL)
 	*ab_quota = MDSS_MDP_BUS_FUDGE_FACTOR_AB(*ab_quota);
 	if (npipe > 1)
 		*ib_quota = MDSS_MDP_BUS_FUDGE_FACTOR_HIGH_IB(*ib_quota);
 	else
 		*ib_quota = MDSS_MDP_BUS_FUDGE_FACTOR_IB(*ib_quota);
-
+#elif defined(CONFIG_VIDEO_MHL_V2)
+	if (hdmi_hpd_status()) {
+		pr_info("%s: hdmi_hpd_status fuction was called @ %d\n", __func__, __LINE__);
+		*ab_quota = MDSS_MDP_BUS_FUDGE_FACTOR_AB(*ab_quota);
+		if (npipe > 1)
+			*ib_quota = MDSS_MDP_BUS_FUDGE_FACTOR_HIGH_IB(*ib_quota);
+		else
+			*ib_quota = MDSS_MDP_BUS_FUDGE_FACTOR_IB(*ib_quota);
+		}
+#endif
 	if (ovrd && (*ib_quota < MDSS_MDP_BUS_FLOOR_BW)) {
 		*ib_quota = MDSS_MDP_BUS_FLOOR_BW;
 		pr_debug("forcing the BIMC clock to 200 MHz : %llu bytes",
@@ -273,7 +285,8 @@ static void mdss_mdp_perf_mixer_update(struct mdss_mdp_mixer *mixer,
 			v_total = mixer->height;
 		}
 		*clk_rate = mixer->width * v_total * fps;
-		if (pinfo && pinfo->lcdc.v_back_porch < MDP_MIN_VBP)
+		if ((pinfo && pinfo->lcdc.v_back_porch < MDP_MIN_VBP)
+				&& (pinfo->type == MIPI_VIDEO_PANEL))
 			*clk_rate = MDSS_MDP_CLK_FUDGE_FACTOR(*clk_rate);
 
 		if (!pinfo) {
@@ -624,6 +637,31 @@ int mdss_mdp_ctl_splash_finish(struct mdss_mdp_ctl *ctl, bool handoff)
 	}
 }
 
+#if defined(CONFIG_FB_MSM_EDP_SAMSUNG)
+int mdss_mdp_scan_pipes(void)
+{
+	unsigned long  off;
+	u32  size;
+	int i, pnum = 0;
+
+	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
+	for (i = 0; i < 6; i++) {
+		off = MDSS_MDP_REG_SSPP_OFFSET(i) + MDSS_MDP_REG_SSPP_SRC_SIZE;
+
+		size = MDSS_MDP_REG_READ(off);
+
+		pr_debug("%s: i=%d: addr=%x hw=%x\n",
+				__func__, i, (int)off, (int)size);
+		if (size)
+			pnum++;
+
+	}
+	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
+
+	return pnum;
+}
+#endif
+
 static inline int mdss_mdp_set_split_ctl(struct mdss_mdp_ctl *ctl,
 		struct mdss_mdp_ctl *split_ctl)
 {
@@ -879,9 +917,16 @@ struct mdss_mdp_ctl *mdss_mdp_ctl_init(struct mdss_panel_data *pdata,
 		ctl->intf_type = MDSS_INTF_HDMI;
 		ctl->opmode = MDSS_MDP_CTL_OP_VIDEO_MODE;
 		ctl->start_fnc = mdss_mdp_video_start;
+#ifndef CONFIG_VIDEO_MHL_V2
+/*
+* mdss_mdp_limited_lut_igc_config() is for make limited range
+* but we use limited range in MHL driver side
+* so comment that function
+*/
 		ret = mdss_mdp_limited_lut_igc_config(ctl);
 		if (ret)
 			pr_err("Unable to config IGC LUT data");
+#endif
 		break;
 	case WRITEBACK_PANEL:
 		ctl->intf_num = MDSS_MDP_NO_INTF;
@@ -975,6 +1020,8 @@ int mdss_mdp_ctl_split_display_setup(struct mdss_mdp_ctl *ctl,
 
 	mixer->width = sctl->width;
 	mixer->height = sctl->height;
+
+	mixer->roi = (struct mdss_mdp_img_rect) {0, 0, mixer->width, mixer->height}; 
 	sctl->mixer_left = mixer;
 
 	return mdss_mdp_set_split_ctl(ctl, sctl);
@@ -1728,6 +1775,11 @@ int mdss_mdp_display_wakeup_time(struct mdss_mdp_ctl *ctl,
 	u32 time_of_line, time_to_vsync;
 	ktime_t current_time = ktime_get();
 
+	if (!ctl) {
+		pr_err("%s : invalid ctl\n", __func__);
+		return -ENODEV;
+	}
+
 	if (!ctl->read_line_cnt_fnc)
 		return -ENOSYS;
 
@@ -1836,6 +1888,10 @@ int mdss_mdp_display_wait4pingpong(struct mdss_mdp_ctl *ctl)
 	return ret;
 }
 
+#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
+struct mdss_mdp_ctl *commit_ctl;
+#endif
+
 int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 {
 	struct mdss_mdp_ctl *sctl = NULL;
@@ -1847,6 +1903,10 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 		pr_err("display function not set\n");
 		return -ENODEV;
 	}
+
+#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
+	commit_ctl = ctl;
+#endif
 
 	mutex_lock(&ctl->lock);
 	pr_debug("commit ctl=%d play_cnt=%d\n", ctl->num, ctl->play_cnt);
@@ -2073,3 +2133,18 @@ int mdss_mdp_mixer_handoff(struct mdss_mdp_ctl *ctl, u32 num,
 
 	return rc;
 }
+#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
+void mdss_mdp_mixer_read(void)
+{
+	int i, off;
+	u32 data[4];
+
+	for (i=0; i < 4; i++) {
+		off =  MDSS_MDP_REG_CTL_LAYER(i);
+		data[i] = mdss_mdp_ctl_read(commit_ctl, off);
+	}
+	xlog(__func__, data[0], data[1], data[2], data[3], off, 0);
+
+}
+#endif
+

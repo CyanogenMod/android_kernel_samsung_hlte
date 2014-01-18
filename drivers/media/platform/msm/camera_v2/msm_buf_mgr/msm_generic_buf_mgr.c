@@ -166,7 +166,7 @@ static int __init msm_buf_mngr_init(void)
 	rc = msm_sd_register(&msm_buf_mngr_dev->subdev);
 	if (rc != 0) {
 		pr_err("%s: msm_sd_register error = %d\n", __func__, rc);
-		goto end;
+		goto register_error;
 	}
 
 	v4l2_subdev_notify(&msm_buf_mngr_dev->subdev.sd, MSM_SD_NOTIFY_REQ_CB,
@@ -174,8 +174,11 @@ static int __init msm_buf_mngr_init(void)
 
 	INIT_LIST_HEAD(&msm_buf_mngr_dev->buf_qhead);
 	spin_lock_init(&msm_buf_mngr_dev->buf_q_spinlock);
-end:
 	return rc;
+    
+register_error:
+    kfree(msm_buf_mngr_dev); 
+    return rc;
 }
 
 static void __exit msm_buf_mngr_exit(void)

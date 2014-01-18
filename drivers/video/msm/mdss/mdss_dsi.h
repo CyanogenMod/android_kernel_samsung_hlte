@@ -48,6 +48,8 @@
 #define MIPI_DSI_PANEL_720P_PT	8
 #define DSI_PANEL_MAX	8
 
+//#define DSI_CLK_DEBUG
+
 enum {		/* mipi dsi panel */
 	DSI_VIDEO_MODE,
 	DSI_CMD_MODE,
@@ -195,7 +197,20 @@ struct dsi_clk_desc {
 	u32 pre_div_func;
 };
 
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
+#define DEBUG_LDI_STATUS
+#define DYNAMIC_FPS_USE_TE_CTRL
+extern int dynamic_fps_use_te_ctrl;
+#endif
 
+struct dsi_cmd {
+	struct dsi_cmd_desc *cmd_desc;
+	char *read_size;
+	char *read_startoffset;
+	int num_of_cmds;
+	char *cmds_buff;
+	int cmds_len;
+};
 struct dsi_panel_cmds {
 	char *buf;
 	int blen;
@@ -203,6 +218,8 @@ struct dsi_panel_cmds {
 	int cmd_cnt;
 	int link_state;
 };
+
+#define CMD_REQ_SINGLE_TX 0x0010
 
 struct dsi_kickoff_action {
 	struct list_head act_entry;
@@ -214,6 +231,7 @@ struct dsi_drv_cm_data {
 	struct regulator *vdd_vreg;
 	struct regulator *vdd_io_vreg;
 	struct regulator *vdda_vreg;
+	struct regulator *iovdd_vreg;
 	int broadcast_enable;
 };
 
@@ -234,10 +252,18 @@ struct mdss_dsi_ctrl_pdata {
 	int (*partial_update_fnc) (struct mdss_panel_data *pdata);
 	int (*check_status) (struct mdss_dsi_ctrl_pdata *pdata);
 	void (*cmdlist_commit)(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp);
+	int (*registered) (struct mdss_panel_data *pdata);
+	int (*dimming_init) (struct mdss_panel_data *pdata);
+	int (*event_handler) (int e);
+	int (*panel_blank) (struct mdss_panel_data *pdata, int blank);
+	void (*panel_reset) (struct mdss_panel_data *pdata, int enable);
+	int (*panel_extra_power) (struct mdss_panel_data *pdata, int enable);
+	void (*bl_fnc) (struct mdss_panel_data *pdata, u32 level);
 	struct mdss_panel_data panel_data;
 	unsigned char *ctrl_base;
 	int reg_size;
 	u32 clk_cnt;
+	u32 clk_cnt_by_dsi1;
 	struct clk *mdp_core_clk;
 	struct clk *ahb_clk;
 	struct clk *axi_clk;
@@ -274,6 +300,15 @@ struct mdss_dsi_ctrl_pdata {
 
 	struct dsi_panel_cmds on_cmds;
 	struct dsi_panel_cmds off_cmds;
+	struct dsi_panel_cmds ce_on_cmds;
+	struct dsi_panel_cmds ce_off_cmds;
+	struct dsi_panel_cmds cabc_on_cmds;
+	struct dsi_panel_cmds cabc_off_cmds;
+	struct dsi_panel_cmds cabc_tune_cmds;
+
+
+	int dsi_on_state;
+	int dsi_off_state;
 
 	struct dcs_cmd_list cmdlist;
 	struct completion dma_comp;
@@ -285,11 +320,15 @@ struct mdss_dsi_ctrl_pdata {
 	int mdp_busy;
 	struct mutex mutex;
 	struct mutex cmd_mutex;
+	struct mutex dfps_mutex;
+	int mdp_tg_on;
 
 	struct dsi_buf tx_buf;
 	struct dsi_buf rx_buf;
+	int dsi_err_cnt;
 };
 
+extern unsigned int gv_manufacture_id;
 int dsi_panel_device_register(struct device_node *pan_node,
 				struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 
@@ -311,6 +350,7 @@ void mdss_dsi_ack_err_status(struct mdss_dsi_ctrl_pdata *ctrl);
 int mdss_dsi_clk_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, int enable);
 void mdss_dsi_clk_req(struct mdss_dsi_ctrl_pdata *ctrl,
 				int enable);
+void mdss_dsi_clk_ctrl_mdp(int ndx, int enable);
 void mdss_dsi_controller_cfg(int enable,
 				struct mdss_panel_data *pdata);
 void mdss_dsi_sw_reset(struct mdss_panel_data *pdata);
@@ -333,6 +373,9 @@ void mdss_dsi_phy_sw_reset(unsigned char *ctrl_base);
 void mdss_dsi_cmd_test_pattern(struct mdss_panel_data *pdata);
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl);
 
+int mdss_dsi_cmds_single_tx(struct mdss_dsi_ctrl_pdata *ctrl,
+                 struct dsi_cmd_desc *cmds, int cnt);
+
 void mdss_dsi_ctrl_init(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_cmd_mdp_busy(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_wait4video_done(struct mdss_dsi_ctrl_pdata *ctrl);
@@ -343,4 +386,11 @@ int mdss_dsi_bta_status_check(struct mdss_dsi_ctrl_pdata *ctrl);
 int mdss_dsi_panel_init(struct device_node *node,
 		struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		bool cmd_cfg_cont_splash);
+void mdss_dsi_mdp_busy_wait(int panel_ndx);
+void mdss_dsi_dump_power_clk(struct mdss_panel_data *pdata, int flag);
+
+/*for mondrian*/
+void pwm_backlight_enable(void);
+void pwm_backlight_disable(void);
+
 #endif /* MDSS_DSI_H */

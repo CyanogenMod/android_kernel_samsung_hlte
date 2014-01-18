@@ -879,6 +879,7 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 			"Invalid input, inst = %p, format = %p\n", inst, f);
 		return -EINVAL;
 	}
+	
 	if (f->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
 
 		fmt = msm_comm_get_pixel_fmt_fourcc(vdec_formats,
@@ -971,7 +972,16 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 			rc = -EINVAL;
 			goto err_invalid_fmt;
 		}
+		if (!(get_hal_codec_type(fmt->fourcc) & 			  
+		inst->core->dec_codec_supported)) { 				  
+		dprintk(VIDC_ERR,									  
+		"Codec(0x%x) not supported\n",						  
+		get_hal_codec_type(fmt->fourcc));					  
+		rc = -EINVAL;										  
+		goto err_invalid_fmt;								  
+		}													  
 		inst->fmts[fmt->type] = fmt;
+		
 		rc = msm_comm_try_state(inst, MSM_VIDC_OPEN_DONE);
 		if (rc) {
 			dprintk(VIDC_ERR, "Failed to open instance\n");

@@ -28,18 +28,7 @@
 #include "msm_jpeg_common.h"
 #include "msm_jpeg_hw.h"
 
-int msm_jpeg_platform_set_clk_rate(struct msm_jpeg_device *pgmn_dev,
-		long clk_rate)
-{
-	struct msm_cam_clk_info jpeg_core_clk_info[] = {
-		{"core_clk", JPEG_CLK_RATE, 0}
-	};
-
-	jpeg_core_clk_info[0].clk_rate = clk_rate;
-
-	return msm_cam_clk_enable(&pgmn_dev->pdev->dev, jpeg_core_clk_info,
-			pgmn_dev->jpeg_clk, ARRAY_SIZE(jpeg_core_clk_info), 1);
-}
+#define JPEG_CORE_CLK 266670000
 
 void msm_jpeg_platform_p2v(struct msm_jpeg_device *pgmn_dev, struct file  *file,
 	struct ion_handle **ionhandle, int domain_num)
@@ -83,7 +72,7 @@ error1:
 }
 
 static struct msm_cam_clk_info jpeg_8x_clk_info[] = {
-	{"core_clk", JPEG_CLK_RATE},
+	{"core_clk", JPEG_CORE_CLK},
 	{"iface_clk", -1},
 	{"bus_clk0", -1},
 	{"camss_top_ahb_clk", -1},
@@ -148,8 +137,8 @@ static struct msm_bus_vectors msm_jpeg_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_JPEG,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
-		.ab  = JPEG_MAX_CLK_RATE * 2.5,
-		.ib  = JPEG_MAX_CLK_RATE * 2.5,
+		.ab  = JPEG_CORE_CLK * 1.6,
+		.ib  = JPEG_CORE_CLK * 2.5,
 	},
 };
 
@@ -184,8 +173,6 @@ int msm_jpeg_platform_init(struct platform_device *pdev,
 	void *jpeg_base;
 	struct msm_jpeg_device *pgmn_dev =
 		(struct msm_jpeg_device *) context;
-
-	pgmn_dev->state = MSM_JPEG_IDLE;
 
 	jpeg_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!jpeg_mem) {
@@ -286,7 +273,6 @@ int msm_jpeg_platform_init(struct platform_device *pdev,
 	pgmn_dev->jpeg_client = msm_ion_client_create(-1, "camera/jpeg");
 	JPEG_DBG("%s:%d] success\n", __func__, __LINE__);
 
-	pgmn_dev->state = MSM_JPEG_INIT;
 	return rc;
 
 fail_request_irq:
@@ -361,7 +347,6 @@ int msm_jpeg_platform_release(struct resource *mem, void *base, int irq,
 	iounmap(base);
 	release_mem_region(mem->start, resource_size(mem));
 	ion_client_destroy(pgmn_dev->jpeg_client);
-	pgmn_dev->state = MSM_JPEG_IDLE;
 	JPEG_DBG("%s:%d] success\n", __func__, __LINE__);
 	return result;
 }

@@ -520,7 +520,7 @@ int map_and_register_buf(struct msm_vidc_inst *inst, struct v4l2_buffer *b)
 		if ((i == 0) && is_dynamic_output_buffer_mode(b, inst)) {
 			rc = buf_ref_get(inst, binfo);
 			if (rc < 0)
-				return rc;
+				goto exit;
 		}
 	}
 	dprintk(VIDC_DBG, "[MAP] Adding binfo = %p to list\n", binfo);
@@ -708,11 +708,13 @@ int msm_vidc_release_buffers(void *instance, int buffer_type)
 	struct v4l2_buffer buffer_info;
 	struct v4l2_plane plane[VIDEO_MAX_PLANES];
 	int i, rc = 0;
+	bool release_buf = false;	
 
 	if (!inst)
 		return -EINVAL;
 
 	list_for_each_safe(ptr, next, &inst->registered_bufs) {
+		mutex_lock(&inst->lock);
 		bi = list_entry(ptr, struct buffer_info, list);
 		if (bi->type == buffer_type) {
 			buffer_info.type = bi->type;
@@ -730,18 +732,29 @@ int msm_vidc_release_buffers(void *instance, int buffer_type)
 					buffer_info.m.planes[i].length);
 			}
 			buffer_info.length = bi->num_planes;
-			if (inst->session_type == MSM_VIDC_DECODER)
-				rc = msm_vdec_release_buf(instance,
-					&buffer_info);
-			if (inst->session_type == MSM_VIDC_ENCODER)
-				rc = msm_venc_release_buf(instance,
-					&buffer_info);
-			if (rc)
-				dprintk(VIDC_ERR,
-					"Failed Release buffer: %d, %d, %d\n",
-					buffer_info.m.planes[0].reserved[0],
-					buffer_info.m.planes[0].reserved[1],
-					buffer_info.m.planes[0].length);
+			release_buf = true;
+		}
+		mutex_unlock(&inst->lock);
+		if (!release_buf)
+			continue;
+		release_buf = false;
+		if (inst->session_type == MSM_VIDC_DECODER)
+			rc = msm_vdec_release_buf(instance,
+				&buffer_info);
+		if (inst->session_type == MSM_VIDC_ENCODER)
+			rc = msm_venc_release_buf(instance,
+				&buffer_info);
+		if (rc)
+			dprintk(VIDC_ERR,
+				"Failed Release buffer: %d, %d, %d\n",
+				buffer_info.m.planes[0].reserved[0],
+				buffer_info.m.planes[0].reserved[1],
+				buffer_info.m.planes[0].length);
+	}
+	mutex_lock(&inst->lock);
+	list_for_each_safe(ptr, next, &inst->registered_bufs) {
+		bi = list_entry(ptr, struct buffer_info, list);
+		if (bi->type == buffer_type) {
 			list_del(&bi->list);
 			for (i = 0; i < bi->num_planes; i++) {
 				if (bi->handle[i])
@@ -751,6 +764,7 @@ int msm_vidc_release_buffers(void *instance, int buffer_type)
 			kfree(bi);
 		}
 	}
+	mutex_unlock(&inst->lock);
 	return rc;
 }
 
@@ -904,6 +918,13 @@ int msm_vidc_dqbuf(void *instance, struct v4l2_buffer *b)
 			return -EINVAL;
 		}
 	}
+
+	if (!buffer_info) { 
+		dprintk(VIDC_ERR, 
+		"%s: error - no buffer info found in registered list\n", 
+		__func__); 
+		return -EINVAL; 
+	} 
 
 	if (is_dynamic_output_buffer_mode(b, inst)) {
 		mutex_lock(&inst->lock);
@@ -1187,7 +1208,7 @@ void *msm_vidc_open(int core_id, int session_type)
 			"Failed to initialize vb2 queue on capture port\n");
 		goto fail_bufq_output;
 	}
-	rc = msm_comm_try_state(inst, MSM_VIDC_CORE_INIT);
+	rc = msm_comm_try_state(inst, MSM_VIDC_CORE_INIT_DONE);
 	if (rc) {
 		dprintk(VIDC_ERR,
 			"Failed to move video instance to init state\n");

@@ -571,6 +571,10 @@ static void krait_update_uv(int *uv, int num, int boost_uv)
 {
 	int i;
 
+#if defined(CONFIG_MACH_VIENNAEUR)
+	boost_uv=25000;
+	enable_boost=1;
+#endif
 	switch (read_cpuid_id()) {
 	case 0x511F04D0: /* KR28M2A20 */
 	case 0x511F04D1: /* KR28M2A21 */

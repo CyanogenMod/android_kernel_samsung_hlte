@@ -306,6 +306,10 @@ static enum power_supply_property msm_bms_power_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
 	POWER_SUPPLY_PROP_CHARGE_FULL,
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_VOLTAGE_AVG,
+#endif
 };
 
 static int discard_backup_fcc_data(struct qpnp_bms_chip *chip);
@@ -765,9 +769,22 @@ static bool is_battery_full(struct qpnp_bms_chip *chip)
 	return get_battery_status(chip) == POWER_SUPPLY_STATUS_FULL;
 }
 
+#define BAT_PRES_BIT		BIT(7)
 static bool is_battery_present(struct qpnp_bms_chip *chip)
 {
 	union power_supply_propval ret = {0,};
+	int rc;
+	u8 batt_pres;
+
+	/* first try to use the batt_pres register if given */
+	if (chip->batt_pres_addr) {
+		rc = qpnp_read_wrapper(chip, &batt_pres,
+				chip->batt_pres_addr, 1);
+		if (!rc && (batt_pres & BAT_PRES_BIT))
+			return true;
+		else
+			return false;
+	}
 
 	if (chip->batt_psy == NULL)
 		chip->batt_psy = power_supply_get_by_name("battery");
@@ -3342,6 +3359,16 @@ static int qpnp_bms_power_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CYCLE_COUNT:
 		val->intval = chip->charge_cycles;
 		break;
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+	case POWER_SUPPLY_PROP_VOLTAGE_AVG:
+	{
+		int vbat_uv;
+		get_battery_voltage(chip, &vbat_uv);
+		val->intval = vbat_uv/1000;
+	}
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -3552,7 +3579,12 @@ static int set_battery_data(struct qpnp_bms_chip *chip)
 	} else if (chip->batt_type == BATT_PALLADIUM) {
 		batt_data = &palladium_1500_data;
 	} else if (chip->batt_type == BATT_OEM) {
+#if (defined(CONFIG_MACH_MILLET3G_EUR) || defined(CONFIG_MACH_MATISSE3G_OPEN) \
+		|| defined(CONFIG_MACH_MILLETLTE_OPEN))
+		batt_data = &samsung_4450mAH_data;
+#else
 		batt_data = &oem_batt_data;
+#endif
 	} else if (chip->batt_type == BATT_QRD_4V35_2000MAH) {
 		batt_data = &QRD_4v35_2000mAh_data;
 	} else if (chip->batt_type == BATT_QRD_4V2_1300MAH) {

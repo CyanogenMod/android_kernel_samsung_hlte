@@ -102,6 +102,9 @@ struct cpufreq_policy {
 	unsigned int		cur;    /* in kHz, only needed if cpufreq
 					 * governors are used */
 	unsigned int            util;  /* CPU utilization at max frequency */
+#ifdef CONFIG_SEC_PM
+	unsigned int            load_at_max;  /* CPU utilization at max frequency */
+#endif
 	unsigned int		policy; /* see above */
 	struct cpufreq_governor	*governor; /* see below */
 
@@ -343,6 +346,35 @@ static inline unsigned int cpufreq_quick_get_max(unsigned int cpu)
 {
 	return 0;
 }
+#endif
+
+#if defined (CONFIG_SEC_DVFS) || defined (CONFIG_CPU_FREQ_LIMIT_USERSPACE)
+enum {
+	BOOT_CPU = 0,
+};
+
+#define MIN_TOUCH_LIMIT		1728000
+#define MIN_TOUCH_HIGH_LIMIT	2265600
+#define MIN_TOUCH_LIMIT_SECOND	1190400
+
+enum {
+	DVFS_NO_ID			= 0,
+
+	/* need to update now */
+	DVFS_TOUCH_ID			= 0x00000001,
+	DVFS_APPS_MIN_ID		= 0x00000002,
+	DVFS_APPS_MAX_ID		= 0x00000004,
+	DVFS_UNICPU_ID			= 0x00000008,
+	DVFS_LTETP_ID			= 0x00000010,
+
+	/* DO NOT UPDATE NOW */
+	DVFS_THERMALD_ID		= 0x00000100,
+
+	DVFS_MAX_ID
+};
+
+
+int set_freq_limit(unsigned long id, unsigned int freq);
 #endif
 
 

@@ -19,7 +19,7 @@
 
 /*#define CONFIG_MSMB_CAMERA_DEBUG*/
 #undef CDBG
-#ifdef CONFIG_MSMB_CAMERA_DEBUG
+#ifdef MT9M114_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
 #else
 #define CDBG(fmt, args...) do { } while (0)
@@ -36,50 +36,6 @@
 DEFINE_MSM_MUTEX(mt9m114_mut);
 static struct msm_sensor_ctrl_t mt9m114_s_ctrl;
 
-static struct msm_sensor_power_setting mt9m114_power_setting[] = {
-	{
-		.seq_type = SENSOR_VREG,
-		.seq_val = CAM_VIO,
-		.config_val = 0,
-		.delay = 0,
-	},
-	{
-		.seq_type = SENSOR_VREG,
-		.seq_val = CAM_VDIG,
-		.config_val = 0,
-		.delay = 0,
-	},
-	{
-		.seq_type = SENSOR_VREG,
-		.seq_val = CAM_VANA,
-		.config_val = 0,
-		.delay = 0,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_RESET,
-		.config_val = GPIO_OUT_LOW,
-		.delay = 1,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_RESET,
-		.config_val = GPIO_OUT_HIGH,
-		.delay = 30,
-	},
-	{
-		.seq_type = SENSOR_CLK,
-		.seq_val = SENSOR_CAM_MCLK,
-		.config_val = 0,
-		.delay = 100,
-	},
-	{
-		.seq_type = SENSOR_I2C_MUX,
-		.seq_val = 0,
-		.config_val = 0,
-		.delay = 0,
-	},
-};
 
 static struct msm_camera_i2c_reg_conf mt9m114_720p_settings[] = {
 	{0xdc00, 0x50, MSM_CAMERA_I2C_BYTE_DATA, MSM_CAMERA_I2C_CMD_WRITE},
@@ -1112,7 +1068,6 @@ static int32_t msm_mt9m114_i2c_probe(struct i2c_client *client,
 {
 	return msm_sensor_i2c_probe(client, id, &mt9m114_s_ctrl);
 }
-
 static struct i2c_driver mt9m114_i2c_driver = {
 	.id_table = mt9m114_i2c_id,
 	.probe  = msm_mt9m114_i2c_probe,
@@ -1152,12 +1107,14 @@ static int32_t mt9m114_platform_probe(struct platform_device *pdev)
 static int __init mt9m114_init_module(void)
 {
 	int32_t rc;
-	pr_info("%s:%d\n", __func__, __LINE__);
+	CDBG("%s:%d\n", __func__, __LINE__);
 	rc = platform_driver_probe(&mt9m114_platform_driver,
 		mt9m114_platform_probe);
-	if (!rc)
+	if (!rc) {
+		pr_info("%s: probe success\n", __func__);
 		return rc;
-	pr_err("%s:%d rc %d\n", __func__, __LINE__, rc);
+	}
+	CDBG("%s:%d rc %d\n", __func__, __LINE__, rc);
 	return i2c_add_driver(&mt9m114_i2c_driver);
 }
 
@@ -1243,7 +1200,8 @@ int32_t mt9m114_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 		break;
 	case CFG_SET_SLAVE_INFO: {
 		struct msm_camera_sensor_slave_info sensor_slave_info;
-		struct msm_sensor_power_setting_array *power_setting_array;
+		struct msm_camera_power_ctrl_t *p_ctrl;
+		uint16_t size;
 		int slave_index = 0;
 		if (copy_from_user(&sensor_slave_info,
 		    (void *)cdata->cfg.setting,
@@ -1263,27 +1221,29 @@ int32_t mt9m114_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 			sensor_slave_info.addr_type;
 
 		/* Update power up / down sequence */
-		s_ctrl->power_setting_array =
-			sensor_slave_info.power_setting_array;
-		power_setting_array = &s_ctrl->power_setting_array;
-		power_setting_array->power_setting = kzalloc(
-			power_setting_array->size *
-			sizeof(struct msm_sensor_power_setting), GFP_KERNEL);
-		if (!power_setting_array->power_setting) {
-			pr_err("%s:%d failed\n", __func__, __LINE__);
+		p_ctrl = &s_ctrl->sensordata->power_info;
+		size = sensor_slave_info.power_setting_array.size;
+		if (p_ctrl->power_setting_size < size) {
+			struct msm_sensor_power_setting *tmp;
+			tmp = kmalloc(sizeof(struct msm_sensor_power_setting)
+				      * size, GFP_KERNEL);
+			if (!tmp) {
+				pr_err("%s: failed to alloc mem\n", __func__);
 			rc = -ENOMEM;
 			break;
+			}
+			kfree(p_ctrl->power_setting);
+			p_ctrl->power_setting = tmp;
 		}
-		if (copy_from_user(power_setting_array->power_setting,
-		    (void *)sensor_slave_info.power_setting_array.power_setting,
-		    power_setting_array->size *
-		    sizeof(struct msm_sensor_power_setting))) {
-			kfree(power_setting_array->power_setting);
+		p_ctrl->power_setting_size = size;
+		rc = copy_from_user(p_ctrl->power_setting, (void *)
+			sensor_slave_info.power_setting_array.power_setting,
+			size * sizeof(struct msm_sensor_power_setting));
+		if (rc) {
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 			rc = -EFAULT;
 			break;
 		}
-		s_ctrl->free_power_setting = true;
 		CDBG("%s sensor id %x\n", __func__,
 			sensor_slave_info.slave_addr);
 		CDBG("%s sensor addr type %d\n", __func__,
@@ -1293,19 +1253,14 @@ int32_t mt9m114_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 		CDBG("%s sensor id %x\n", __func__,
 			sensor_slave_info.sensor_id_info.sensor_id);
 		for (slave_index = 0; slave_index <
-			power_setting_array->size; slave_index++) {
+			p_ctrl->power_setting_size; slave_index++) {
 			CDBG("%s i %d power setting %d %d %ld %d\n", __func__,
 				slave_index,
-				power_setting_array->power_setting[slave_index].
-				seq_type,
-				power_setting_array->power_setting[slave_index].
-				seq_val,
-				power_setting_array->power_setting[slave_index].
-				config_val,
-				power_setting_array->power_setting[slave_index].
-				delay);
+				p_ctrl->power_setting[slave_index].seq_type,
+				p_ctrl->power_setting[slave_index].seq_val,
+				p_ctrl->power_setting[slave_index].config_val,
+				p_ctrl->power_setting[slave_index].delay);
 		}
-		kfree(power_setting_array->power_setting);
 		break;
 	}
 	case CFG_WRITE_I2C_ARRAY: {
@@ -1381,7 +1336,11 @@ int32_t mt9m114_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 
 	case CFG_POWER_UP:
 		if (s_ctrl->func_tbl->sensor_power_up)
-			rc = s_ctrl->func_tbl->sensor_power_up(s_ctrl);
+			rc = s_ctrl->func_tbl->sensor_power_up(s_ctrl,
+				&s_ctrl->sensordata->power_info,
+				s_ctrl->sensor_i2c_client,
+				s_ctrl->sensordata->slave_info,
+				s_ctrl->sensordata->sensor_name);
 		else
 			rc = -EFAULT;
 		break;
@@ -1389,7 +1348,10 @@ int32_t mt9m114_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 	case CFG_POWER_DOWN:
 		if (s_ctrl->func_tbl->sensor_power_down)
 			rc = s_ctrl->func_tbl->sensor_power_down(
-				s_ctrl);
+				s_ctrl,
+				&s_ctrl->sensordata->power_info,
+				s_ctrl->sensor_device_type,
+				s_ctrl->sensor_i2c_client);
 		else
 			rc = -EFAULT;
 		break;
@@ -1424,51 +1386,8 @@ int32_t mt9m114_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 			break;
 		}
 		break;
-		}
-		case CFG_SET_SATURATION: {
-			int32_t sat_lev;
-			if (copy_from_user(&sat_lev, (void *)cdata->cfg.setting,
-				sizeof(int32_t))) {
-				pr_err("%s:%d failed\n", __func__, __LINE__);
-				rc = -EFAULT;
-				break;
-			}
-		pr_debug("%s: Saturation Value is %d", __func__, sat_lev);
-		break;
-		}
-		case CFG_SET_CONTRAST: {
-			int32_t con_lev;
-			if (copy_from_user(&con_lev, (void *)cdata->cfg.setting,
-				sizeof(int32_t))) {
-				pr_err("%s:%d failed\n", __func__, __LINE__);
-				rc = -EFAULT;
-				break;
-			}
-		pr_debug("%s: Contrast Value is %d", __func__, con_lev);
-		break;
-		}
-		case CFG_SET_SHARPNESS: {
-			int32_t shp_lev;
-			if (copy_from_user(&shp_lev, (void *)cdata->cfg.setting,
-				sizeof(int32_t))) {
-				pr_err("%s:%d failed\n", __func__, __LINE__);
-				rc = -EFAULT;
-				break;
-			}
-		pr_debug("%s: Sharpness Value is %d", __func__, shp_lev);
-		break;
-		}
-		case CFG_SET_AUTOFOCUS: {
-		/* TO-DO: set the Auto Focus */
-		pr_debug("%s: Setting Auto Focus", __func__);
-		break;
-		}
-		case CFG_CANCEL_AUTOFOCUS: {
-		/* TO-DO: Cancel the Auto Focus */
-		pr_debug("%s: Cancelling Auto Focus", __func__);
-		break;
-		}
-		default:
+	}
+	default:
 		rc = -EFAULT;
 		break;
 	}
@@ -1487,8 +1406,6 @@ static struct msm_sensor_fn_t mt9m114_sensor_func_tbl = {
 
 static struct msm_sensor_ctrl_t mt9m114_s_ctrl = {
 	.sensor_i2c_client = &mt9m114_sensor_i2c_client,
-	.power_setting_array.power_setting = mt9m114_power_setting,
-	.power_setting_array.size = ARRAY_SIZE(mt9m114_power_setting),
 	.msm_sensor_mutex = &mt9m114_mut,
 	.sensor_v4l2_subdev_info = mt9m114_subdev_info,
 	.sensor_v4l2_subdev_info_size = ARRAY_SIZE(mt9m114_subdev_info),

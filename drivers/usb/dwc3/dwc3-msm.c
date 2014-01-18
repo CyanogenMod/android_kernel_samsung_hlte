@@ -27,6 +27,8 @@
 #include <linux/delay.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
+#include <linux/of_device.h>
+#include <linux/of_gpio.h>
 #include <linux/list.h>
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
@@ -261,6 +263,12 @@ struct dwc3_msm {
 #define USB_SSPHY_1P8_HPM_LOAD		23000	/* uA */
 
 static struct usb_ext_notification *usb_ext;
+
+#if defined(CONFIG_SEC_VIENNA_PROJECT) || defined(CONFIG_SEC_V2_PROJECT) \
+|| defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT)
+int vienna_usb_rdrv_pin;
+EXPORT_SYMBOL(vienna_usb_rdrv_pin);
+#endif
 
 /**
  *
@@ -1190,8 +1198,11 @@ devote_3p3:
 static int dwc3_hsusb_ldo_enable(struct dwc3_msm *dwc, int on)
 {
 	int rc = 0;
-
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+	dev_info(dwc->dev, "%s reg (%s)\n", __func__, on ? "HPM" : "LPM");
+#else
 	dev_dbg(dwc->dev, "reg (%s)\n", on ? "HPM" : "LPM");
+#endif
 
 	if (!on)
 		goto disable_regulators;
@@ -1290,8 +1301,11 @@ static int dwc3_ssusb_ldo_init(struct dwc3_msm *dwc, int init)
 static int dwc3_ssusb_ldo_enable(struct dwc3_msm *dwc, int on)
 {
 	int rc = 0;
-
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+	dev_info(dwc->dev, "%s reg (%s)\n", __func__, on ? "HPM" : "LPM");
+#else
 	dev_dbg(dwc->dev, "reg (%s)\n", on ? "HPM" : "LPM");
+#endif
 
 	if (!on)
 		goto disable_regulators;
@@ -1412,7 +1426,12 @@ static void dwc3_msm_ss_phy_reg_init(struct dwc3_msm *mdwc)
 	data &= ~(1 << 6);
 	data |= (1 << 7);
 	data &= ~(0x7 << 8);
-	data |= (0x3 << 8);
+#if defined(CONFIG_SEC_MONDRIAN_PROJECT)
+	data |= (0x5 << 8);
+#else
+	/* HLTE, Vienna customized value */
+	data |= (0x4 << 8);
+#endif
 	data |= (0x1 << 11);
 	dwc3_msm_ssusb_write_phycreg(mdwc->base, 0x1006, data);
 
@@ -1804,10 +1823,14 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 	bool host_ss_active;
 	bool host_ss_suspend;
 
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+	dev_info(mdwc->dev, "%s: entering lpm\n", __func__);
+#else
 	dev_dbg(mdwc->dev, "%s: entering lpm\n", __func__);
+#endif
 
 	if (atomic_read(&mdwc->in_lpm)) {
-		dev_dbg(mdwc->dev, "%s: Already suspended\n", __func__);
+		dev_info(mdwc->dev, "%s: Already suspended\n", __func__);
 		return 0;
 	}
 
@@ -1854,6 +1877,9 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 		clk_disable_unprepare(mdwc->ref_clk);
 
 	if (host_bus_suspend) {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+		dev_info(mdwc->dev, "%s: host_bus_suspend\n", __func__);
+#endif
 		/* Sequence for host bus suspend case:
 		 * 1. Set suspend and sleep bits in GUSB2PHYCONFIG reg
 		 * 2. Clear interrupt latch register and enable BSV, ID HV intr
@@ -1869,6 +1895,9 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 		dwc3_msm_write_reg(mdwc->base, ALT_INTERRUPT_EN_REG, 0xFC0);
 		udelay(5);
 	} else {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+		dev_info(mdwc->dev, "%s: low power state\n", __func__);
+#endif
 		/* Sequence to put hardware in low power state:
 		 * 1. Set OTGDISABLE to disable OTG block in HSPHY (saves power)
 		 * 2. Clear charger detection control fields (performed above)
@@ -1934,7 +1963,7 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 	if (mdwc->hs_phy_irq) {
 		enable_irq(mdwc->hs_phy_irq);
 		/* with DCP we dont require wakeup using HS_PHY_IRQ */
-		if (dcp)
+		if (dcp || !mdwc->vbus_active) // add SAMSUNG
 			disable_irq_wake(mdwc->hs_phy_irq);
 	}
 
@@ -1948,10 +1977,14 @@ static int dwc3_msm_resume(struct dwc3_msm *mdwc)
 	bool host_bus_suspend;
 	bool resume_from_core_clk_off = false;
 
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+	dev_info(mdwc->dev, "%s: exiting lpm\n", __func__);
+#else
 	dev_dbg(mdwc->dev, "%s: exiting lpm\n", __func__);
+#endif
 
 	if (!atomic_read(&mdwc->in_lpm)) {
-		dev_dbg(mdwc->dev, "%s: Already resumed\n", __func__);
+		dev_info(mdwc->dev, "%s: Already resumed\n", __func__);
 		return 0;
 	}
 
@@ -2009,6 +2042,9 @@ static int dwc3_msm_resume(struct dwc3_msm *mdwc)
 	}
 
 	if (host_bus_suspend) {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+		dev_info(mdwc->dev, "%s: host_bus_suspend\n", __func__);
+#endif
 		/* Disable HV interrupt */
 		if (mdwc->otg_xceiv && (!mdwc->ext_xceiv.otg_capability))
 			dwc3_msm_write_readback(mdwc->base, HS_PHY_CTRL_REG,
@@ -2019,6 +2055,9 @@ static int dwc3_msm_resume(struct dwc3_msm *mdwc)
 		/* Disable DP and DM HV interrupt */
 		dwc3_msm_write_reg(mdwc->base, ALT_INTERRUPT_EN_REG, 0x000);
 	} else {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+		dev_info(mdwc->dev, "%s: low power state\n", __func__);
+#endif
 		/* Disable HV interrupt */
 		if (mdwc->otg_xceiv && (!mdwc->ext_xceiv.otg_capability))
 			dwc3_msm_write_readback(mdwc->base, HS_PHY_CTRL_REG,
@@ -2070,7 +2109,7 @@ static int dwc3_msm_resume(struct dwc3_msm *mdwc)
 		mdwc->lpm_irq_seen = false;
 	}
 	/* it must DCP disconnect, re-enable HS_PHY wakeup IRQ */
-	if (mdwc->hs_phy_irq && dcp)
+	if ((mdwc->hs_phy_irq && dcp) || !mdwc->vbus_active) // add SAMSUNG
 		enable_irq_wake(mdwc->hs_phy_irq);
 
 	dev_info(mdwc->dev, "DWC3 exited from low power mode\n");
@@ -2107,10 +2146,18 @@ static void dwc3_resume_work(struct work_struct *w)
 	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm,
 							resume_work.work);
 
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+	dev_info(mdwc->dev, "%s: dwc3 resume work\n", __func__);
+#else
 	dev_dbg(mdwc->dev, "%s: dwc3 resume work\n", __func__);
+#endif
 	/* handle any event that was queued while work was already running */
 	if (!atomic_read(&mdwc->in_lpm)) {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+		dev_info(mdwc->dev, "%s: notifying xceiv event\n", __func__);
+#else
 		dev_dbg(mdwc->dev, "%s: notifying xceiv event\n", __func__);
+#endif
 		if (mdwc->otg_xceiv) {
 			dwc3_wait_for_ext_chg_done(mdwc);
 			mdwc->ext_xceiv.notify_ext_events(mdwc->otg_xceiv->otg,
@@ -2708,6 +2755,8 @@ unreg_chrdev:
 	return ret;
 }
 
+#include "dwc3-sec.c"
+
 static int __devinit dwc3_msm_probe(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
@@ -2825,6 +2874,23 @@ static int __devinit dwc3_msm_probe(struct platform_device *pdev)
 	}
 
 	/* SS PHY */
+
+	/* [Vienna only] For USB 3.0 redriver enable */
+	/* PM8914 MPP5 enable */
+#if defined(CONFIG_SEC_VIENNA_PROJECT) || defined(CONFIG_SEC_V2_PROJECT) \
+|| defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT)
+
+	pr_info("Get USB 3.0 redriver GPIO address\n");
+	vienna_usb_rdrv_pin = of_get_named_gpio(node,	"qcom,gpio_usb_rdrv_en", 0);
+	if (vienna_usb_rdrv_pin < 0) {
+#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT)
+		of_property_read_u32(node,	"qcom,gpio_usb_rdrv_en", &vienna_usb_rdrv_pin);
+		if (vienna_usb_rdrv_pin < 0)
+#endif
+			dev_err(&pdev->dev, "unable to get qcom,gpio_usb_rdrv_en\n");
+	}
+#endif
+
 	mdwc->ssusb_vddcx = devm_regulator_get(&pdev->dev, "ssusb_vdd_dig");
 	if (IS_ERR(mdwc->ssusb_vddcx)) {
 		dev_err(&pdev->dev, "unable to get ssusb vddcx\n");
@@ -3039,8 +3105,8 @@ static int __devinit dwc3_msm_probe(struct platform_device *pdev)
 	/* usb_psy required only for vbus_notifications or charging support */
 	if (mdwc->ext_xceiv.otg_capability ||
 			!mdwc->charger.charging_disabled) {
-		mdwc->usb_psy.name = "usb";
-		mdwc->usb_psy.type = POWER_SUPPLY_TYPE_USB;
+		mdwc->usb_psy.name = "dwc-usb";
+		mdwc->usb_psy.type = POWER_SUPPLY_TYPE_UNKNOWN;
 		mdwc->usb_psy.supplied_to = dwc3_msm_pm_power_supplied_to;
 		mdwc->usb_psy.num_supplicants = ARRAY_SIZE(
 						dwc3_msm_pm_power_supplied_to);
@@ -3088,6 +3154,19 @@ static int __devinit dwc3_msm_probe(struct platform_device *pdev)
 	/* Register with OTG if present, ignore USB2 OTG using other PHY */
 	if (mdwc->otg_xceiv &&
 			!(mdwc->otg_xceiv->flags & ENABLE_SECONDARY_PHY)) {
+		pr_info("dwc3-msm: sec_otg_init is called.\n");
+		sec_otg_init(mdwc, mdwc->otg_xceiv);
+#ifdef CONFIG_USB_HOST_NOTIFY
+		get_vbus_detect_gpio(mdwc, &pdev->dev);
+#endif
+
+#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT)
+	/* set gpio to enable redriver for USB3.0 */
+	gpio_tlmm_config(GPIO_CFG(vienna_usb_rdrv_pin, 0, GPIO_CFG_OUTPUT,
+					GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
+	gpio_set_value(vienna_usb_rdrv_pin,0);
+#endif
+
 		/* Skip charger detection for simulator targets */
 		if (!mdwc->charger.skip_chg_detect) {
 			mdwc->charger.start_detection = dwc3_start_chg_det;
@@ -3234,7 +3313,11 @@ static int dwc3_msm_pm_suspend(struct device *dev)
 	int ret = 0;
 	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
 
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+	dev_info(dev, "dwc3-msm PM suspend\n");
+#else
 	dev_dbg(dev, "dwc3-msm PM suspend\n");
+#endif
 
 	flush_delayed_work_sync(&mdwc->resume_work);
 	if (!atomic_read(&mdwc->in_lpm)) {
@@ -3254,7 +3337,11 @@ static int dwc3_msm_pm_resume(struct device *dev)
 	int ret = 0;
 	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
 
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+	dev_info(dev, "dwc3-msm PM resume\n");
+#else
 	dev_dbg(dev, "dwc3-msm PM resume\n");
+#endif
 
 	atomic_set(&mdwc->pm_suspended, 0);
 	if (mdwc->resume_pending) {
@@ -3284,7 +3371,11 @@ static int dwc3_msm_runtime_idle(struct device *dev)
 {
 	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
 
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+	dev_info(dev, "DWC3-msm runtime idle\n");
+#else
 	dev_dbg(dev, "DWC3-msm runtime idle\n");
+#endif
 
 	if (mdwc->ext_chg_active) {
 		dev_dbg(dev, "Deferring LPM\n");
@@ -3310,7 +3401,11 @@ static int dwc3_msm_runtime_suspend(struct device *dev)
 {
 	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
 
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+	dev_info(dev, "DWC3-msm runtime suspend\n");
+#else
 	dev_dbg(dev, "DWC3-msm runtime suspend\n");
+#endif
 
 	return dwc3_msm_suspend(mdwc);
 }
@@ -3319,7 +3414,11 @@ static int dwc3_msm_runtime_resume(struct device *dev)
 {
 	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
 
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+	dev_info(dev, "DWC3-msm runtime resume\n");
+#else
 	dev_dbg(dev, "DWC3-msm runtime resume\n");
+#endif
 
 	return dwc3_msm_resume(mdwc);
 }

@@ -300,7 +300,7 @@ struct acpuclk_krait_params {
  * @boost_uv: Voltage boost amount
  * @speed_bin: Speed bin ID.
  * @pvs_bin: PVS bin ID.
- * @pvs_bin: PVS revision ID.
+ * @pvs_rev: PVS revision ID.
  * @dev: Device.
  */
 struct drv_data {

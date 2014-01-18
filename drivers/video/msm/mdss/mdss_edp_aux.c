@@ -41,6 +41,20 @@
 /*
  * edp buffer operation
  */
+#if defined(CONFIG_FB_MSM_EDP_SAMSUNG)
+static struct mdss_edp_drv_pdata *g_ep;
+
+void set_global_ep(struct mdss_edp_drv_pdata *ep)
+{
+	g_ep = ep;
+}
+
+struct mdss_edp_drv_pdata *get_global_ep(void)
+{
+	return g_ep;
+}
+#endif
+
 static char *edp_buf_init(struct edp_buf *eb, char *buf, int size)
 {
 	eb->start = buf;
@@ -129,6 +143,7 @@ static int edp_cmd_fifo_tx(struct edp_buf *tp, unsigned char *base)
 	u32 data;
 	char *dp;
 	int len, cnt;
+	u32 reg;
 
 	len = tp->len;	/* total byte to cmd fifo */
 	if (len == 0)
@@ -152,6 +167,10 @@ static int edp_cmd_fifo_tx(struct edp_buf *tp, unsigned char *base)
 	data = (tp->trans_num - 1);
 	if (tp->i2c)
 		data |= BIT(8); /* I2C */
+
+	/* To clear BIT(9) GO bit */
+	reg = edp_read(base + EDP_AUX_TRANS_CTRL);
+	edp_write(base + EDP_AUX_TRANS_CTRL, reg & (~(0x1 << 9)));
 
 	data |= BIT(9); /* GO */
 	pr_debug("%s: data=%x\n", __func__, data);
@@ -290,14 +309,21 @@ void edp_aux_native_handler(struct mdss_edp_drv_pdata *ep, u32 isr)
 
 	pr_debug("%s: isr=%x\n", __func__, isr);
 
-	if (isr & EDP_INTR_AUX_I2C_DONE)
+	if (isr & EDP_INTR_AUX_I2C_DONE) {
 		ep->aux_error_num = EDP_AUX_ERR_NONE;
-	else if (isr & EDP_INTR_WRONG_ADDR)
+	}
+	else if (isr & EDP_INTR_WRONG_ADDR) {
 		ep->aux_error_num = EDP_AUX_ERR_ADDR;
-	else if (isr & EDP_INTR_TIMEOUT)
+		pr_err("%s: isr=%x\n", __func__, isr);
+	}
+	else if (isr & EDP_INTR_TIMEOUT) {
 		ep->aux_error_num = EDP_AUX_ERR_TOUT;
-	if (isr & EDP_INTR_NACK_DEFER)
+		pr_err("%s: isr=%x\n", __func__, isr);
+	}
+	if (isr & EDP_INTR_NACK_DEFER) {
 		ep->aux_error_num = EDP_AUX_ERR_NACK;
+		pr_err("%s: isr=%x\n", __func__, isr);
+	}
 
 	complete(&ep->aux_comp);
 }
@@ -410,7 +436,7 @@ void edp_extract_edid_manufacturer(struct edp_edid *edid, char *buf)
 	edid->id_name[2] = 'A' + data - 1;
 	edid->id_name[3] = 0;
 
-	pr_debug("%s: edid manufacturer = %s\n", __func__, edid->id_name);
+	pr_info("%s: edid manufacturer = %s\n", __func__, edid->id_name);
 }
 
 void edp_extract_edid_product(struct edp_edid *edid, char *buf)
@@ -426,14 +452,14 @@ void edp_extract_edid_product(struct edp_edid *edid, char *buf)
 	data <<= 8;
 	edid->id_product |= data;
 
-	pr_debug("%s: edid product = 0x%x\n", __func__, edid->id_product);
+	pr_info("%s: edid product = 0x%x\n", __func__, edid->id_product);
 };
 
 void edp_extract_edid_version(struct edp_edid *edid, char *buf)
 {
 	edid->version = buf[0x12];
 	edid->revision = buf[0x13];
-	pr_debug("%s: edid version = %d.%d\n", __func__, edid->version,
+	pr_info("%s: edid version = %d.%d\n", __func__, edid->version,
 			edid->revision);
 };
 
@@ -592,22 +618,22 @@ void edp_extract_edid_detailed_timing_description(struct edp_edid *edid,
 		}
 	}
 
-	pr_debug("%s: pixel_clock = %d\n", __func__, dp->pclk);
+	pr_info("%s: pixel_clock = %d\n", __func__, dp->pclk);
 
-	pr_debug("%s: horizontal=%d, blank=%d, porch=%d, sync=%d\n"
+	pr_info("%s: horizontal=%d, blank=%d, porch=%d, sync=%d\n"
 			, __func__, dp->h_addressable, dp->h_blank,
 			dp->h_fporch, dp->h_sync_pulse);
-	pr_debug("%s: vertical=%d, blank=%d, porch=%d, vsync=%d\n"
+	pr_info("%s: vertical=%d, blank=%d, porch=%d, vsync=%d\n"
 			, __func__, dp->v_addressable, dp->v_blank,
 			dp->v_fporch, dp->v_sync_pulse);
-	pr_debug("%s: panel size in mm, width=%d height=%d\n", __func__,
+	pr_info("%s: panel size in mm, width=%d height=%d\n", __func__,
 			dp->width_mm, dp->height_mm);
-	pr_debug("%s: panel border horizontal=%d vertical=%d\n", __func__,
+	pr_info("%s: panel border horizontal=%d vertical=%d\n", __func__,
 				dp->h_border, dp->v_border);
-	pr_debug("%s: flags: interlaced=%d stereo=%d sync_type=%d sync_sep=%d\n"
+	pr_info("%s: flags: interlaced=%d stereo=%d sync_type=%d sync_sep=%d\n"
 			, __func__, dp->interlaced, dp->stereo,
 			dp->sync_type, dp->sync_separate);
-	pr_debug("%s: polarity vsync=%d, hsync=%d", __func__,
+	pr_info("%s: polarity vsync=%d, hsync=%d", __func__,
 			dp->vsync_pol, dp->hsync_pol);
 }
 
@@ -634,6 +660,9 @@ void edp_extract_edid_detailed_timing_description(struct edp_edid *edid,
 
 static int edp_aux_chan_ready(struct mdss_edp_drv_pdata *ep)
 {
+#if defined(CONFIG_FB_MSM_EDP_SAMSUNG)
+	return 1;
+#else
 	int cnt, ret;
 	char data = 0;
 
@@ -651,6 +680,7 @@ static int edp_aux_chan_ready(struct mdss_edp_drv_pdata *ep)
 	}
 
 	return 1;
+#endif
 }
 
 static int edp_sink_edid_read(struct mdss_edp_drv_pdata *ep, int block)
@@ -666,11 +696,11 @@ static int edp_sink_edid_read(struct mdss_edp_drv_pdata *ep, int block)
 	}
 
 	for (cnt = 5; cnt; cnt--) {
-		rlen = edp_aux_read_buf(ep, 0x50, 128, 1);
+	rlen = edp_aux_read_buf(ep, 0x50, 128, 1);
 		if (rlen > 0) {
 			pr_debug("%s: rlen=%d\n", __func__, rlen);
 
-			rp = &ep->rxp;
+	rp = &ep->rxp;
 			if (!edp_edid_buf_error(rp->data, rp->len))
 				break;
 		}
@@ -722,7 +752,7 @@ static void edp_sink_capability_read(struct mdss_edp_drv_pdata *ep,
 	cap->max_link_rate = data;
 	if (--rlen <= 0)
 		return;
-	pr_debug("%s: link_rate=%d\n", __func__, cap->max_link_rate);
+	pr_info("%s: link_rate=%d\n", __func__, cap->max_link_rate);
 
 	data = *bp++; /* byte 2 */
 	if (data & BIT(7))
@@ -1078,6 +1108,11 @@ static int edp_start_link_train_1(struct mdss_edp_drv_pdata *ep)
 	while (1) {
 		usleep(ep->dpcd.training_read_interval);
 
+		if (edp_read(ep->base + EDP_MAINLINK_READY) & BIT(3))
+			pr_debug("%s: Training pattern 1 was sent properly\n", __func__);
+		else
+			pr_err("%s: Error in sending training pattern 1 value : 0x%x\n", __func__, edp_read(ep->base + EDP_MAINLINK_READY) );
+
 		edp_link_status_read(ep, 6);
 		if (edp_sink_clock_recovery_done(ep)) {
 			ret = 0;
@@ -1127,6 +1162,11 @@ static int edp_start_link_train_2(struct mdss_edp_drv_pdata *ep)
 	tries = 0;
 	while (1) {
 		usleep(ep->dpcd.training_read_interval);
+
+		if (edp_read(ep->base + 0x84) & BIT(4))
+			pr_debug("%s: Training pattern 2 was sent properly\n", __func__);
+		else
+			pr_err("%s: Error in sending training pattern 2\n", __func__);
 
 		edp_link_status_read(ep, 6);
 
@@ -1178,13 +1218,13 @@ static int edp_link_rate_down_shift(struct mdss_edp_drv_pdata *ep)
 		lrate /= 10; /* byte, 10 bits --> 8 bits */
 		lrate *= lane;
 
-		pr_debug("%s: new lrate=%u prate=%u rate=%d lane=%d p=%d b=%d\n",
+		pr_info("%s: new lrate=%u prate=%u rate=%d lane=%d p=%d b=%d\n",
 		__func__, lrate, prate, rate, lane, ep->pixel_rate, ep->bpp);
 
 		if (lrate > prate) {
 			ep->link_rate = rate;
 			ep->lane_cnt = lane;
-			pr_debug("%s: new rate=%d %d\n", __func__, rate, lane);
+			pr_info("%s: new rate=%d %d\n", __func__, rate, lane);
 			return 0;
 		}
 	}
@@ -1205,7 +1245,8 @@ static int edp_aux_link_train(struct mdss_edp_drv_pdata *ep)
 {
 	int ret = 0;
 
-	pr_debug("%s", __func__);
+	pr_info("%s", __func__);
+	ep->dpcd.training_read_interval = 1000;
 	ret = edp_aux_chan_ready(ep);
 	if (ret == 0) {
 		pr_err("%s: LINK Train failed: aux chan NOT ready\n", __func__);
@@ -1238,9 +1279,12 @@ train_start:
 		}
 	}
 
-	pr_debug("%s: Training 1 completed successfully", __func__);
-
+	/* recovery_done : 0x1111*/
+	pr_info("%s: Training 1 completed successfully recovery_done : 0x%x", __func__,
+		(ep->link_status.lane_23_status << 8) | ep->link_status.lane_01_status);
+#if !defined(CONFIG_FB_MSM_EDP_SAMSUNG)
 	edp_clear_training_pattern(ep);
+#endif
 	ret = edp_start_link_train_2(ep);
 	if (ret < 0) {
 		if (edp_link_rate_down_shift(ep) == 0) {
@@ -1252,7 +1296,9 @@ train_start:
 		}
 	}
 
-	pr_debug("%s: Training 2 completed successfully", __func__);
+	/* recovery_done : 0x7777*/
+	pr_info("%s: Training 2 completed successfully eq_done : 0x%x v_level : %d p_level : %d", __func__,
+		(ep->link_status.lane_23_status << 8) | ep->link_status.lane_01_status, ep->v_level, ep->p_level);
 
 	mdss_edp_state_ctrl(ep, ST_SEND_VIDEO);
 clear:
@@ -1306,7 +1352,7 @@ int mdss_edp_sink_power_state(struct mdss_edp_drv_pdata *ep, char state)
 	int ret;
 
 	ret = edp_aux_write_buf(ep, 0x600, &state, 1, 0);
-	pr_debug("%s: state=%d ret=%d\n", __func__, state, ret);
+	pr_info("%s: state=%d ret=%d\n", __func__, state, ret);
 	return ret;
 }
 
@@ -1314,6 +1360,29 @@ int mdss_edp_link_train(struct mdss_edp_drv_pdata *ep)
 {
 	return edp_aux_link_train(ep);
 }
+
+void mdss_edp_aux_setup(struct mdss_edp_drv_pdata *ep)
+{
+	mutex_init(&ep->aux_mutex);
+	init_completion(&ep->aux_comp);
+
+	edp_buf_init(&ep->txp, ep->txbuf, sizeof(ep->txbuf));
+	edp_buf_init(&ep->rxp, ep->rxbuf, sizeof(ep->rxbuf));
+}
+
+#if defined(CONFIG_FB_MSM_EDP_SAMSUNG)
+int aux_tx(int addr, char *data, int len)
+{
+	struct mdss_edp_drv_pdata *ep = get_global_ep();
+
+	if (!ep) {
+		pr_info("%s error", __func__);
+		return -1;
+	}
+
+	return edp_aux_write_buf(ep, addr, data, len, 0);
+}
+#endif
 
 void mdss_edp_aux_init(struct mdss_edp_drv_pdata *ep)
 {

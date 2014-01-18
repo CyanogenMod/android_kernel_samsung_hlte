@@ -160,6 +160,9 @@ int msm_gpiomux_put(unsigned gpio);
  */
 int msm_gpiomux_write(unsigned gpio, enum msm_gpiomux_setting which,
 	struct gpiomux_setting *setting, struct gpiomux_setting *old_setting);
+#ifdef CONFIG_SEC_PM_DEBUG
+void msm_gpio_print_enabled(void);
+#endif
 
 /* Architecture-internal function for use by the framework only.
  * This function can assume the following:
@@ -170,6 +173,9 @@ int msm_gpiomux_write(unsigned gpio, enum msm_gpiomux_setting which,
  * should use msm_gpiomux_write.
  */
 void __msm_gpiomux_write(unsigned gpio, struct gpiomux_setting val);
+#if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8226) || defined(CONFIG_ARCH_MSM8610)
+void __msm_gpiomux_read(unsigned gpio, struct gpiomux_setting *val);
+#endif
 #else
 static inline int msm_gpiomux_init(size_t ngpio)
 {

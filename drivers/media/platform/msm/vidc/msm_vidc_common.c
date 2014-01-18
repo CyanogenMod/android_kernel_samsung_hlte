@@ -277,14 +277,21 @@ static void handle_sys_init_done(enum command_response cmd, void *data)
 		dprintk(VIDC_ERR, "Wrong device_id received\n");
 		return;
 	}
-	dprintk(VIDC_DBG, "index = %d\n", index);
-	dprintk(VIDC_DBG, "ptr = %p\n", &(core->completions[index]));
-	complete(&(core->completions[index]));
+//	dprintk(VIDC_DBG, "index = %d\n", index);
+//	dprintk(VIDC_DBG, "ptr = %p\n", &(core->completions[index]));
+//	complete(&(core->completions[index]));
 	sys_init_msg = response->data;
 	if (!sys_init_msg) {
 		dprintk(VIDC_ERR, "sys_init_done message not proper\n");
 		return;
 	}
+	core->enc_codec_supported = sys_init_msg->enc_codec_supported;						
+	core->dec_codec_supported = sys_init_msg->dec_codec_supported;						
+	dprintk(VIDC_DBG, "supported_codecs: enc = 0x%x, dec = 0x%x\n", 					
+	core->enc_codec_supported, core->dec_codec_supported);								
+	dprintk(VIDC_DBG, "ptr[%d] = %p\n", index, &(core->completions[index]));			
+	complete(&(core->completions[index]));																																	
+	
 }
 
 static void handle_session_release_buf_done(enum command_response cmd,
@@ -515,6 +522,13 @@ static void handle_event_change(enum command_response cmd, void *data)
 					__func__, inst,
 					event_notify->packet_buffer,
 					event_notify->exra_data_buffer);
+				if (inst->state == MSM_VIDC_CORE_INVALID ||
+					inst->core->state ==
+						VIDC_CORE_INVALID) {
+					dprintk(VIDC_DBG,
+						"Event release buf ref received in invalid state - discard\n");
+					return;
+				}				
 
 				/*
 				* Get the buffer_info entry for the
@@ -1598,7 +1612,8 @@ static enum hal_domain get_hal_domain(int session_type)
 	return domain;
 }
 
-static enum hal_video_codec get_hal_codec_type(int fourcc)
+//static enum hal_video_codec get_hal_codec_type(int fourcc)
+enum hal_video_codec get_hal_codec_type(int fourcc)
 {
 	enum hal_video_codec codec;
 	dprintk(VIDC_DBG, "codec is 0x%x", fourcc);
@@ -2987,6 +3002,9 @@ int msm_comm_flush(struct msm_vidc_inst *inst, u32 flags)
 		dprintk(VIDC_INFO, "Input only flush not supported\n");
 		return 0;
 	}
+	mutex_lock(&inst->sync_lock);
+	msm_comm_flush_dynamic_buffers(inst);
+	mutex_unlock(&inst->sync_lock);
 	if (inst->state == MSM_VIDC_CORE_INVALID ||
 			core->state == VIDC_CORE_INVALID) {
 		dprintk(VIDC_ERR,
@@ -2997,7 +3015,6 @@ int msm_comm_flush(struct msm_vidc_inst *inst, u32 flags)
 	}
 
 	mutex_lock(&inst->sync_lock);
-	msm_comm_flush_dynamic_buffers(inst);
 	if (inst->in_reconfig && !ip_flush && op_flush) {
 		if (!list_empty(&inst->pendingq)) {
 			/*Execution can never reach here since port reconfig

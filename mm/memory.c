@@ -154,6 +154,11 @@ static void add_mm_counter_fast(struct mm_struct *mm, int member, int val)
 
 /* sync counter once per 64 page faults */
 #define TASK_RSS_EVENTS_THRESH	(64)
+
+#if defined(CONFIG_VMWARE_MVP)
+EXPORT_SYMBOL_GPL(get_mm_counter);
+#endif
+
 static void check_sync_rss_stat(struct task_struct *task)
 {
 	if (unlikely(task != current))
@@ -827,16 +832,45 @@ out:
 	return pfn_to_page(pfn);
 }
 
+#ifdef CONFIG_TIMA_RKP_L2_GROUP
+/* redefining the original function for L2 group
+ * Original function is is asm-generic.
+ */
+static inline void tima_l2group_ptep_set_wrprotect(struct mm_struct *mm,
+			unsigned long address, pte_t *ptep, 
+			tima_l2group_entry_t *tima_l2group_buffer,
+			unsigned long *tima_l2group_buffer_index)
+{
+        pte_t old_pte = *ptep;
+        timal2group_set_pte_at(ptep, pte_wrprotect(old_pte),
+        			(((unsigned long) tima_l2group_buffer) + 
+				 (sizeof(tima_l2group_entry_t)*(*tima_l2group_buffer_index))),
+				address, tima_l2group_buffer_index);
+        //set_pte_at(mm, address, ptep, pte_wrprotect(old_pte)); /* Removed as grouping works */
+}
+
+#endif /* CONFIG_TIMA_RKP_L2_GROUP */
+
+
 /*
  * copy one vm_area from one task to the other. Assumes the page tables
  * already present in the new task to be cleared in the whole range
  * covered by this vma.
  */
-
+#ifdef CONFIG_TIMA_RKP_L2_GROUP
+static inline unsigned long
+tima_l2group_copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
+		pte_t *dst_pte, pte_t *src_pte, struct vm_area_struct *vma,
+		unsigned long addr, int *rss, 
+		tima_l2group_entry_t *tima_l2group_buffer,
+		unsigned long *tima_l2group_buffer_index,
+		unsigned long tima_l2group_flag)
+#else
 static inline unsigned long
 copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		pte_t *dst_pte, pte_t *src_pte, struct vm_area_struct *vma,
 		unsigned long addr, int *rss)
+#endif /* CONFIG_TIMA_RKP_L2_GROUP */		
 {
 	unsigned long vm_flags = vma->vm_flags;
 	pte_t pte = *src_pte;
@@ -888,7 +922,17 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 	 * in the parent and the child
 	 */
 	if (is_cow_mapping(vm_flags)) {
+#ifdef CONFIG_TIMA_RKP_L2_GROUP
+		if (tima_l2group_flag) {
+			tima_l2group_ptep_set_wrprotect(src_mm, addr, src_pte,
+				tima_l2group_buffer, tima_l2group_buffer_index);
+			//(*tima_l2group_buffer_index)++;
+		}
+		else
+			ptep_set_wrprotect(src_mm, addr, src_pte);
+#else
 		ptep_set_wrprotect(src_mm, addr, src_pte);
+#endif /* CONFIG_TIMA_RKP_L2_GROUP */
 		pte = pte_wrprotect(pte);
 	}
 
@@ -925,6 +969,12 @@ int copy_pte_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 	int progress = 0;
 	int rss[NR_MM_COUNTERS];
 	swp_entry_t entry = (swp_entry_t){0};
+#ifdef CONFIG_TIMA_RKP_L2_GROUP
+        unsigned long tima_l2group_flag = 0;
+        tima_l2group_entry_t *tima_l2group_buffer = NULL;
+        unsigned long tima_l2group_numb_entries;
+        unsigned long tima_l2group_buffer_index = 0;
+#endif
 
 again:
 	init_rss_vec(rss);
@@ -938,6 +988,43 @@ again:
 	orig_src_pte = src_pte;
 	orig_dst_pte = dst_pte;
 	arch_enter_lazy_mmu_mode();
+#ifdef CONFIG_TIMA_RKP_L2_GROUP
+	/* Initialize all L2_GROUP variables */
+	tima_l2group_flag= 0;
+	tima_l2group_buffer = NULL;
+	tima_l2group_numb_entries = ((end-addr) >> PAGE_SHIFT);
+	tima_l2group_buffer_index = 0;
+        /*
+         * Lazy mmu mode for tima:
+         * 1-Define a memory area to hold the PTEs to be changed
+         * 2-Commit the changes right away to TIMA
+	 * 0x200 = 512 bytes which is 2 L2 pages. If grouped 
+	 * entries are <= 2, there is not much point in
+	 * grouping it, in which case follow the normal path. 
+         */
+        if (tima_l2group_numb_entries > 2 && tima_l2group_numb_entries <= 0x200
+		&& tima_is_pg_protected((unsigned long)src_pte) == 1) {
+        	/*
+        	 * Kmalloc does not work in this function (causes crashes) so
+        	 * we use get_free_pages instead which mostly wastes some space
+        	 */
+		/*tima_l2group_buffer = kmalloc(sizeof(*tima_l2group_buffer) * 
+						tima_l2group_numb_entries, 
+						GFP_KERNEL | GFP_ATOMIC);*/
+		tima_l2group_buffer = (tima_l2group_entry_t *)
+					__get_free_pages(GFP_ATOMIC, 1);
+		if (tima_l2group_buffer == NULL) {
+			printk(KERN_ERR"TIMA -> L2GRP FAILED %lx %lx %lx\n",
+				addr, end, tima_l2group_numb_entries);
+		} else {
+			tima_l2group_flag = 1;
+			/* make sure index is reset here, or all
+			 * hell breaks loose!
+			 */
+			tima_l2group_buffer_index = 0;
+		}
+        }
+#endif /* CONFIG_TIMA_RKP_L2_GROUP */
 
 	do {
 		/*
@@ -954,13 +1041,43 @@ again:
 			progress++;
 			continue;
 		}
+#ifdef CONFIG_TIMA_RKP_L2_GROUP
+		/* function tima_l2group_copy_one_pte() increments
+		 * tima_l2group_buffer_index. Do not increment
+		 * it outside else we end up with buffer sizes 
+		 * which are invalid.
+		 */
+		entry.val = tima_l2group_copy_one_pte(dst_mm, src_mm, dst_pte, src_pte,
+							vma, addr, rss, 
+							tima_l2group_buffer,
+							&tima_l2group_buffer_index,
+							tima_l2group_flag);
+#else		
 		entry.val = copy_one_pte(dst_mm, src_mm, dst_pte, src_pte,
 							vma, addr, rss);
+#endif /* CONFIG_TIMA_RKP_L2_GROUP */						
 		if (entry.val)
 			break;
 		progress += 8;
 	} while (dst_pte++, src_pte++, addr += PAGE_SIZE, addr != end);
 
+#ifdef CONFIG_TIMA_RKP_L2_GROUP
+	if (tima_l2group_flag) {
+		unsigned long buffer_va = (unsigned long) tima_l2group_buffer;
+		/*First: Flush the cache of the buffer to be read by the TZ side
+		 */
+		flush_dcache_page(virt_to_page(buffer_va));
+		flush_dcache_page(virt_to_page(buffer_va + PAGE_SIZE));
+
+		/*Second: Pass the buffer pointer and length to TIMA to commit the changes
+		 */
+		if (tima_l2group_buffer_index) {
+			timal2group_set_pte_commit(tima_l2group_buffer,
+						tima_l2group_buffer_index, (void*)src_pte);
+		}
+		free_pages((unsigned long) tima_l2group_buffer, 1);
+	}
+#endif /* CONFIG_TIMA_RKP_L2_GROUP */
 	arch_leave_lazy_mmu_mode();
 	spin_unlock(src_ptl);
 	pte_unmap(orig_src_pte);
@@ -2341,6 +2458,53 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 	return err;
 }
 EXPORT_SYMBOL(remap_pfn_range);
+
+/**
+ * vm_iomap_memory - remap memory to userspace
+ * @vma: user vma to map to
+ * @start: start of area
+ * @len: size of area
+ *
+ * This is a simplified io_remap_pfn_range() for common driver use. The
+ * driver just needs to give us the physical memory range to be mapped,
+ * we'll figure out the rest from the vma information.
+ *
+ * NOTE! Some drivers might want to tweak vma->vm_page_prot first to get
+ * whatever write-combining details or similar.
+ */
+int vm_iomap_memory(struct vm_area_struct *vma, phys_addr_t start, unsigned long len)
+{
+	unsigned long vm_len, pfn, pages;
+
+	/* Check that the physical memory area passed in looks valid */
+	if (start + len < start)
+		return -EINVAL;
+	/*
+	 * You *really* shouldn't map things that aren't page-aligned,
+	 * but we've historically allowed it because IO memory might
+	 * just have smaller alignment.
+	 */
+	len += start & ~PAGE_MASK;
+	pfn = start >> PAGE_SHIFT;
+	pages = (len + ~PAGE_MASK) >> PAGE_SHIFT;
+	if (pfn + pages < pfn)
+		return -EINVAL;
+
+	/* We start the mapping 'vm_pgoff' pages into the area */
+	if (vma->vm_pgoff > pages)
+		return -EINVAL;
+	pfn += vma->vm_pgoff;
+	pages -= vma->vm_pgoff;
+
+	/* Can we fit all of the mapping? */
+	vm_len = vma->vm_end - vma->vm_start;
+	if (vm_len >> PAGE_SHIFT > pages)
+		return -EINVAL;
+
+	/* Ok, let it rip */
+	return io_remap_pfn_range(vma, vma->vm_start, pfn, vm_len, vma->vm_page_prot);
+}
+EXPORT_SYMBOL(vm_iomap_memory);
 
 static int apply_to_pte_range(struct mm_struct *mm, pmd_t *pmd,
 				     unsigned long addr, unsigned long end,

@@ -35,7 +35,8 @@
 #define ANDROID_ALARM_PRINT_FLOW (1U << 6)
 
 static int debug_mask = ANDROID_ALARM_PRINT_ERROR | \
-			ANDROID_ALARM_PRINT_INIT_STATUS;
+			ANDROID_ALARM_PRINT_INIT_STATUS | \
+			ANDROID_ALARM_PRINT_SUSPEND;
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 #define pr_alarm(debug_level_mask, args...) \
@@ -70,6 +71,7 @@ static struct platform_device *alarm_platform_dev;
 struct alarm_queue alarms[ANDROID_ALARM_TYPE_COUNT];
 static bool suspended;
 static long power_on_alarm;
+struct alarm *wakeup_alarm;
 
 void set_power_on_alarm(long secs)
 {
@@ -105,6 +107,9 @@ static void update_timer_locked(struct alarm_queue *base, bool head_removed)
 		wake_lock_timeout(&alarm_rtc_wake_lock, 1 * HZ);
 		return;
 	}
+
+	if (is_wakeup)
+		wakeup_alarm = alarm;
 
 	hrtimer_try_to_cancel(&base->timer);
 	base->timer.node.expires = ktime_add(base->delta, alarm->expires);
@@ -461,7 +466,8 @@ static int alarm_suspend(struct platform_device *pdev, pm_message_t state)
 		rtc_read_time(alarm_rtc_dev, &rtc_current_rtc_time);
 		rtc_tm_to_time(&rtc_current_rtc_time, &rtc_current_time);
 		pr_alarm(SUSPEND,
-			"rtc alarm set at %ld, now %ld, rtc delta %ld.%09ld\n",
+			"rtc alarm set func %pF at %ld, now %ld, rtc delta %ld.%09ld\n",
+			wakeup_alarm->function,
 			rtc_alarm_time, rtc_current_time,
 			rtc_delta.tv_sec, rtc_delta.tv_nsec);
 		if (rtc_current_time + 1 >= rtc_alarm_time) {

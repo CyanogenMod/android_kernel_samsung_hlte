@@ -202,6 +202,7 @@ static int __devinit qpnp_clkdiv_probe(struct spmi_device *spmi)
 	if (!res) {
 		dev_err(&spmi->dev, "%s: unable to get device reg resource\n",
 					__func__);
+		return -ENOMEM;
 	}
 
 	q_clkdiv->slave = spmi->sid;

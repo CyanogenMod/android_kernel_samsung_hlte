@@ -163,6 +163,7 @@ struct mdss_data_type {
 	int current_bus_idx;
 	bool mixer_switched;
 	struct mdss_panel_cfg pan_cfg;
+
 };
 extern struct mdss_data_type *mdss_res;
 
@@ -186,6 +187,18 @@ void mdss_enable_irq(struct mdss_hw *hw);
 void mdss_disable_irq(struct mdss_hw *hw);
 void mdss_disable_irq_nosync(struct mdss_hw *hw);
 void mdss_bus_bandwidth_ctrl(int enable);
+void mdss_mdp_dump_power_clk(void);
+void mdss_mdp_underrun_dump_info(void);
+
+#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
+int mdss_mdp_debug_bus(void);
+void xlog(const char *name, u32 data0, u32 data1, u32 data2, u32 data3, u32 data4, u32 data5);
+void xlog_dump(void);
+#endif
+
+#if defined (CONFIG_FB_MSM_MDSS_DBG_SEQ_TICK)
+void mdss_dbg_tick_save(int op_name);
+#endif
 
 static inline struct ion_client *mdss_get_ionclient(void)
 {

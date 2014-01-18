@@ -261,6 +261,11 @@ static int diagchar_close(struct inode *inode, struct file *file)
 	if (!driver)
 		return -ENOMEM;
 
+	if(driver->silent_log_pid) {
+		put_pid(driver->silent_log_pid);
+		driver->silent_log_pid = NULL;
+	}
+
 	/* clean up any DCI registrations, if this is a DCI client
 	* This will specially help in case of ungraceful exit of any DCI client
 	* This call will remove any pending registrations of such client
@@ -1097,6 +1102,10 @@ long diagchar_ioctl(struct file *filp,
 		result = 1;
 		break;
 	case DIAG_IOCTL_SWITCH_LOGGING:
+		/*
+		 * Get a pid of diag_mdlog(app) and save it.
+		 */
+		driver->silent_log_pid = get_pid(task_pid(current));
 		result = diag_switch_logging(ioarg);
 		break;
 	case DIAG_IOCTL_REMOTE_DEV:
@@ -1147,6 +1156,26 @@ long diagchar_ioctl(struct file *filp,
 	}
 	return result;
 }
+
+/*
+ * silent_log_panic_handler()
+ * If the silent log is enabled for CP and CP is in
+ * trouble, diag_mdlog (APP) should be terminated before
+ * a panic occurs, since it can flush logs to SD card
+ * when it is over. So, please use this function to termimate it.
+ */
+int silent_log_panic_handler(void)
+{
+	int ret = 0;
+	if(driver->silent_log_pid) {
+		pr_info("%s: killing slient log...\n", __func__);
+		kill_pid(driver->silent_log_pid, SIGTERM, 1);
+		driver->silent_log_pid = NULL;
+		ret = 1;
+	}
+	return ret;
+}
+EXPORT_SYMBOL(silent_log_panic_handler);
 
 static int diagchar_read(struct file *file, char __user *buf, size_t count,
 			  loff_t *ppos)
@@ -2143,7 +2172,7 @@ static int __init diagchar_init(void)
 			goto fail;
 	} else {
 		printk(KERN_INFO "kzalloc failed\n");
-		goto fail;
+		goto fail2;
 	}
 
 	pr_info("diagchar initialized now");
@@ -2158,6 +2187,8 @@ fail:
 	diag_masks_exit();
 	diag_sdio_fn(EXIT);
 	diagfwd_bridge_fn(EXIT);
+	kfree(driver);
+fail2:
 	return -1;
 }
 

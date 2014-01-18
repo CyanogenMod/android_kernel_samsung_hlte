@@ -21,6 +21,10 @@
 #include <linux/spinlock.h>
 #include <linux/spmi.h>
 
+#ifdef CONFIG_SEC_PM
+#include <linux/wakelock.h>
+#endif
+
 /* RTC/ALARM Register offsets */
 #define REG_OFFSET_ALARM_RW	0x40
 #define REG_OFFSET_ALARM_CTRL1	0x46
@@ -64,6 +68,10 @@ struct qpnp_rtc {
 	struct spmi_device *spmi;
 	spinlock_t alarm_ctrl_lock;
 };
+
+#ifdef CONFIG_SEC_PM
+static struct wake_lock			resume_wakelock;
+#endif
 
 static int qpnp_read_wrapper(struct qpnp_rtc *rtc_dd, u8 *rtc_val,
 			u16 base, int count)
@@ -111,7 +119,7 @@ qpnp_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	value[2] = (secs >> 16) & 0xFF;
 	value[3] = (secs >> 24) & 0xFF;
 
-	dev_dbg(dev, "Seconds value to be written to RTC = %lu\n", secs);
+	dev_info(dev, "Seconds value to be written to RTC = %lu\n", secs);
 
 	spin_lock_irqsave(&rtc_dd->alarm_ctrl_lock, irq_flags);
 	ctrl_reg = rtc_dd->alarm_ctrl_reg1;
@@ -555,6 +563,9 @@ static int __devinit qpnp_rtc_probe(struct spmi_device *spmi)
 		goto fail_req_irq;
 	}
 
+#ifdef CONFIG_SEC_PM
+	wake_lock_init(&resume_wakelock, WAKE_LOCK_SUSPEND, "resume_wakelock");
+#endif
 	device_init_wakeup(&spmi->dev, 1);
 	enable_irq_wake(rtc_dd->rtc_alarm_irq);
 
@@ -569,6 +580,28 @@ fail_rtc_enable:
 
 	return rc;
 }
+
+#ifdef CONFIG_SEC_PM
+static int qpnp_rtc_resume(struct device *dev)
+{
+	pr_info("%s\n",__func__);
+	wake_lock_timeout(&resume_wakelock, HZ/10);
+
+	return 0;
+}
+
+static int qpnp_rtc_suspend(struct device *dev)
+{
+	pr_info("%s\n",__func__);
+
+	return 0;
+}
+
+static const struct dev_pm_ops qpnp_rtc_pm_ops = {
+	.suspend = qpnp_rtc_suspend,
+	.resume = qpnp_rtc_resume,
+};
+#endif
 
 static int __devexit qpnp_rtc_remove(struct spmi_device *spmi)
 {
@@ -615,6 +648,10 @@ static void qpnp_rtc_shutdown(struct spmi_device *spmi)
 fail_alarm_disable:
 		spin_unlock_irqrestore(&rtc_dd->alarm_ctrl_lock, irq_flags);
 	}
+
+#ifdef CONFIG_SEC_PM
+	wake_lock_destroy(&resume_wakelock);
+#endif
 }
 
 static struct of_device_id spmi_match_table[] = {
@@ -632,6 +669,9 @@ static struct spmi_driver qpnp_rtc_driver = {
 		.name   = "qcom,qpnp-rtc",
 		.owner  = THIS_MODULE,
 		.of_match_table = spmi_match_table,
+#ifdef CONFIG_SEC_PM
+		.pm	= &qpnp_rtc_pm_ops,
+#endif
 	},
 };
 

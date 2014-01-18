@@ -616,3 +616,13 @@ config KEYBOARD_W90P910
 	  module will be called w90p910_keypad.
 
 endif
+
+config SENSORS_HALL
+	bool "HALL"
+	help
+	  Say Y here to enable the HALL
+
+
+source "drivers/input/keyboard/cypress_touchkey/Kconfig"
+source "drivers/input/keyboard/cypress_touchkey_h/Kconfig"
+source "drivers/input/keyboard/cypress_touchkey_ks01/Kconfig"

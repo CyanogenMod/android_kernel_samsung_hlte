@@ -18,6 +18,7 @@
 #include <linux/platform_device.h>
 #include <linux/mutex.h>
 #include <linux/cpu.h>
+#include <linux/qpnp/pin.h>
 #include <linux/of.h>
 #include <linux/hrtimer.h>
 #include <linux/ktime.h>
@@ -32,6 +33,18 @@
 #include "rpm-notifier.h"
 #include "spm.h"
 #include "idle.h"
+#include "clock.h"
+
+#include <mach/gpiomux.h>
+#include <linux/regulator/consumer.h>
+
+#ifdef CONFIG_SEC_GPIO_DVS
+#include <linux/secgpio_dvs.h>
+#endif
+
+#ifdef CONFIG_GPIO_PCAL6416A
+#include <linux/i2c/pcal6416a.h>
+#endif
 
 #define SCLK_HZ (32768)
 
@@ -123,6 +136,10 @@ static int msm_pm_sleep_time_override;
 module_param_named(sleep_time_override,
 	msm_pm_sleep_time_override, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
+static int msm_pm_sleep_sec_debug;
+module_param_named(secdebug,
+	msm_pm_sleep_sec_debug, int, S_IRUGO | S_IWUSR | S_IWGRP);
+
 static int num_powered_cores;
 static struct hrtimer lpm_hrtimer;
 
@@ -212,7 +229,6 @@ static int lpm_set_l2_mode(struct lpm_system_state *system_state,
 
 	switch (sleep_mode) {
 	case MSM_SPM_L2_MODE_POWER_COLLAPSE:
-		pr_info("Configuring for L2 power collapse\n");
 		msm_pm_set_l2_flush_flag(MSM_SCM_L2_OFF);
 		break;
 	case MSM_SPM_L2_MODE_GDHS:
@@ -773,6 +789,7 @@ static int lpm_suspend_enter(suspend_state_t state)
 	if (i < 0)
 		return -EINVAL;
 
+	clock_debug_print_enabled();
 	lpm_enter_low_power(&sys_state, i,  false);
 
 	return 0;
@@ -782,6 +799,26 @@ static int lpm_suspend_prepare(void)
 {
 	suspend_in_progress = true;
 	msm_mpm_suspend_prepare();
+	regulator_showall_enabled();
+
+#ifdef CONFIG_SEC_GPIO_DVS
+	/************************ Caution !!! ****************************
+	 * This functiongit a must be located in appropriate SLEEP position
+	 * in accordance with the specification of each BB vendor.
+	 ************************ Caution !!! ****************************/
+	gpio_dvs_check_sleepgpio();
+#endif
+
+#ifdef CONFIG_SEC_PM_DEBUG
+	if (msm_pm_sleep_sec_debug) {
+		msm_gpio_print_enabled();
+		qpnp_debug_suspend_show();
+#ifdef CONFIG_GPIO_PCAL6416A
+		expander_print_all();
+#endif
+	}
+#endif
+
 	return 0;
 }
 
@@ -1075,6 +1112,10 @@ static int lpm_probe(struct platform_device *pdev)
 	get_cpu();
 	on_each_cpu(setup_broadcast_timer, (void *)true, 1);
 	put_cpu();
+	if (num_online_cpus() == 1)
+		allowed_l2_mode = MSM_SPM_L2_MODE_POWER_COLLAPSE;
+	else
+		allowed_l2_mode = default_l2_mode;
 
 	register_hotcpu_notifier(&lpm_cpu_nblk);
 

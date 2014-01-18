@@ -70,6 +70,9 @@
 #define USB_PHY_VDD_DIG_VOL_MAX	1320000 /* uV */
 
 #define USB_SUSPEND_DELAY_TIME	(500 * HZ/1000) /* 500 msec */
+#if !defined(CONFIG_SEC_MILLET_PROJECT) && !defined(CONFIG_SEC_MATISSE_PROJECT) && ! defined (CONFIG_SEC_BERLUTI_PROJECT)
+#define NO_USB_SUPPLY	1
+#endif
 
 enum msm_otg_phy_reg_mode {
 	USB_PHY_REG_OFF,
@@ -93,7 +96,14 @@ module_param(floated_charger_enable , bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(floated_charger_enable,
 	"Whether to enable floated charger");
 
+#if defined(CONFIG_SEC_MILLET_PROJECT) || defined(CONFIG_SEC_MATISSE_PROJECT) || defined (CONFIG_SEC_BERLUTI_PROJECT)
+#ifdef OTG_WAIT_PMIC
 static DECLARE_COMPLETION(pmic_vbus_init);
+#endif
+#else 
+static DECLARE_COMPLETION(pmic_vbus_init);
+#endif
+
 static struct msm_otg *the_msm_otg;
 static bool debug_aca_enabled;
 static bool debug_bus_voting_enabled;
@@ -129,6 +139,26 @@ static int vdd_val[VDD_TYPE_MAX][VDD_VAL_MAX] = {
 			[VDD_MAX]	= USB_PHY_VDD_DIG_VOL_MAX,
 		},
 };
+
+#ifdef CONFIG_USB_HOST_NOTIFY
+#include "msm_otg_sec.c"
+#else
+void sec_otg_set_dock_state(int enable)
+{       pr_info("%s\n", __func__);      }
+EXPORT_SYMBOL_GPL(sec_otg_set_dock_state);
+
+void sec_otg_set_id_state(bool enable)
+{       pr_info("%s\n", __func__);      }
+EXPORT_SYMBOL_GPL(sec_otg_set_id_state);
+#endif
+/* rapper function for set_vbus_state() */
+static void msm_otg_set_vbus_state(int online);
+void sec_otg_set_vbus_state(int online)
+{
+	msm_otg_set_vbus_state(online);
+}
+EXPORT_SYMBOL(sec_otg_set_vbus_state);
+
 
 static int msm_hsusb_ldo_init(struct msm_otg *motg, int init)
 {
@@ -2483,7 +2513,13 @@ static void msm_otg_init_sm(struct msm_otg *motg)
 			 * VBUS initial state is reported after PMIC
 			 * driver initialization. Wait for it.
 			 */
+#if defined(CONFIG_SEC_MILLET_PROJECT) || defined(CONFIG_SEC_MATISSE_PROJECT) || defined (CONFIG_SEC_BERLUTI_PROJECT)
+#ifdef OTG_WAIT_PMIC
 			wait_for_completion(&pmic_vbus_init);
+#endif
+#else 
+			wait_for_completion(&pmic_vbus_init);
+#endif
 		}
 		break;
 	case USB_HOST:
@@ -2501,7 +2537,14 @@ static void msm_otg_init_sm(struct msm_otg *motg)
 			 * VBUS initial state is reported after PMIC
 			 * driver initialization. Wait for it.
 			 */
+#if defined(CONFIG_SEC_MILLET_PROJECT) || defined(CONFIG_SEC_MATISSE_PROJECT) || defined (CONFIG_SEC_BERLUTI_PROJECT)
+#ifdef OTG_WAIT_PMIC
 			wait_for_completion(&pmic_vbus_init);
+#endif
+#else
+			wait_for_completion(&pmic_vbus_init);
+#endif			
+
 		}
 		break;
 	default:
@@ -3326,7 +3369,13 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 
 static void msm_otg_set_vbus_state(int online)
 {
+#if defined(CONFIG_SEC_MILLET_PROJECT) || defined(CONFIG_SEC_MATISSE_PROJECT) || defined (CONFIG_SEC_BERLUTI_PROJECT)
+#ifdef OTG_WAIT_PMIC
 	static bool init;
+#endif
+#else 
+	static bool init;
+#endif
 	struct msm_otg *motg = the_msm_otg;
 
 	if (online) {
@@ -3337,6 +3386,8 @@ static void msm_otg_set_vbus_state(int online)
 		clear_bit(B_SESS_VLD, &motg->inputs);
 	}
 
+#if defined(CONFIG_SEC_MILLET_PROJECT) || defined(CONFIG_SEC_MATISSE_PROJECT) || defined (CONFIG_SEC_BERLUTI_PROJECT)
+#ifdef OTG_WAIT_PMIC
 	/* do not queue state m/c work if id is grounded */
 	if (!test_bit(ID, &motg->inputs)) {
 		/*
@@ -3354,6 +3405,26 @@ static void msm_otg_set_vbus_state(int online)
 		pr_debug("PMIC: BSV init complete\n");
 		return;
 	}
+#endif
+#else 
+/* do not queue state m/c work if id is grounded */
+	if (!test_bit(ID, &motg->inputs)) {
+		/*
+		 * state machine work waits for initial VBUS
+		 * completion in UNDEFINED state.  Process
+		 * the initial VBUS event in ID_GND state.
+		 */
+		if (init)
+			return;
+	}
+
+	if (!init) {
+		init = true;
+		complete(&pmic_vbus_init);
+		pr_debug("PMIC: BSV init complete\n");
+		return;
+	}
+#endif
 
 	if (test_bit(MHL, &motg->inputs) ||
 			mhl_det_in_progress) {
@@ -3638,6 +3709,7 @@ static ssize_t msm_otg_bus_write(struct file *file, const char __user *ubuf,
 	return count;
 }
 
+#ifndef NO_USB_SUPPLY
 static int otg_power_get_property_usb(struct power_supply *psy,
 				  enum power_supply_property psp,
 				  union power_supply_propval *val)
@@ -3738,6 +3810,7 @@ static enum power_supply_property otg_pm_power_props_usb[] = {
 	POWER_SUPPLY_PROP_SCOPE,
 	POWER_SUPPLY_PROP_TYPE,
 };
+#endif
 
 const struct file_operations msm_otg_bus_fops = {
 	.open = msm_otg_bus_open,
@@ -3942,6 +4015,7 @@ static int msm_otg_setup_devices(struct platform_device *ofdev,
 	return retval;
 }
 
+#ifndef NO_USB_SUPPLY
 static int msm_otg_register_power_supply(struct platform_device *pdev,
 					struct msm_otg *motg)
 {
@@ -3958,6 +4032,7 @@ static int msm_otg_register_power_supply(struct platform_device *pdev,
 	legacy_power_supply = false;
 	return 0;
 }
+#endif
 
 static int msm_otg_ext_chg_open(struct inode *inode, struct file *file)
 {
@@ -4613,6 +4688,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		pm_runtime_use_autosuspend(&pdev->dev);
 	}
 
+#if 0
 	motg->usb_psy.name = "usb";
 	motg->usb_psy.type = POWER_SUPPLY_TYPE_USB;
 	motg->usb_psy.supplied_to = otg_pm_power_supplied_to;
@@ -4633,6 +4709,30 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		if (!msm_otg_register_power_supply(pdev, motg))
 			psy = &motg->usb_psy;
 	}
+#endif
+#ifndef NO_USB_SUPPLY
+	motg->usb_psy.name = "dwc-usb";
+	motg->usb_psy.type = POWER_SUPPLY_TYPE_UNKNOWN;
+	motg->usb_psy.supplied_to = otg_pm_power_supplied_to;
+	motg->usb_psy.num_supplicants = ARRAY_SIZE(otg_pm_power_supplied_to);
+	motg->usb_psy.properties = otg_pm_power_props_usb;
+	motg->usb_psy.num_properties = ARRAY_SIZE(otg_pm_power_props_usb);
+	motg->usb_psy.get_property = otg_power_get_property_usb;
+	motg->usb_psy.set_property = otg_power_set_property_usb;
+	motg->usb_psy.property_is_writeable
+		= otg_power_property_is_writeable_usb;
+
+	if (!pm8921_charger_register_vbus_sn(NULL)) {
+		/* if pm8921 use legacy implementation */
+		dev_dbg(motg->phy.dev, "%s: legacy support\n", __func__);
+		legacy_power_supply = true;
+	} else {
+		/* otherwise register our own power supply */
+		if (!msm_otg_register_power_supply(pdev, motg))
+			psy = &motg->usb_psy;
+	}
+#endif
+
 
 	if (legacy_power_supply && pdata->otg_control == OTG_PMIC_CONTROL)
 		pm8921_charger_register_vbus_sn(&msm_otg_set_vbus_state);

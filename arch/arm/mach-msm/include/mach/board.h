@@ -670,5 +670,17 @@ void msm_snddev_tx_route_deconfig(void);
 
 extern phys_addr_t msm_shared_ram_phys; /* defined in arch/arm/mach-msm/io.c */
 
+#if defined(CONFIG_BT_BCM4335) || defined(CONFIG_BT_BCM4339)
+void msm8974_bt_init(void);
+#endif
+
+#if defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE) || \
+    defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE) || \
+    defined(CONFIG_BCM4354) || defined(CONFIG_BCM4354_MODULE)
+int brcm_wlan_init(void);
+int brcm_wifi_status_register(
+			void (*callback)(int card_present, void *dev_id), void *dev_id);
+unsigned int brcm_wifi_status(struct device *dev);
+#endif
 
 #endif

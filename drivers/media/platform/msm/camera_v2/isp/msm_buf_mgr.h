@@ -42,6 +42,7 @@ struct msm_isp_buffer_mapped_info {
 	unsigned long len;
 	unsigned long paddr;
 	struct ion_handle *handle;
+	unsigned long offset;
 };
 
 struct msm_isp_buffer {

@@ -277,7 +277,7 @@ config HID_LOGITECH
 config HID_LOGITECH_DJ
 	tristate "Logitech Unifying receivers full support"
 	depends on HID_LOGITECH
-	default m
+	default y
 	---help---
 	Say Y if you want support for Logitech Unifying receivers and devices.
 	Unifying receivers are capable of pairing up to 6 Logitech compliant
@@ -522,7 +522,7 @@ config HID_SAITEK
 
 config HID_SAMSUNG
 	tristate "Samsung InfraRed remote control or keyboards"
-	depends on USB_HID
+	depends on (USB_HID || BT_HIDP)
 	---help---
 	Support for Samsung InfraRed remote control or keyboards.
 
@@ -583,6 +583,13 @@ config SMARTJOYPLUS_FF
 	---help---
 	Say Y here if you have a SmartJoy PLUS PS2/USB adapter and want to
 	enable force feedback support for it.
+
+config HID_SYNAPTICS_BT
+	tristate "HID Synaptics"
+	depends on HID
+	default n
+	---help---
+	For a Bluetooth HID touchpad
 
 config HID_TIVO
 	tristate "TiVo Slide Bluetooth remote control support"
@@ -664,6 +671,13 @@ config HID_ZYDACRON
 	depends on USB_HID
 	---help---
 	Support for Zydacron remote control.
+
+config HID_OVR
+	tristate "OVR device support"
+	depends on USB_HID
+	---help---
+	Support for OVR devices.
+	Say Y here if you have a OVR device.
 
 endmenu
 

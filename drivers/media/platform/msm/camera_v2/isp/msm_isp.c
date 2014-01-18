@@ -38,10 +38,6 @@ static const struct of_device_id msm_vfe_dt_match[] = {
 		.compatible = "qcom,vfe40",
 		.data = &vfe40_hw_info,
 	},
-	{
-		.compatible = "qcom,vfe32",
-		.data = &vfe32_hw_info,
-	},
 	{}
 };
 
@@ -91,6 +87,7 @@ static int __devinit vfe_probe(struct platform_device *pdev)
 
 	if (!vfe_dev->hw_info) {
 		pr_err("%s: No vfe hardware info\n", __func__);
+		kfree(vfe_dev);//prevent
 		return -EINVAL;
 	}
 	ISP_DBG("%s: device id = %d\n", __func__, pdev->id);

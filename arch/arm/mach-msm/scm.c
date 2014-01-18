@@ -22,12 +22,20 @@
 
 #include <mach/scm.h>
 
+#include <linux/thread_info.h>
+#include <linux/sched.h>
+#include <linux/string.h>
+#ifdef CONFIG_ARCH_MSM8226
+#include <linux/smp.h>
+#endif
+
 #define SCM_ENOMEM		-5
 #define SCM_EOPNOTSUPP		-4
 #define SCM_EINVAL_ADDR		-3
 #define SCM_EINVAL_ARG		-2
 #define SCM_ERROR		-1
 #define SCM_INTERRUPTED		1
+#define SCM_EBUSY		-55
 
 static DEFINE_MUTEX(scm_lock);
 
@@ -114,7 +122,8 @@ static inline void *scm_get_response_buffer(const struct scm_response *rsp)
 
 static int scm_remap_error(int err)
 {
-	pr_err("scm_call failed with error code %d\n", err);
+	if (err != SCM_EBUSY)
+		pr_err("scm_call failed with error code %d\n", err);
 	switch (err) {
 	case SCM_ERROR:
 		return -EIO;
@@ -125,6 +134,8 @@ static int scm_remap_error(int err)
 		return -EOPNOTSUPP;
 	case SCM_ENOMEM:
 		return -ENOMEM;
+	case SCM_EBUSY:
+		return -EBUSY;
 	}
 	return -EINVAL;
 }
@@ -153,10 +164,29 @@ static u32 smc(u32 cmd_addr)
 	return r0;
 }
 
+#ifdef CONFIG_ARCH_MSM8226
+static void __wrap_flush_cache_all(void* vp)
+{
+	flush_cache_all();
+}
+#endif
+
 static int __scm_call(const struct scm_command *cmd)
 {
+	int flush_all_need;
+	int call_from_ss_daemon;
 	int ret;
 	u32 cmd_addr = virt_to_phys(cmd);
+
+	/*
+	 * in case of QSEE command
+	 */
+	flush_all_need = ((cmd->id & 0x0003FC00) == (252 << 10));
+
+	/*
+	 * in case of secure_storage_daemon
+	*/
+	call_from_ss_daemon = (strncmp(current_thread_info()->task->comm, "secure_storage_daemon", TASK_COMM_LEN - 1) == 0);
 
 	/*
 	 * Flush the command buffer so that the secure world sees
@@ -164,6 +194,16 @@ static int __scm_call(const struct scm_command *cmd)
 	 */
 	__cpuc_flush_dcache_area((void *)cmd, cmd->len);
 	outer_flush_range(cmd_addr, cmd_addr + cmd->len);
+
+	if (flush_all_need && call_from_ss_daemon) {
+		flush_cache_all();
+
+#ifdef CONFIG_ARCH_MSM8226
+		smp_call_function((void (*)(void *))__wrap_flush_cache_all, NULL, 1);
+#endif
+
+		outer_flush_all();
+	}
 
 	ret = smc(cmd_addr);
 	if (ret < 0)
@@ -300,6 +340,9 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
 {
 	struct scm_command *cmd;
 	int ret;
+	int retry_started = 0;
+	unsigned int retry_cnt = 0;
+	unsigned long retry_till = jiffies + msecs_to_jiffies(15 * 1000);
 	size_t len = SCM_BUF_LEN(cmd_len, resp_len);
 
 	if (cmd_len > len || resp_len > len)
@@ -309,8 +352,26 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
 	if (!cmd)
 		return -ENOMEM;
 
+_retry:
+	retry_cnt++;
 	ret = scm_call_common(svc_id, cmd_id, cmd_buf, cmd_len, resp_buf,
 				resp_len, cmd, len);
+
+	if (ret == -EBUSY) {
+		if (retry_started == 0) {
+			pr_err("scm_call_common : busy => retry start\n");
+			retry_started = 1;
+		}
+
+		if (time_after(jiffies, retry_till))
+			panic("scm_call_common : met deadline, retry_cnt = %u\n", retry_cnt);
+
+		goto _retry;
+	}
+
+	if (retry_started)
+		pr_err("scm_call_common : busy => retry ends (cnt = %u)\n", retry_cnt);
+
 	kfree(cmd);
 	return ret;
 }

@@ -2443,10 +2443,17 @@ static const struct snd_soc_dapm_widget msm8x10_wcd_dapm_widgets[] = {
 		MSM8X10_WCD_A_MICB_1_CTL, 7, 0,
 		msm8x10_wcd_codec_enable_micbias, SND_SOC_DAPM_PRE_PMU |
 		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+#if defined(CONFIG_SEC_HEAT_PROJECT) /*Remove Intenal mic bias2*/
+	SND_SOC_DAPM_MICBIAS_E("MIC BIAS Internal2",
+		0, 0, 0,
+		0, SND_SOC_DAPM_PRE_PMU |
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+#else
 	SND_SOC_DAPM_MICBIAS_E("MIC BIAS Internal2",
 		MSM8X10_WCD_A_MICB_1_CTL, 7, 0,
 		msm8x10_wcd_codec_enable_micbias, SND_SOC_DAPM_PRE_PMU |
 		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+#endif
 	SND_SOC_DAPM_MICBIAS_E("MIC BIAS Internal3",
 		MSM8X10_WCD_A_MICB_1_CTL, 7, 0,
 		msm8x10_wcd_codec_enable_micbias, SND_SOC_DAPM_PRE_PMU |
@@ -2542,9 +2549,17 @@ static const struct msm8x10_wcd_reg_mask_val msm8x10_wcd_reg_defaults[] = {
 
 	/* Disable internal biasing path which can cause leakage */
 	MSM8X10_WCD_REG_VAL(MSM8X10_WCD_A_BIAS_CURR_CTL_2, 0x04),
+#if defined(CONFIG_MACH_CS02VE)||defined(CONFIG_MACH_KYLEVE2_CTC) || defined(CONFIG_SEC_HEAT_PROJECT)
+	MSM8X10_WCD_REG_VAL(MSM8X10_WCD_A_MICB_CFILT_1_VAL, 0x9C),
+#else
+#endif
 
 	/* Enable pulldown to reduce leakage */
+#if defined(CONFIG_MACH_CS02VE)||defined(CONFIG_MACH_KYLEVE2_CTC) || defined(CONFIG_SEC_HEAT_PROJECT)
+	MSM8X10_WCD_REG_VAL(MSM8X10_WCD_A_MICB_1_CTL, 0x92),
+#else
 	MSM8X10_WCD_REG_VAL(MSM8X10_WCD_A_MICB_1_CTL, 0x82),
+#endif
 	MSM8X10_WCD_REG_VAL(MSM8X10_WCD_A_TX_COM_BIAS, 0xE0),
 	/* Keep the same default gain settings for TX paths */
 	MSM8X10_WCD_REG_VAL(MSM8X10_WCD_A_TX_1_EN, 0x32),
@@ -2580,7 +2595,11 @@ static const struct msm8x10_wcd_reg_mask_val
 	/* Initialize current threshold to 350MA
 	 * number of wait and run cycles to 4096
 	 */
+#if defined(CONFIG_MACH_CS02VE)||defined(CONFIG_MACH_KYLEVE2_CTC) || defined(CONFIG_SEC_HEAT_PROJECT)
+	{MSM8X10_WCD_A_RX_HPH_OCP_CTL, 0xFF, 0x6B},
+#else
 	{MSM8X10_WCD_A_RX_HPH_OCP_CTL, 0xE1, 0x61},
+#endif
 	{MSM8X10_WCD_A_RX_COM_OCP_COUNT, 0xFF, 0xFF},
 	{MSM8X10_WCD_A_RX_HPH_L_TEST, 0x01, 0x01},
 	{MSM8X10_WCD_A_RX_HPH_R_TEST, 0x01, 0x01},
@@ -2977,11 +2996,13 @@ static void delayed_hs_detect_fn(struct work_struct *work)
 int msm8x10_wcd_hs_detect(struct snd_soc_codec *codec,
 		    struct wcd9xxx_mbhc_config *mbhc_cfg)
 {
+    #ifndef CONFIG_SAMSUNG_JACK
 	struct msm8x10_wcd_priv *wcd = snd_soc_codec_get_drvdata(codec);
 
 	wcd->mbhc_cfg = mbhc_cfg;
 	schedule_delayed_work(&wcd->hs_detect_work,
 			msecs_to_jiffies(5000));
+	#endif
 	return 0;
 }
 EXPORT_SYMBOL_GPL(msm8x10_wcd_hs_detect);
@@ -3186,6 +3207,7 @@ static int msm8x10_wcd_codec_probe(struct snd_soc_codec *codec)
 				on_demand_supply_name[ON_DEMAND_MICBIAS]);
 	atomic_set(&msm8x10_wcd_priv->on_demand_list[ON_DEMAND_MICBIAS].ref, 0);
 
+    #ifndef CONFIG_SAMSUNG_JACK
 	ret = wcd9xxx_mbhc_init(&msm8x10_wcd_priv->mbhc,
 				&msm8x10_wcd_priv->resmgr,
 				codec, NULL, &mbhc_cb, &cdc_intr_ids,
@@ -3195,6 +3217,7 @@ static int msm8x10_wcd_codec_probe(struct snd_soc_codec *codec)
 			__func__);
 		goto exit_probe;
 	}
+	#endif
 
 	/* Handle the Pdata */
 	ret = msm8x10_wcd_handle_pdata(codec, pdata);

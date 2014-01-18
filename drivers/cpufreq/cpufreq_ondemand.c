@@ -350,6 +350,7 @@ static void update_sampling_rate(unsigned int new_rate)
 				     = max(new_rate, min_sampling_rate);
 
 	get_online_cpus();
+	mutex_lock(&dbs_mutex);
 	for_each_online_cpu(cpu) {
 		struct cpufreq_policy *policy;
 		struct cpu_dbs_info_s *dbs_info;
@@ -384,6 +385,7 @@ static void update_sampling_rate(unsigned int new_rate)
 		}
 		mutex_unlock(&dbs_info->timer_mutex);
 	}
+	mutex_unlock(&dbs_mutex);
 	put_online_cpus();
 }
 
@@ -1340,9 +1342,9 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		break;
 
 	case CPUFREQ_GOV_STOP:
+		mutex_lock(&dbs_mutex);
 		dbs_timer_exit(this_dbs_info);
 
-		mutex_lock(&dbs_mutex);
 		dbs_enable--;
 
 		for_each_cpu(j, policy->cpus) {
@@ -1370,6 +1372,11 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 
 	case CPUFREQ_GOV_LIMITS:
 		mutex_lock(&this_dbs_info->timer_mutex);
+		if (this_dbs_info->cur_policy == NULL) {
+			pr_debug("Unable to limit cpu freq due to cur_policy == NULL\n");
+			mutex_unlock(&this_dbs_info->timer_mutex);
+			return -EPERM;
+		}
 		if (policy->max < this_dbs_info->cur_policy->cur)
 			__cpufreq_driver_target(this_dbs_info->cur_policy,
 				policy->max, CPUFREQ_RELATION_H);
