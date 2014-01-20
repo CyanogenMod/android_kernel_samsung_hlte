@@ -39,6 +39,7 @@
 
 #include <sound/apr_audio-v2.h>
 #include <sound/q6asm-v2.h>
+#include <sound/q6audio-v2.h>
 
 #include "audio_acdb.h"
 
@@ -354,7 +355,7 @@ static void q6asm_session_free(struct audio_client *ac)
 	session[ac->session] = 0;
 	mutex_unlock(&session_lock);
 	ac->session = 0;
-	ac->perf_mode = 0;
+	ac->perf_mode = LEGACY_PCM_MODE;
 	ac->fptr_cache_ops = NULL;
 	return;
 }
@@ -810,7 +811,7 @@ struct audio_client *q6asm_audio_client_alloc(app_cb cb, void *priv)
 	ac->cb = cb;
 	ac->priv = priv;
 	ac->io_mode = SYNC_IO_MODE;
-	ac->perf_mode = false;
+	ac->perf_mode = LEGACY_PCM_MODE;
 	ac->fptr_cache_ops = NULL;
 	ac->apr = apr_register("ADSP", "ASM", \
 				(apr_fn)q6asm_callback,\
@@ -1256,6 +1257,7 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 		case ASM_STREAM_CMD_OPEN_READ_V3:
 		case ASM_STREAM_CMD_OPEN_WRITE_V3:
 		case ASM_STREAM_CMD_OPEN_READWRITE_V2:
+		case ASM_STREAM_CMD_OPEN_LOOPBACK_V2:
 		case ASM_DATA_CMD_MEDIA_FMT_UPDATE_V2:
 		case ASM_STREAM_CMD_SET_ENCDEC_PARAM:
 		case ASM_CMD_ADD_TOPOLOGIES:
@@ -1694,10 +1696,13 @@ static int __q6asm_open_read(struct audio_client *ac,
 	open.bits_per_sample = bits_per_sample;
 	open.mode_flags = 0x0;
 
-	if (ac->perf_mode)
-		open.mode_flags |= ASM_LOW_LATENCY_STREAM_SESSION;
-	else
-		open.mode_flags |= ASM_LEGACY_STREAM_SESSION;
+	if (ac->perf_mode == LOW_LATENCY_PCM_MODE) {
+		open.mode_flags |= ASM_LOW_LATENCY_STREAM_SESSION <<
+				ASM_SHIFT_STREAM_PERF_MODE_FLAG_IN_OPEN_READ;
+	} else {
+		open.mode_flags |= ASM_LEGACY_STREAM_SESSION <<
+				ASM_SHIFT_STREAM_PERF_MODE_FLAG_IN_OPEN_READ;
+	}
 
 	switch (format) {
 	case FORMAT_LINEAR_PCM:
@@ -1741,6 +1746,7 @@ static int __q6asm_open_read(struct audio_client *ac,
 			rc);
 		goto fail_cmd;
 	}
+	ac->io_mode |= TUN_READ_IO_MODE;
 	return 0;
 fail_cmd:
 	return -EINVAL;
@@ -1776,7 +1782,9 @@ static int __q6asm_open_write(struct audio_client *ac, uint32_t format,
 
 	open.hdr.opcode = ASM_STREAM_CMD_OPEN_WRITE_V3;
 	open.mode_flags = 0x00;
-	if (ac->perf_mode)
+	if (ac->perf_mode == ULTRA_LOW_LATENCY_PCM_MODE)
+		open.mode_flags |= ASM_ULTRA_LOW_LATENCY_STREAM_SESSION;
+	else if (ac->perf_mode == LOW_LATENCY_PCM_MODE)
 		open.mode_flags |= ASM_LOW_LATENCY_STREAM_SESSION;
 	else {
 		open.mode_flags |= ASM_LEGACY_STREAM_SESSION;
@@ -1835,6 +1843,7 @@ static int __q6asm_open_write(struct audio_client *ac, uint32_t format,
 			rc);
 		goto fail_cmd;
 	}
+	ac->io_mode |= TUN_WRITE_IO_MODE;
 	return 0;
 fail_cmd:
 	return -EINVAL;
@@ -1968,6 +1977,49 @@ int q6asm_open_read_write(struct audio_client *ac,
 			(atomic_read(&ac->cmd_state) == 0), 5*HZ);
 	if (!rc) {
 		pr_err("timeout. waited for open read-write rc[%d]\n", rc);
+		goto fail_cmd;
+	}
+	return 0;
+fail_cmd:
+	return -EINVAL;
+}
+
+int q6asm_open_loopback_v2(struct audio_client *ac, uint16_t bits_per_sample)
+{
+	int rc = 0x00;
+	struct asm_stream_cmd_open_loopback_v2 open;
+
+	if ((ac == NULL) || (ac->apr == NULL)) {
+		pr_err("%s APR handle NULL\n", __func__);
+		return -EINVAL;
+	}
+	pr_debug("%s: session[%d]", __func__, ac->session);
+
+	q6asm_add_hdr(ac, &open.hdr, sizeof(open), TRUE);
+	open.hdr.opcode = ASM_STREAM_CMD_OPEN_LOOPBACK_V2;
+
+	open.mode_flags = 0;
+	open.src_endpointype = 0;
+	open.sink_endpointype = 0;
+	/* source endpoint : matrix */
+	open.postprocopo_id = get_asm_topology();
+	if (open.postprocopo_id == 0)
+		open.postprocopo_id = DEFAULT_POPP_TOPOLOGY;
+	open.bits_per_sample = bits_per_sample;
+	open.reserved = 0;
+
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &open);
+	if (rc < 0) {
+		pr_err("%s open failed op[0x%x]rc[%d]\n", __func__,
+				open.hdr.opcode, rc);
+		goto fail_cmd;
+	}
+
+	rc = wait_event_timeout(ac->cmd_wait,
+			(atomic_read(&ac->cmd_state) == 0), 5*HZ);
+	if (!rc) {
+		pr_err("%s timeout. waited for open_loopback rc[%d]\n",
+				__func__, rc);
 		goto fail_cmd;
 	}
 	return 0;
@@ -4465,9 +4517,11 @@ static void q6asm_reset_buf_state(struct audio_client *ac)
 {
 	int cnt = 0;
 	int loopcnt = 0;
+	int used;
 	struct audio_port_data *port = NULL;
 
 	if (ac->io_mode & SYNC_IO_MODE) {
+		used = (ac->io_mode & TUN_WRITE_IO_MODE ? 1 : 0);
 		mutex_lock(&ac->cmd_lock);
 		for (loopcnt = 0; loopcnt <= OUT; loopcnt++) {
 			port = &ac->port[loopcnt];
@@ -4477,7 +4531,7 @@ static void q6asm_reset_buf_state(struct audio_client *ac)
 			while (cnt >= 0) {
 				if (!port->buf)
 					continue;
-				port->buf[cnt].used = 1;
+				port->buf[cnt].used = used;
 				cnt--;
 			}
 		}

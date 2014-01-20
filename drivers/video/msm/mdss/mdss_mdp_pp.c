@@ -211,6 +211,13 @@ static u32 igc_limited[IGC_LUT_ENTRIES] = {
 	GAMUT_T2_SIZE + GAMUT_T3_SIZE + GAMUT_T4_SIZE + \
 	GAMUT_T5_SIZE + GAMUT_T6_SIZE + GAMUT_T7_SIZE)
 
+#define MDSS_MDP_PA_SIZE		0xC
+#define MDSS_MDP_GC_SIZE		0x28
+#define MDSS_MDP_PCC_SIZE		0xB8
+#define MDSS_MDP_GAMUT_SIZE		0x5C
+#define MDSS_MDP_IGC_DSPP_COLORS	0x3
+#define TOTAL_BLEND_STAGES		0x4
+
 #define PP_FLAGS_DIRTY_PA	0x1
 #define PP_FLAGS_DIRTY_PCC	0x2
 #define PP_FLAGS_DIRTY_IGC	0x4
@@ -242,6 +249,10 @@ static u32 igc_limited[IGC_LUT_ENTRIES] = {
 #define PP_STS_PA_SAT_ZERO_EXP_EN	0x1000
 
 #define PP_AD_BAD_HW_NUM 255
+
+#define MDSS_SIDE_NONE	0
+#define MDSS_SIDE_LEFT	1
+#define MDSS_SIDE_RIGHT	2
 
 #define PP_AD_STATE_INIT	0x2
 #define PP_AD_STATE_CFG		0x4
@@ -320,8 +331,8 @@ struct mdss_pp_res_type {
 	u32 enhist_lut[MDSS_BLOCK_DISP_NUM][ENHIST_LUT_ENTRIES];
 	struct mdp_pa_cfg pa_disp_cfg[MDSS_BLOCK_DISP_NUM];
 	struct mdp_pa_v2_data pa_v2_disp_cfg[MDSS_BLOCK_DISP_NUM];
-	u32 six_zone_lut_curve_p0[MDSS_BLOCK_DISP_NUM][SIX_ZONE_LUT_ENTRIES];
-	u32 six_zone_lut_curve_p1[MDSS_BLOCK_DISP_NUM][SIX_ZONE_LUT_ENTRIES];
+	u32 six_zone_lut_curve_p0[MDSS_BLOCK_DISP_NUM][MDP_SIX_ZONE_LUT_SIZE];
+	u32 six_zone_lut_curve_p1[MDSS_BLOCK_DISP_NUM][MDP_SIX_ZONE_LUT_SIZE];
 	struct mdp_pcc_cfg_data pcc_disp_cfg[MDSS_BLOCK_DISP_NUM];
 	struct mdp_igc_lut_data igc_disp_cfg[MDSS_BLOCK_DISP_NUM];
 	struct mdp_pgc_lut_data argc_disp_cfg[MDSS_BLOCK_DISP_NUM];
@@ -331,15 +342,15 @@ struct mdss_pp_res_type {
 	struct mdp_gamut_cfg_data gamut_disp_cfg[MDSS_BLOCK_DISP_NUM];
 	uint16_t gamut_tbl[MDSS_BLOCK_DISP_NUM][GAMUT_TOTAL_TABLE_SIZE];
 	u32 hist_data[MDSS_BLOCK_DISP_NUM][HIST_V_SIZE];
-	/* physical info */
 	struct pp_sts_type pp_disp_sts[MDSS_BLOCK_DISP_NUM];
+	/* physical info */
 	struct pp_hist_col_info dspp_hist[MDSS_MDP_MAX_DSPP];
 };
 
 static DEFINE_MUTEX(mdss_pp_mutex);
 static struct mdss_pp_res_type *mdss_pp_res;
 
-static void pp_hist_read(char __iomem *v_addr,
+static u32 pp_hist_read(char __iomem *v_addr,
 				struct pp_hist_col_info *hist_info);
 static int pp_histogram_setup(u32 *op, u32 block, struct mdss_mdp_mixer *mix);
 static int pp_histogram_disable(struct pp_hist_col_info *hist_info,
@@ -378,8 +389,9 @@ static void pp_enhist_config(unsigned long flags, char __iomem *addr,
 static void pp_dither_config(char __iomem *addr,
 				struct pp_sts_type *pp_sts,
 				struct mdp_dither_cfg_data *dither_cfg);
-static void pp_dspp_opmode_config(struct pp_sts_type *pp_sts, u32 *opmode,
-				int mdp_rev);
+static void pp_dspp_opmode_config(struct mdss_mdp_ctl *ctl, u32 num,
+					struct pp_sts_type *pp_sts, int mdp_rev,
+					u32 *opmode);
 static void pp_sharp_config(char __iomem *addr,
 				struct pp_sts_type *pp_sts,
 				struct mdp_sharp_cfg *sharp_config);
@@ -413,11 +425,15 @@ static void pp_ad_init_write(struct mdss_mdp_ad *ad_hw,
 			struct mdss_ad_info *ad, struct mdss_mdp_ctl *ctl);
 static void pp_ad_input_write(struct mdss_mdp_ad *ad_hw,
 						struct mdss_ad_info *ad);
-static void pp_ad_bypass_config(struct mdss_ad_info *ad, u32 *opmode);
 static int pp_ad_setup_hw_nums(struct msm_fb_data_type *mfd,
 						struct mdss_ad_info *ad);
+static void pp_ad_bypass_config(struct mdss_ad_info *ad,
+				struct mdss_mdp_ctl *ctl, u32 num, u32 *opmode);
 static int mdss_mdp_ad_setup(struct msm_fb_data_type *mfd);
 static void pp_ad_cfg_lut(char __iomem *addr, u32 *data);
+static int pp_num_to_side(struct mdss_mdp_ctl *ctl, u32 num);
+static inline bool pp_sts_is_enabled(u32 sts, int side);
+static inline void pp_sts_set_split_bits(u32 *sts, u32 bits);
 
 static u32 last_sts, last_state;
 
@@ -562,6 +578,7 @@ static void pp_gamut_config(struct mdp_gamut_cfg_data *gamut_cfg,
 		pp_sts->gamut_sts &= ~PP_STS_ENABLE;
 	else if (gamut_cfg->flags & MDP_PP_OPS_ENABLE)
 		pp_sts->gamut_sts |= PP_STS_ENABLE;
+	pp_sts_set_split_bits(&pp_sts->gamut_sts, gamut_cfg->flags);
 }
 
 static void pp_pa_config(unsigned long flags, char __iomem *addr,
@@ -677,7 +694,7 @@ static void pp_update_pa_v2_six_zone_regs(char __iomem *addr,
 				data, addr);
 
 		/* Remove Index Update */
-		for (i = 1; i < SIX_ZONE_LUT_ENTRIES; i++) {
+		for (i = 1; i < MDP_SIX_ZONE_LUT_SIZE; i++) {
 			addr += 4;
 			writel_relaxed(pa_v2_config->six_zone_curve_p1[i],
 					addr);
@@ -730,6 +747,7 @@ static void pp_update_pa_v2_sts(struct pp_sts_type *pp_sts,
 	if (pa_v2_config->flags & MDP_PP_PA_SIX_ZONE_VAL_MASK)
 		pp_sts->pa_sts |= PP_STS_PA_SIX_ZONE_VAL_MASK;
 
+	pp_sts_set_split_bits(&pp_sts->pa_sts, pa_v2_config->flags);
 }
 
 static void pp_pcc_config(unsigned long flags, char __iomem *addr,
@@ -744,6 +762,7 @@ static void pp_pcc_config(unsigned long flags, char __iomem *addr,
 			pp_sts->pcc_sts &= ~PP_STS_ENABLE;
 		else if (pcc_config->ops & MDP_PP_OPS_ENABLE)
 			pp_sts->pcc_sts |= PP_STS_ENABLE;
+		pp_sts_set_split_bits(&pp_sts->pcc_sts, pcc_config->ops);
 	}
 }
 
@@ -771,6 +790,7 @@ static void pp_igc_config(unsigned long flags, char __iomem *addr,
 			pp_sts->igc_sts &= ~PP_STS_ENABLE;
 		else if (igc_config->ops & MDP_PP_OPS_ENABLE)
 			pp_sts->igc_sts |= PP_STS_ENABLE;
+		pp_sts_set_split_bits(&pp_sts->igc_sts, igc_config->ops);
 	}
 }
 
@@ -904,7 +924,7 @@ static int pp_vig_pipe_setup(struct mdss_mdp_pipe *pipe, u32 *op)
 		}
 	}
 
-	*op = opmode;
+	*op |= opmode;
 
 	return 0;
 }
@@ -935,12 +955,15 @@ static void pp_update_pa_v2_vig_opmode(struct pp_sts_type *pp_sts,
 static int mdss_mdp_scale_setup(struct mdss_mdp_pipe *pipe)
 {
 	u32 scale_config = 0;
-	u32 phasex_step = 0, phasey_step = 0;
+	int init_phasex = 0, init_phasey = 0;
+	int phasex_step = 0, phasey_step = 0;
 	u32 chroma_sample;
 	u32 filter_mode;
 	struct mdss_data_type *mdata;
 	u32 src_w, src_h;
 
+	pr_debug("pipe=%d, change pxl ext=%d\n", pipe->num,
+			pipe->scale.enable_pxl_ext);
 	mdata = mdss_mdp_get_mdata();
 	if (mdata->mdp_rev >= MDSS_MDP_HW_REV_102 && pipe->src_fmt->is_yuv)
 		filter_mode = MDSS_MDP_SCALE_FILTER_CA;
@@ -987,7 +1010,8 @@ static int mdss_mdp_scale_setup(struct mdss_mdp_pipe *pipe)
 	if ((src_h != pipe->dst.h) ||
 	    (pipe->pp_res.pp_sts.sharp_sts & PP_STS_ENABLE) ||
 	    (chroma_sample == MDSS_MDP_CHROMA_420) ||
-	    (chroma_sample == MDSS_MDP_CHROMA_H1V2)) {
+	    (chroma_sample == MDSS_MDP_CHROMA_H1V2) ||
+		pipe->scale.enable_pxl_ext) {
 		pr_debug("scale y - src_h=%d dst_h=%d\n", src_h, pipe->dst.h);
 
 		if ((src_h / MAX_DOWNSCALE_RATIO) > pipe->dst.h) {
@@ -997,7 +1021,8 @@ static int mdss_mdp_scale_setup(struct mdss_mdp_pipe *pipe)
 		}
 
 		scale_config |= MDSS_MDP_SCALEY_EN;
-		phasey_step = pipe->phase_step_y;
+		phasey_step = pipe->scale.phase_step_y[0];
+		init_phasey = pipe->scale.init_phase_y[0];
 
 		if (pipe->type == MDSS_MDP_PIPE_TYPE_VIG) {
 			u32 chroma_shift = 0;
@@ -1022,6 +1047,8 @@ static int mdss_mdp_scale_setup(struct mdss_mdp_pipe *pipe)
 				scale_config |= /* CrCb */
 					(MDSS_MDP_SCALE_FILTER_PCMN << 14);
 
+			writel_relaxed(init_phasey, pipe->base +
+				MDSS_MDP_REG_VIG_QSEED2_C12_INIT_PHASEY);
 			writel_relaxed(phasey_step >> chroma_shift, pipe->base +
 				MDSS_MDP_REG_VIG_QSEED2_C12_PHASESTEPY);
 		} else {
@@ -1039,7 +1066,8 @@ static int mdss_mdp_scale_setup(struct mdss_mdp_pipe *pipe)
 	if ((src_w != pipe->dst.w) ||
 	    (pipe->pp_res.pp_sts.sharp_sts & PP_STS_ENABLE) ||
 	    (chroma_sample == MDSS_MDP_CHROMA_420) ||
-	    (chroma_sample == MDSS_MDP_CHROMA_H2V1)) {
+	    (chroma_sample == MDSS_MDP_CHROMA_H2V1) ||
+		pipe->scale.enable_pxl_ext) {
 		pr_debug("scale x - src_w=%d dst_w=%d\n", src_w, pipe->dst.w);
 
 		if ((src_w / MAX_DOWNSCALE_RATIO) > pipe->dst.w) {
@@ -1049,7 +1077,8 @@ static int mdss_mdp_scale_setup(struct mdss_mdp_pipe *pipe)
 		}
 
 		scale_config |= MDSS_MDP_SCALEX_EN;
-		phasex_step = pipe->phase_step_x;
+		init_phasex = pipe->scale.init_phase_x[0];
+		phasex_step = pipe->scale.phase_step_x[0];
 
 		if (pipe->type == MDSS_MDP_PIPE_TYPE_VIG) {
 			u32 chroma_shift = 0;
@@ -1075,6 +1104,8 @@ static int mdss_mdp_scale_setup(struct mdss_mdp_pipe *pipe)
 				scale_config |= /* CrCb */
 					(MDSS_MDP_SCALE_FILTER_PCMN << 12);
 
+			writel_relaxed(init_phasex, pipe->base +
+				MDSS_MDP_REG_VIG_QSEED2_C12_INIT_PHASEX);
 			writel_relaxed(phasex_step >> chroma_shift, pipe->base +
 				MDSS_MDP_REG_VIG_QSEED2_C12_PHASESTEPX);
 		} else {
@@ -1089,12 +1120,48 @@ static int mdss_mdp_scale_setup(struct mdss_mdp_pipe *pipe)
 		}
 	}
 
+	if (pipe->scale.enable_pxl_ext &&
+		pipe->type == MDSS_MDP_PIPE_TYPE_VIG) {
+
+		/*program x,y initial phase and phase step*/
+		writel_relaxed(pipe->scale.init_phase_x[0],
+			pipe->base + MDSS_MDP_REG_VIG_QSEED2_C03_INIT_PHASEX);
+		writel_relaxed(pipe->scale.phase_step_x[0],
+			pipe->base + MDSS_MDP_REG_VIG_QSEED2_C03_PHASESTEPX);
+		writel_relaxed(pipe->scale.init_phase_x[1],
+			pipe->base + MDSS_MDP_REG_VIG_QSEED2_C12_INIT_PHASEX);
+		writel_relaxed(pipe->scale.phase_step_x[1],
+			pipe->base + MDSS_MDP_REG_VIG_QSEED2_C12_PHASESTEPX);
+
+		writel_relaxed(pipe->scale.init_phase_y[0],
+			pipe->base + MDSS_MDP_REG_VIG_QSEED2_C03_INIT_PHASEY);
+		writel_relaxed(pipe->scale.phase_step_y[0],
+			pipe->base + MDSS_MDP_REG_VIG_QSEED2_C03_PHASESTEPY);
+		writel_relaxed(pipe->scale.init_phase_y[1],
+			pipe->base + MDSS_MDP_REG_VIG_QSEED2_C12_INIT_PHASEY);
+		writel_relaxed(pipe->scale.phase_step_y[1],
+			pipe->base + MDSS_MDP_REG_VIG_QSEED2_C12_PHASESTEPY);
+
+		/*program pixel extn values for the SSPP*/
+		mdss_mdp_pipe_program_pixel_extn(pipe);
+	} else if (pipe->type == MDSS_MDP_PIPE_TYPE_VIG) {
+		writel_relaxed(phasex_step, pipe->base +
+		   MDSS_MDP_REG_SCALE_PHASE_STEP_X);
+		writel_relaxed(phasey_step, pipe->base +
+		   MDSS_MDP_REG_SCALE_PHASE_STEP_Y);
+		writel_relaxed(init_phasex, pipe->base +
+			MDSS_MDP_REG_SCALE_INIT_PHASE_X);
+		writel_relaxed(init_phasey, pipe->base +
+			MDSS_MDP_REG_SCALE_INIT_PHASE_Y);
+	} else {
+		writel_relaxed(phasex_step, pipe->base +
+		   MDSS_MDP_REG_SCALE_PHASE_STEP_X);
+		writel_relaxed(phasey_step, pipe->base +
+		   MDSS_MDP_REG_SCALE_PHASE_STEP_Y);
+	}
+
 	writel_relaxed(scale_config, pipe->base +
 	   MDSS_MDP_REG_SCALE_CONFIG);
-	writel_relaxed(phasex_step, pipe->base +
-	   MDSS_MDP_REG_SCALE_PHASE_STEP_X);
-	writel_relaxed(phasey_step, pipe->base +
-	   MDSS_MDP_REG_SCALE_PHASE_STEP_Y);
 
 	return 0;
 }
@@ -1295,10 +1362,7 @@ static int pp_histogram_setup(u32 *op, u32 block, struct mdss_mdp_mixer *mix)
 		mutex_lock(&hist_info->hist_mutex);
 		spin_lock_irqsave(&hist_info->hist_lock, flag);
 		col_state = hist_info->col_state;
-		if (hist_info->is_kick_ready &&
-			((col_state == HIST_IDLE) ||
-			((false == hist_info->read_request) &&
-				col_state == HIST_READY))) {
+		if (col_state == HIST_IDLE) {
 			/* Kick off collection */
 			writel_relaxed(1, base + kick_base);
 			hist_info->col_state = HIST_START;
@@ -1337,12 +1401,20 @@ static void pp_dither_config(char __iomem *addr,
 		pp_sts->dither_sts &= ~PP_STS_ENABLE;
 	else if (dither_cfg->flags & MDP_PP_OPS_ENABLE)
 		pp_sts->dither_sts |= PP_STS_ENABLE;
+	pp_sts_set_split_bits(&pp_sts->dither_sts, dither_cfg->flags);
 }
 
-static void pp_dspp_opmode_config(struct pp_sts_type *pp_sts, u32 *opmode,
-			int mdp_rev)
+static void pp_dspp_opmode_config(struct mdss_mdp_ctl *ctl, u32 num,
+					struct pp_sts_type *pp_sts, int mdp_rev,
+					u32 *opmode)
 {
-	if (pp_sts->pa_sts & PP_STS_ENABLE)
+	int side;
+	side = pp_num_to_side(ctl, num);
+
+	if (side < 0)
+		return;
+
+	if (pp_sts_is_enabled(pp_sts->pa_sts, side))
 		*opmode |= MDSS_MDP_DSPP_OP_PA_EN; /* PA_EN */
 	if (mdp_rev >= MDSS_MDP_HW_REV_103) {
 		if (pp_sts->pa_sts & PP_STS_PA_HUE_MASK)
@@ -1370,10 +1442,10 @@ static void pp_dspp_opmode_config(struct pp_sts_type *pp_sts, u32 *opmode,
 		if (pp_sts->pa_sts & PP_STS_PA_SIX_ZONE_VAL_MASK)
 			*opmode |= MDSS_MDP_DSPP_OP_PA_SIX_ZONE_VAL_MASK;
 	}
-	if (pp_sts->pcc_sts & PP_STS_ENABLE)
+	if (pp_sts_is_enabled(pp_sts->pcc_sts, side))
 		*opmode |= MDSS_MDP_DSPP_OP_PCC_EN; /* PCC_EN */
 
-	if (pp_sts->igc_sts & PP_STS_ENABLE) {
+	if (pp_sts_is_enabled(pp_sts->igc_sts, side)) {
 		*opmode |= MDSS_MDP_DSPP_OP_IGC_LUT_EN | /* IGC_LUT_EN */
 			      (pp_sts->igc_tbl_idx << 1);
 	}
@@ -1381,14 +1453,14 @@ static void pp_dspp_opmode_config(struct pp_sts_type *pp_sts, u32 *opmode,
 		*opmode |= MDSS_MDP_DSPP_OP_HIST_LUTV_EN | /* HIST_LUT_EN */
 				  MDSS_MDP_DSPP_OP_PA_EN; /* PA_EN */
 	}
-	if (pp_sts->dither_sts & PP_STS_ENABLE)
+	if (pp_sts_is_enabled(pp_sts->dither_sts, side))
 		*opmode |= MDSS_MDP_DSPP_OP_DST_DITHER_EN; /* DITHER_EN */
-	if (pp_sts->gamut_sts & PP_STS_ENABLE) {
+	if (pp_sts_is_enabled(pp_sts->gamut_sts, side)) {
 		*opmode |= MDSS_MDP_DSPP_OP_GAMUT_EN; /* GAMUT_EN */
 		if (pp_sts->gamut_sts & PP_STS_GAMUT_FIRST)
 			*opmode |= MDSS_MDP_DSPP_OP_GAMUT_PCC_ORDER;
 	}
-	if (pp_sts->pgc_sts & PP_STS_ENABLE)
+	if (pp_sts_is_enabled(pp_sts->pgc_sts, side))
 		*opmode |= MDSS_MDP_DSPP_OP_ARGC_LUT_EN;
 }
 
@@ -1494,8 +1566,12 @@ static int pp_dspp_setup(u32 disp_num, struct mdss_mdp_mixer *mixer)
 			pp_sts->pgc_sts &= ~PP_STS_ENABLE;
 		else if (pgc_config->flags & MDP_PP_OPS_ENABLE)
 			pp_sts->pgc_sts |= PP_STS_ENABLE;
+		pp_sts_set_split_bits(&pp_sts->pgc_sts, pgc_config->flags);
 	}
 
+	pp_dspp_opmode_config(ctl, dspp_num, pp_sts, mdata->mdp_rev, &opmode);
+
+flush_exit:
 	if (ad_hw) {
 		mutex_lock(&ad->lock);
 		ad_flags = ad->reg_sts;
@@ -1505,13 +1581,11 @@ static int pp_dspp_setup(u32 disp_num, struct mdss_mdp_mixer *mixer)
 			pp_ad_init_write(ad_hw, ad, ctl);
 		if (ad_flags & PP_AD_STS_DIRTY_CFG)
 			pp_ad_cfg_write(ad_hw, ad);
-		pp_ad_bypass_config(ad, &ad_bypass);
+		pp_ad_bypass_config(ad, ctl, ad_hw->num, &ad_bypass);
 		writel_relaxed(ad_bypass, ad_hw->base);
 		mutex_unlock(&ad->lock);
 	}
 
-	pp_dspp_opmode_config(pp_sts, &opmode, mdata->mdp_rev);
-flush_exit:
 	writel_relaxed(opmode, base + MDSS_MDP_REG_DSPP_OP_MODE);
 	ctl->flush_bits |= BIT(13 + dspp_num);
 	wmb();
@@ -1718,11 +1792,13 @@ int mdss_mdp_pp_init(struct device *dev)
 		if (mdss_pp_res == NULL) {
 			pr_err("%s mdss_pp_res allocation failed!", __func__);
 			ret = -ENOMEM;
-		}
-
-		for (i = 0; i < MDSS_MDP_MAX_DSPP; i++) {
-			mutex_init(&mdss_pp_res->dspp_hist[i].hist_mutex);
-			spin_lock_init(&mdss_pp_res->dspp_hist[i].hist_lock);
+		} else {
+			for (i = 0; i < MDSS_MDP_MAX_DSPP; i++) {
+				mutex_init(
+					&mdss_pp_res->dspp_hist[i].hist_mutex);
+				spin_lock_init(
+					&mdss_pp_res->dspp_hist[i].hist_lock);
+			}
 		}
 	}
 	if (mdata) {
@@ -1849,6 +1925,12 @@ int mdss_mdp_pa_v2_config(struct mdp_pa_v2_cfg_data *config,
 		(config->block >= MDP_BLOCK_MAX))
 		return -EINVAL;
 
+	if ((config->pa_v2_data.flags & MDSS_PP_SPLIT_MASK) ==
+							MDSS_PP_SPLIT_MASK) {
+		pr_warn("Can't set both split bits\n");
+		return -EINVAL;
+	}
+
 	mutex_lock(&mdss_pp_mutex);
 	disp_num = config->block - MDP_LOGICAL_BLOCK_DISP_0;
 
@@ -1916,10 +1998,13 @@ static int pp_read_pa_v2_regs(char __iomem *addr,
 
 	/* Six zone LUT and thresh data */
 	if (pa_v2_config->flags & MDP_PP_PA_SIX_ZONE_ENABLE) {
+		if (pa_v2_config->six_zone_len != MDP_SIX_ZONE_LUT_SIZE)
+			return -EINVAL;
+
 		data = (3 << 25);
 		writel_relaxed(data, addr);
 
-		for (i = 0; i < SIX_ZONE_LUT_ENTRIES; i++) {
+		for (i = 0; i < MDP_SIX_ZONE_LUT_SIZE; i++) {
 			addr += 4;
 			mdss_pp_res->six_zone_lut_curve_p1[disp_num][i] =
 				readl_relaxed(addr);
@@ -1930,13 +2015,13 @@ static int pp_read_pa_v2_regs(char __iomem *addr,
 
 		if (copy_to_user(pa_v2_config->six_zone_curve_p0,
 			&mdss_pp_res->six_zone_lut_curve_p0[disp_num][0],
-			SIX_ZONE_LUT_ENTRIES * sizeof(u32))) {
+			pa_v2_config->six_zone_len * sizeof(u32))) {
 			return -EFAULT;
 		}
 
 		if (copy_to_user(pa_v2_config->six_zone_curve_p1,
 			&mdss_pp_res->six_zone_lut_curve_p1[disp_num][0],
-			SIX_ZONE_LUT_ENTRIES * sizeof(u32))) {
+			pa_v2_config->six_zone_len * sizeof(u32))) {
 			return -EFAULT;
 		}
 
@@ -1981,14 +2066,17 @@ static void pp_read_pa_mem_col_regs(char __iomem *addr,
 static int pp_copy_pa_six_zone_lut(struct mdp_pa_v2_cfg_data *pa_v2_config,
 				u32 disp_num)
 {
+	if (pa_v2_config->pa_v2_data.six_zone_len != MDP_SIX_ZONE_LUT_SIZE)
+		return -EINVAL;
+
 	if (copy_from_user(&mdss_pp_res->six_zone_lut_curve_p0[disp_num][0],
 			pa_v2_config->pa_v2_data.six_zone_curve_p0,
-			SIX_ZONE_LUT_ENTRIES * sizeof(u32))) {
+			pa_v2_config->pa_v2_data.six_zone_len * sizeof(u32))) {
 		return -EFAULT;
 	}
 	if (copy_from_user(&mdss_pp_res->six_zone_lut_curve_p1[disp_num][0],
 			pa_v2_config->pa_v2_data.six_zone_curve_p1,
-			SIX_ZONE_LUT_ENTRIES * sizeof(u32))) {
+			pa_v2_config->pa_v2_data.six_zone_len * sizeof(u32))) {
 		return -EFAULT;
 	}
 
@@ -2132,6 +2220,11 @@ int mdss_mdp_pcc_config(struct mdp_pcc_cfg_data *config,
 		(config->block >= MDP_BLOCK_MAX))
 		return -EINVAL;
 
+	if ((config->ops & MDSS_PP_SPLIT_MASK) == MDSS_PP_SPLIT_MASK) {
+		pr_warn("Can't set both split bits\n");
+		return -EINVAL;
+	}
+
 	mutex_lock(&mdss_pp_mutex);
 	disp_num = config->block - MDP_LOGICAL_BLOCK_DISP_0;
 
@@ -2250,6 +2343,11 @@ int mdss_mdp_igc_lut_config(struct mdp_igc_lut_data *config,
 
 	if (config->len != IGC_LUT_ENTRIES)
 		return -EINVAL;
+
+	if ((config->ops & MDSS_PP_SPLIT_MASK) == MDSS_PP_SPLIT_MASK) {
+		pr_warn("Can't set both split bits\n");
+		return -EINVAL;
+	}
 
 	mutex_lock(&mdss_pp_mutex);
 	disp_num = config->block - MDP_LOGICAL_BLOCK_DISP_0;
@@ -2450,6 +2548,11 @@ int mdss_mdp_argc_config(struct mdp_pgc_lut_data *config,
 		(PP_BLOCK(config->block) >= MDP_BLOCK_MAX))
 		return -EINVAL;
 
+	if ((config->flags & MDSS_PP_SPLIT_MASK) == MDSS_PP_SPLIT_MASK) {
+		pr_warn("Can't set both split bits\n");
+		return -EINVAL;
+	}
+
 	mutex_lock(&mdss_pp_mutex);
 
 	disp_num = PP_BLOCK(config->block) - MDP_LOGICAL_BLOCK_DISP_0;
@@ -2621,6 +2724,11 @@ int mdss_mdp_dither_config(struct mdp_dither_cfg_data *config,
 	if (config->flags & MDP_PP_OPS_READ)
 		return -ENOTSUPP;
 
+	if ((config->flags & MDSS_PP_SPLIT_MASK) == MDSS_PP_SPLIT_MASK) {
+		pr_warn("Can't set both split bits\n");
+		return -EINVAL;
+	}
+
 	mutex_lock(&mdss_pp_mutex);
 	disp_num = config->block - MDP_LOGICAL_BLOCK_DISP_0;
 	mdss_pp_res->dither_disp_cfg[disp_num] = *config;
@@ -2669,6 +2777,11 @@ int mdss_mdp_gamut_config(struct mdp_gamut_cfg_data *config,
 
 	if (pp_gm_has_invalid_lut_size(config))
 		return -EINVAL;
+
+	if ((config->flags & MDSS_PP_SPLIT_MASK) == MDSS_PP_SPLIT_MASK) {
+		pr_warn("Can't set both split bits\n");
+		return -EINVAL;
+	}
 
 	mutex_lock(&mdss_pp_mutex);
 	disp_num = config->block - MDP_LOGICAL_BLOCK_DISP_0;
@@ -2786,19 +2899,27 @@ gamut_config_exit:
 	mutex_unlock(&mdss_pp_mutex);
 	return ret;
 }
-static void pp_hist_read(char __iomem *v_addr,
+
+static u32 pp_hist_read(char __iomem *v_addr,
 				struct pp_hist_col_info *hist_info)
 {
 	int i, i_start;
+	u32 sum = 0;
 	u32 data;
 	data = readl_relaxed(v_addr);
 	i_start = data >> 24;
 	hist_info->data[i_start] = data & 0xFFFFFF;
-	for (i = i_start + 1; i < HIST_V_SIZE; i++)
+	sum += hist_info->data[i_start];
+	for (i = i_start + 1; i < HIST_V_SIZE; i++) {
 		hist_info->data[i] = readl_relaxed(v_addr) & 0xFFFFFF;
-	for (i = 0; i < i_start - 1; i++)
+		sum += hist_info->data[i];
+	}
+	for (i = 0; i < i_start; i++) {
 		hist_info->data[i] = readl_relaxed(v_addr) & 0xFFFFFF;
+		sum += hist_info->data[i];
+	}
 	hist_info->hist_cnt_read++;
+	return sum;
 }
 
 /* Assumes that relevant clocks are enabled */
@@ -2824,11 +2945,10 @@ static int pp_histogram_enable(struct pp_hist_col_info *hist_info,
 	hist_info->hist_cnt_sent = 0;
 	hist_info->hist_cnt_time = 0;
 	spin_lock_irqsave(&hist_info->hist_lock, flag);
-	hist_info->read_request = false;
+	hist_info->read_request = 0;
 	hist_info->col_state = HIST_RESET;
 	hist_info->col_en = true;
 	spin_unlock_irqrestore(&hist_info->hist_lock, flag);
-	hist_info->is_kick_ready = true;
 	mdss_mdp_hist_intr_req(&mdata->hist_intr, 3 << shift_bit, true);
 	writel_relaxed(req->frame_cnt, ctl_base + 8);
 	/* Kick out reset start */
@@ -2949,7 +3069,6 @@ static int pp_histogram_disable(struct pp_hist_col_info *hist_info,
 	hist_info->col_en = false;
 	hist_info->col_state = HIST_UNKNOWN;
 	spin_unlock_irqrestore(&hist_info->hist_lock, flag);
-	hist_info->is_kick_ready = false;
 	mdss_mdp_hist_intr_req(&mdata->hist_intr, done_bit, false);
 	writel_relaxed(BIT(1), ctl_base);/* cancel */
 	ret = 0;
@@ -3181,10 +3300,10 @@ exit:
 
 static int pp_hist_collect(struct mdp_histogram_data *hist,
 				struct pp_hist_col_info *hist_info,
-				char __iomem *ctl_base)
+				char __iomem *ctl_base, u32 expect_sum)
 {
 	int wait_ret, ret = 0;
-	u32 timeout;
+	u32 timeout, sum;
 	char __iomem *v_base;
 	unsigned long flag;
 	struct mdss_pipe_pp_res *res;
@@ -3199,7 +3318,6 @@ static int pp_hist_collect(struct mdp_histogram_data *hist,
 	spin_lock_irqsave(&hist_info->hist_lock, flag);
 	/* wait for hist done if cache has no data */
 	if (hist_info->col_state != HIST_READY) {
-		hist_info->read_request = true;
 		spin_unlock_irqrestore(&hist_info->hist_lock, flag);
 		timeout = HIST_WAIT_TIMEOUT(hist_info->frame_cnt);
 		mutex_unlock(&hist_info->hist_mutex);
@@ -3239,9 +3357,11 @@ static int pp_hist_collect(struct mdp_histogram_data *hist,
 		}
 		if (hist_info->col_state != HIST_READY) {
 			ret = -ENODATA;
+			spin_lock_irqsave(&hist_info->hist_lock, flag);
+			hist_info->col_state = HIST_READY;
+			spin_unlock_irqrestore(&hist_info->hist_lock, flag);
 			pr_debug("%s: state is not ready: %d",
 					__func__, hist_info->col_state);
-			goto hist_collect_exit;
 		}
 	} else {
 		spin_unlock_irqrestore(&hist_info->hist_lock, flag);
@@ -3251,10 +3371,11 @@ static int pp_hist_collect(struct mdp_histogram_data *hist,
 		spin_unlock_irqrestore(&hist_info->hist_lock, flag);
 		v_base = ctl_base + 0x1C;
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
-		pp_hist_read(v_base, hist_info);
+		sum = pp_hist_read(v_base, hist_info);
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 		spin_lock_irqsave(&hist_info->hist_lock, flag);
-		hist_info->read_request = false;
+		if (expect_sum && sum != expect_sum)
+			ret = -ENODATA;
 		hist_info->col_state = HIST_IDLE;
 	}
 	spin_unlock_irqrestore(&hist_info->hist_lock, flag);
@@ -3265,8 +3386,9 @@ hist_collect_exit:
 
 int mdss_mdp_hist_collect(struct mdp_histogram_data *hist)
 {
-	int i, j, off, ret = 0;
+	int i, j, off, ret = 0, temp_ret = 0;
 	struct pp_hist_col_info *hist_info;
+	struct pp_hist_col_info *hists[MDSS_MDP_INTF_MAX_LAYERMIXER];
 	u32 dspp_num, disp_num;
 	char __iomem *ctl_base;
 	u32 hist_cnt, mixer_id[MDSS_MDP_INTF_MAX_LAYERMIXER];
@@ -3274,8 +3396,10 @@ int mdss_mdp_hist_collect(struct mdp_histogram_data *hist)
 	u32 *hist_data_addr;
 	u32 pipe_cnt = 0;
 	u32 pipe_num = MDSS_MDP_SSPP_VIG0;
+	u32 exp_sum = 0;
 	struct mdss_mdp_pipe *pipe;
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
+	unsigned long flag;
 
 	if ((PP_BLOCK(hist->block) < MDP_LOGICAL_BLOCK_DISP_0) ||
 		(PP_BLOCK(hist->block) >= MDP_BLOCK_MAX))
@@ -3296,17 +3420,41 @@ int mdss_mdp_hist_collect(struct mdp_histogram_data *hist)
 		ret = -EPERM;
 		goto hist_collect_exit;
 	}
+
 	if (PP_LOCAT(hist->block) == MDSS_PP_DSPP_CFG) {
-		hist_info = &mdss_pp_res->dspp_hist[disp_num];
 		for (i = 0; i < hist_cnt; i++) {
 			dspp_num = mixer_id[i];
-			hist_info = &mdss_pp_res->dspp_hist[dspp_num];
+			hists[i] = &mdss_pp_res->dspp_hist[dspp_num];
+		}
+		for (i = 0; i < hist_cnt; i++) {
+			spin_lock_irqsave(&hists[i]->hist_lock, flag);
+			/* mark that collect is ready to handle completions */
+			hists[i]->read_request = 1;
+			spin_unlock_irqrestore(&hists[i]->hist_lock, flag);
+		}
+		for (i = 0; i < hist_cnt; i++) {
+			dspp_num = mixer_id[i];
 			ctl_base = mdss_mdp_get_dspp_addr_off(dspp_num) +
 				MDSS_MDP_REG_DSPP_HIST_CTL_BASE;
-			ret = pp_hist_collect(hist, hist_info, ctl_base);
+			exp_sum = (mdata->mixer_intf[dspp_num].width *
+					mdata->mixer_intf[dspp_num].height);
 			if (ret)
-				goto hist_collect_exit;
+				temp_ret = ret;
+			ret = pp_hist_collect(hist, hists[i], ctl_base,
+								exp_sum);
 		}
+		for (i = 0; i < hist_cnt; i++) {
+			/* reset read requests and re-intialize completions */
+			spin_lock_irqsave(&hists[i]->hist_lock, flag);
+			hists[i]->read_request = 0;
+			INIT_COMPLETION(hists[i]->comp);
+			spin_unlock_irqrestore(&hists[i]->hist_lock, flag);
+		}
+		if (ret || temp_ret) {
+			ret = ret ? ret : temp_ret;
+			goto hist_collect_exit;
+		}
+
 		if (hist->bin_cnt != HIST_V_SIZE) {
 			pr_err("User not expecting size %d output",
 							HIST_V_SIZE);
@@ -3322,19 +3470,19 @@ int mdss_mdp_hist_collect(struct mdp_histogram_data *hist)
 			}
 			memset(hist_concat, 0, HIST_V_SIZE * sizeof(u32));
 			for (i = 0; i < hist_cnt; i++) {
-				dspp_num = mixer_id[i];
-				hist_info = &mdss_pp_res->dspp_hist[dspp_num];
-				mutex_lock(&hist_info->hist_mutex);
+				mutex_lock(&hists[i]->hist_mutex);
 				for (j = 0; j < HIST_V_SIZE; j++)
-					hist_concat[j] += hist_info->data[j];
-				mutex_unlock(&hist_info->hist_mutex);
+					hist_concat[j] += hists[i]->data[j];
+				mutex_unlock(&hists[i]->hist_mutex);
 			}
 			hist_data_addr = hist_concat;
 		} else {
-			hist_data_addr = hist_info->data;
+			hist_data_addr = hists[0]->data;
 		}
-		hist_info = &mdss_pp_res->dspp_hist[disp_num];
-		hist_info->hist_cnt_sent++;
+
+		for (i = 0; i < hist_cnt; i++)
+			hists[i]->hist_cnt_sent++;
+
 	} else if (PP_LOCAT(hist->block) == MDSS_PP_SSPP_CFG) {
 
 		hist_cnt = MDSS_PP_ARG_MASK & hist->block;
@@ -3370,13 +3518,50 @@ int mdss_mdp_hist_collect(struct mdp_histogram_data *hist)
 				continue;
 			}
 			hist_info = &pipe->pp_res.hist;
+			spin_lock_irqsave(&hist_info->hist_lock, flag);
+			hist_info->read_request = 1;
+			spin_unlock_irqrestore(&hist_info->hist_lock, flag);
+		}
+		for (i = pipe_num; i < MDSS_PP_ARG_NUM; i++) {
+			if (!PP_ARG(i, hist->block))
+				continue;
+			pipe_cnt++;
+			pipe = mdss_mdp_pipe_get(mdata, BIT(i));
+			if (IS_ERR_OR_NULL(pipe) ||
+					pipe->num > MDSS_MDP_SSPP_VIG2) {
+				pr_warn("Invalid Hist pipe (%d)", i);
+				continue;
+			}
+			hist_info = &pipe->pp_res.hist;
 			ctl_base = pipe->base +
 				MDSS_MDP_REG_VIG_HIST_CTL_BASE;
-			ret = pp_hist_collect(hist, hist_info, ctl_base);
-			mdss_mdp_pipe_unmap(pipe);
 			if (ret)
-				goto hist_collect_exit;
+				temp_ret = ret;
+			ret = pp_hist_collect(hist, hist_info, ctl_base,
+								exp_sum);
+			mdss_mdp_pipe_unmap(pipe);
 		}
+		for (i = pipe_num; i < MDSS_PP_ARG_NUM; i++) {
+			if (!PP_ARG(i, hist->block))
+				continue;
+			pipe_cnt++;
+			pipe = mdss_mdp_pipe_get(mdata, BIT(i));
+			if (IS_ERR_OR_NULL(pipe) ||
+					pipe->num > MDSS_MDP_SSPP_VIG2) {
+				pr_warn("Invalid Hist pipe (%d)", i);
+				continue;
+			}
+			hist_info = &pipe->pp_res.hist;
+			spin_lock_irqsave(&hist_info->hist_lock, flag);
+			hist_info->read_request = 0;
+			INIT_COMPLETION(hist_info->comp);
+			spin_unlock_irqrestore(&hist_info->hist_lock, flag);
+		}
+		if (ret || temp_ret) {
+			ret = ret ? ret : temp_ret;
+			goto hist_collect_exit;
+		}
+
 		if (pipe_cnt != 0 &&
 			(hist->bin_cnt != (HIST_V_SIZE * pipe_cnt))) {
 			pr_err("User not expecting size %d output",
@@ -3474,8 +3659,10 @@ void mdss_mdp_hist_intr_done(u32 isr)
 			spin_lock(&hist_info->hist_lock);
 			hist_info->col_state = HIST_READY;
 			spin_unlock(&hist_info->hist_lock);
-			if (hist_info->read_request)
+			if (hist_info->read_request == 1) {
 				complete(&hist_info->comp);
+				hist_info->read_request++;
+			}
 		}
 		/* Histogram Reset Done Interrupt */
 		if ((isr_blk & 0x2) &&
@@ -3501,6 +3688,53 @@ static struct msm_fb_data_type *mdss_get_mfd_from_index(int index)
 			out = ctl->mfd;
 	}
 	return out;
+}
+
+static int pp_num_to_side(struct mdss_mdp_ctl *ctl, u32 num)
+{
+	u32 mixer_id[MDSS_MDP_INTF_MAX_LAYERMIXER];
+	u32 mixer_num;
+
+	if (!ctl || !ctl->mfd)
+		return -EINVAL;
+	mixer_num = mdss_mdp_get_ctl_mixers(ctl->mfd->index, mixer_id);
+	if (mixer_num < 2)
+		return MDSS_SIDE_NONE;
+	else if (mixer_id[1] == num)
+		return MDSS_SIDE_RIGHT;
+	else if (mixer_id[0] == num)
+		return MDSS_SIDE_LEFT;
+	else
+		pr_err("invalid, not on any side");
+	return -EINVAL;
+}
+
+static inline void pp_sts_set_split_bits(u32 *sts, u32 bits)
+{
+	u32 tmp = *sts;
+	tmp &= ~MDSS_PP_SPLIT_MASK;
+	tmp |= bits & MDSS_PP_SPLIT_MASK;
+	*sts = tmp;
+}
+
+static inline bool pp_sts_is_enabled(u32 sts, int side)
+{
+	bool ret = false;
+	/*
+	 * If there are no sides, or if there are no split mode bits set, the
+	 * side can't be disabled via split mode.
+	 *
+	 * Otherwise, if the side being checked opposes the split mode
+	 * configuration, the side is disabled.
+	 */
+	if ((side == MDSS_SIDE_NONE) || !(sts & MDSS_PP_SPLIT_MASK))
+		ret = true;
+	else if ((sts & MDSS_PP_SPLIT_RIGHT_ONLY) && (side == MDSS_SIDE_RIGHT))
+		ret = true;
+	else if ((sts & MDSS_PP_SPLIT_LEFT_ONLY) && (side == MDSS_SIDE_LEFT))
+		ret = true;
+
+	return ret && (sts & PP_STS_ENABLE);
 }
 
 static int mdss_ad_init_checks(struct msm_fb_data_type *mfd)
@@ -3599,7 +3833,7 @@ int mdss_mdp_ad_config(struct msm_fb_data_type *mfd,
 	struct mdss_mdp_ctl *ctl;
 	struct msm_fb_data_type *bl_mfd;
 	int lin_ret = -1, inv_ret = -1, ret = 0;
-	u32 ratio_temp, shift = 0;
+	u32 ratio_temp, shift = 0, last_ops;
 
 	ret = mdss_mdp_get_ad(mfd, &ad);
 	if (ret)
@@ -3610,6 +3844,11 @@ int mdss_mdp_ad_config(struct msm_fb_data_type *mfd,
 			return ret;
 	} else {
 		bl_mfd = mfd;
+	}
+
+	if ((init_cfg->ops & MDSS_PP_SPLIT_MASK) == MDSS_PP_SPLIT_MASK) {
+		pr_warn("Can't set both split bits\n");
+		return -EINVAL;
 	}
 
 	mutex_lock(&ad->lock);
@@ -3650,6 +3889,22 @@ int mdss_mdp_ad_config(struct msm_fb_data_type *mfd,
 		ad->cfg.backlight_scale = bl_mfd->panel_info->bl_max;
 		ad->sts |= PP_AD_STS_DIRTY_CFG;
 	}
+
+	last_ops = ad->ops & MDSS_PP_SPLIT_MASK;
+	ad->ops = init_cfg->ops & MDSS_PP_SPLIT_MASK;
+	/*
+	 *  if there is a change in the split mode config, the init values
+	 *  need to be re-written to hardware (if they have already been
+	 *  written or if there is data pending to be written). Check for
+	 *  pending data (DIRTY_INIT) is not checked here since it will not
+	 *  affect the outcome of this conditional (i.e. if init hasn't
+	 *  already been written (*_STATE_INIT is set), this conditional will
+	 *  only evaluate to true (and set the DIRTY bit) if the DIRTY bit has
+	 *  already been set).
+	 */
+	if ((last_ops ^ ad->ops) && (ad->state & PP_AD_STATE_INIT))
+		ad->sts |= PP_AD_STS_DIRTY_INIT;
+
 
 	if (!ret && (init_cfg->ops & MDP_PP_OPS_DISABLE)) {
 		ad->sts &= ~PP_STS_ENABLE;
@@ -3736,7 +3991,7 @@ int mdss_mdp_ad_input(struct msm_fb_data_type *mfd,
 			mutex_unlock(&ad->lock);
 			mutex_lock(&mfd->bl_lock);
 			MDSS_BRIGHT_TO_BL(bl, bl, mfd->panel_info->bl_max,
-							MDSS_MAX_BL_BRIGHTNESS);
+					mfd->panel_info->brightness_max);
 			mdss_fb_set_backlight(mfd, bl);
 			mutex_unlock(&mfd->bl_lock);
 			mutex_lock(&ad->lock);
@@ -3805,8 +4060,9 @@ static void pp_ad_init_write(struct mdss_mdp_ad *ad_hw, struct mdss_ad_info *ad,
 	u32 temp;
 	u32 frame_start, frame_end, procs_start, procs_end, tile_ctrl;
 	u32 num;
+	int side;
 	char __iomem *base;
-	bool is_calc, is_dual_pipe;
+	bool is_calc, is_dual_pipe, split_mode;
 	u32 mixer_id[MDSS_MDP_INTF_MAX_LAYERMIXER];
 	u32 mixer_num;
 	mixer_num = mdss_mdp_get_ctl_mixers(ctl->mfd->index, mixer_id);
@@ -3817,6 +4073,7 @@ static void pp_ad_init_write(struct mdss_mdp_ad *ad_hw, struct mdss_ad_info *ad,
 
 	base = ad_hw->base;
 	is_calc = ad->calc_hw_num == ad_hw->num;
+	split_mode = !!(ad->ops & MDSS_PP_SPLIT_MASK);
 
 	writel_relaxed(ad->init.i_control[0] & 0x1F,
 				base + MDSS_MDP_REG_AD_CON_CTRL_0);
@@ -3842,7 +4099,10 @@ static void pp_ad_init_write(struct mdss_mdp_ad *ad_hw, struct mdss_ad_info *ad,
 	writel_relaxed(ad->init.format, base + MDSS_MDP_REG_AD_CTRL_0);
 	writel_relaxed(ad->init.auto_size, base + MDSS_MDP_REG_AD_CTRL_1);
 
-	temp = ad->init.frame_w << 16;
+	if (split_mode)
+		temp = mdata->mixer_intf[ad_hw->num].width << 16;
+	else
+		temp = ad->init.frame_w << 16;
 	temp |= ad->init.frame_h & 0xFFFF;
 	writel_relaxed(temp, base + MDSS_MDP_REG_AD_FRAME_SIZE);
 
@@ -3854,17 +4114,26 @@ static void pp_ad_init_write(struct mdss_mdp_ad *ad_hw, struct mdss_ad_info *ad,
 	pp_ad_cfg_lut(base + MDSS_MDP_REG_AD_LUT_CC, ad->init.color_corr_lut);
 
 	if (mdata->mdp_rev >= MDSS_MDP_HW_REV_103) {
-		if (is_dual_pipe) {
+		if (is_dual_pipe && !split_mode) {
 			num = ad_hw->num;
+			side = pp_num_to_side(ctl, num);
 			tile_ctrl = 0x5;
-			if (is_calc) {
+			if ((ad->calc_hw_num + 1) == num)
+				tile_ctrl |= 0x10;
+
+			if (side <= MDSS_SIDE_NONE) {
+				WARN(1, "error finding sides, %d", side);
+				frame_start = 0;
+				procs_start = frame_start;
+				frame_end = 0;
+				procs_end = frame_end;
+			} else if (side == MDSS_SIDE_LEFT) {
 				frame_start = 0;
 				procs_start = 0;
 				frame_end = mdata->mixer_intf[num].width +
 							MDSS_AD_MERGED_WIDTH;
 				procs_end = mdata->mixer_intf[num].width;
 			} else {
-				tile_ctrl |= 0x10;
 				procs_start = ad->init.frame_w -
 					(mdata->mixer_intf[num].width);
 				procs_end = ad->init.frame_w;
@@ -3879,8 +4148,13 @@ static void pp_ad_init_write(struct mdss_mdp_ad *ad_hw, struct mdss_ad_info *ad,
 			frame_end = 0xFFFF;
 			procs_start = 0x0;
 			procs_end = 0xFFFF;
-			tile_ctrl = 0x1;
+			if (split_mode)
+				tile_ctrl = 0x0;
+			else
+				tile_ctrl = 0x1;
 		}
+
+
 		writel_relaxed(frame_start, base + MDSS_MDP_REG_AD_FRAME_START);
 		writel_relaxed(frame_end, base + MDSS_MDP_REG_AD_FRAME_END);
 		writel_relaxed(procs_start, base + MDSS_MDP_REG_AD_PROCS_START);
@@ -3944,12 +4218,17 @@ static void pp_ad_vsync_handler(struct mdss_mdp_ctl *ctl, ktime_t t)
 }
 
 #define MDSS_PP_AD_BYPASS_DEF 0x101
-static void pp_ad_bypass_config(struct mdss_ad_info *ad, u32 *opmode)
+static void pp_ad_bypass_config(struct mdss_ad_info *ad,
+				struct mdss_mdp_ctl *ctl, u32 num, u32 *opmode)
 {
-	if (ad->reg_sts & PP_STS_ENABLE)
+	int side = pp_num_to_side(ctl, num);
+
+	if (pp_sts_is_enabled(ad->reg_sts | (ad->ops & MDSS_PP_SPLIT_MASK),
+								side)) {
 		*opmode = 0;
-	else
+	} else {
 		*opmode = MDSS_PP_AD_BYPASS_DEF;
+	}
 }
 
 static int pp_ad_setup_hw_nums(struct msm_fb_data_type *mfd,
@@ -3964,6 +4243,8 @@ static int pp_ad_setup_hw_nums(struct msm_fb_data_type *mfd,
 
 	/* default to left mixer */
 	ad->calc_hw_num = mixer_id[0];
+	if ((mixer_num > 1) && (ad->ops & MDSS_PP_SPLIT_RIGHT_ONLY))
+		ad->calc_hw_num = mixer_id[1];
 	return 0;
 }
 
@@ -4171,6 +4452,7 @@ static void pp_ad_calc_worker(struct work_struct *work)
 		return;
 	}
 
+	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 	if (PP_AD_STATE_RUN & ad->state) {
 		/* Kick off calculation */
 		ad->calc_itr--;
@@ -4191,8 +4473,7 @@ static void pp_ad_calc_worker(struct work_struct *work)
 						MDSS_MDP_REG_AD_BL_OUT);
 				if (ad->state & PP_AD_STATE_BL_LIN) {
 					bl = bl >> ad->bl_bright_shift;
-					bl = min_t(u32, bl,
-						MDSS_MAX_BL_BRIGHTNESS);
+					bl = min_t(u32, bl, (AD_BL_LIN_LEN-1));
 					bl = ad->bl_lin_inv[bl];
 					bl = bl << ad->bl_bright_shift;
 				}
@@ -4210,6 +4491,7 @@ static void pp_ad_calc_worker(struct work_struct *work)
 			ad->last_str = 0xFFFFFFFF;
 		}
 	}
+	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 	complete(&ad->comp);
 
 	if (!ad->calc_itr) {
@@ -4269,6 +4551,7 @@ int mdss_mdp_ad_addr_setup(struct mdss_data_type *mdata, u32 *ad_offsets)
 		mdata->ad_off[i].base = mdata->mdp_base + ad_offsets[i];
 		mdata->ad_off[i].num = i;
 		mdata->ad_cfgs[i].num = i;
+		mdata->ad_cfgs[i].ops = 0;
 		mdata->ad_cfgs[i].reg_sts = 0;
 		mdata->ad_cfgs[i].calc_itr = 0;
 		mdata->ad_cfgs[i].last_str = 0xFFFFFFFF;
@@ -4281,71 +4564,283 @@ int mdss_mdp_ad_addr_setup(struct mdss_data_type *mdata, u32 *ad_offsets)
 	return rc;
 }
 
-static int is_valid_calib_addr(void *addr)
+static int is_valid_calib_ctrl_addr(char __iomem *ptr)
+{
+	char __iomem *base;
+	int ret = 0, counter = 0;
+	int stage = 0;
+	struct mdss_mdp_ctl *ctl;
+
+	/* Controller */
+	for (counter = 0; counter < mdss_res->nctl; counter++) {
+		ctl = mdss_res->ctl_off + counter;
+		base = ctl->base;
+
+		if (ptr == base + MDSS_MDP_REG_CTL_TOP) {
+			ret = MDP_PP_OPS_READ;
+			break;
+		} else if (ptr == base + MDSS_MDP_REG_CTL_FLUSH) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		}
+
+		for (stage = 0; stage < mdss_res->nmixers_intf; stage++)
+			if (ptr == base + MDSS_MDP_REG_CTL_LAYER(stage)) {
+				ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+				goto End;
+			}
+	}
+
+End:
+	return ret;
+}
+
+static int is_valid_calib_dspp_addr(char __iomem *ptr)
+{
+	char __iomem *base;
+	int ret = 0, counter = 0;
+	struct mdss_mdp_mixer *mixer;
+
+	for (counter = 0; counter < mdss_res->nmixers_intf; counter++) {
+		mixer = mdss_res->mixer_intf + counter;
+		base = mixer->dspp_base;
+
+		if (ptr == base) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		/* PA range */
+		} else if ((ptr >= base + MDSS_MDP_REG_DSPP_PA_BASE) &&
+				(ptr <= base + MDSS_MDP_REG_DSPP_PA_BASE +
+						MDSS_MDP_PA_SIZE)) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		/* PCC range */
+		} else if ((ptr >= base + MDSS_MDP_REG_DSPP_PCC_BASE) &&
+				(ptr <= base + MDSS_MDP_REG_DSPP_PCC_BASE +
+						MDSS_MDP_PCC_SIZE)) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		/* Gamut range */
+		} else if ((ptr >= base + MDSS_MDP_REG_DSPP_GAMUT_BASE) &&
+				(ptr <= base + MDSS_MDP_REG_DSPP_GAMUT_BASE +
+						MDSS_MDP_GAMUT_SIZE)) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		/* GC range */
+		} else if ((ptr >= base + MDSS_MDP_REG_DSPP_GC_BASE) &&
+				(ptr <= base + MDSS_MDP_REG_DSPP_GC_BASE +
+						MDSS_MDP_GC_SIZE)) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		/* Dither enable/disable */
+		} else if ((ptr == base + MDSS_MDP_REG_DSPP_DITHER_DEPTH)) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static int is_valid_calib_vig_addr(char __iomem *ptr)
+{
+	char __iomem *base;
+	int ret = 0, counter = 0;
+	struct mdss_mdp_pipe *pipe;
+
+	for (counter = 0; counter < mdss_res->nvig_pipes; counter++) {
+		pipe = mdss_res->vig_pipes + counter;
+		base = pipe->base;
+
+		if (ptr == base + MDSS_MDP_REG_VIG_OP_MODE) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		} else if (ptr == base + MDSS_MDP_REG_SSPP_SRC_FORMAT) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		} else if (ptr == base + MDSS_MDP_REG_SSPP_SRC_CONSTANT_COLOR) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		} else if (ptr == base + MDSS_MDP_REG_SSPP_SRC_UNPACK_PATTERN) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		} else if (ptr == base + MDSS_MDP_REG_SSPP_SRC_OP_MODE) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		} else if ((ptr == base + MDSS_MDP_REG_VIG_QSEED2_SHARP)) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		/* PA range */
+		} else if ((ptr >= base + MDSS_MDP_REG_VIG_PA_BASE) &&
+				(ptr <= base + MDSS_MDP_REG_VIG_PA_BASE +
+						MDSS_MDP_PA_SIZE)) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		/* IGC range */
+		} else if ((ptr >= base + MDSS_MDP_REG_IGC_VIG_BASE) &&
+				(ptr <= base + MDSS_MDP_REG_IGC_VIG_BASE +
+						MDSS_MDP_GC_SIZE)) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static int is_valid_calib_rgb_addr(char __iomem *ptr)
+{
+	char __iomem *base;
+	int ret = 0, counter = 0;
+	struct mdss_mdp_pipe *pipe;
+
+	for (counter = 0; counter < mdss_res->nrgb_pipes; counter++) {
+		pipe = mdss_res->rgb_pipes + counter;
+		base = pipe->base;
+
+		if (ptr == base + MDSS_MDP_REG_SSPP_SRC_FORMAT) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		} else if (ptr == base + MDSS_MDP_REG_SSPP_SRC_CONSTANT_COLOR) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		} else if (ptr == base + MDSS_MDP_REG_SSPP_SRC_UNPACK_PATTERN) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		} else if (ptr == base + MDSS_MDP_REG_SSPP_SRC_OP_MODE) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		/* IGC range */
+		} else if ((ptr >= base + MDSS_MDP_REG_IGC_RGB_BASE) &&
+				(ptr <= base + MDSS_MDP_REG_IGC_RGB_BASE +
+						MDSS_MDP_GC_SIZE)) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static int is_valid_calib_dma_addr(char __iomem *ptr)
+{
+	char __iomem *base;
+	int ret = 0, counter = 0;
+	struct mdss_mdp_pipe *pipe;
+
+	for (counter = 0; counter < mdss_res->ndma_pipes; counter++) {
+		pipe = mdss_res->dma_pipes + counter;
+		base = pipe->base;
+
+		if (ptr == base + MDSS_MDP_REG_SSPP_SRC_FORMAT) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		} else if (ptr == base + MDSS_MDP_REG_SSPP_SRC_CONSTANT_COLOR) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		} else if (ptr == base + MDSS_MDP_REG_SSPP_SRC_UNPACK_PATTERN) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		} else if (ptr == base + MDSS_MDP_REG_SSPP_SRC_OP_MODE) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		/* IGC range */
+		} else if ((ptr >= base + MDSS_MDP_REG_IGC_DMA_BASE) &&
+				(ptr <= base + MDSS_MDP_REG_IGC_DMA_BASE +
+						MDSS_MDP_GC_SIZE)) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static int is_valid_calib_mixer_addr(char __iomem *ptr)
+{
+	char __iomem *base;
+	int ret = 0, counter = 0;
+	int stage = 0;
+	struct mdss_mdp_mixer *mixer;
+
+	for (counter = 0; counter < mdss_res->nmixers_intf; counter++) {
+		mixer = mdss_res->mixer_intf + counter;
+		base = mixer->base;
+
+		if (ptr == base + MDSS_MDP_REG_LM_OP_MODE) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		/* GC range */
+		} else if ((ptr >= base + MDSS_MDP_REG_LM_GC_LUT_BASE) &&
+			(ptr <= base + MDSS_MDP_REG_LM_GC_LUT_BASE +
+						MDSS_MDP_GC_SIZE)) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
+		}
+
+		for (stage = 0; stage < TOTAL_BLEND_STAGES; stage++)
+			if (ptr == base + MDSS_MDP_REG_LM_BLEND_OFFSET(stage) +
+						 MDSS_MDP_REG_LM_BLEND_OP) {
+				ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+				goto End;
+			} else if (ptr == base +
+					MDSS_MDP_REG_LM_BLEND_OFFSET(stage) +
+					MDSS_MDP_REG_LM_BLEND_FG_ALPHA) {
+				ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+				goto End;
+			} else if (ptr == base +
+					 MDSS_MDP_REG_LM_BLEND_OFFSET(stage) +
+					 MDSS_MDP_REG_LM_BLEND_BG_ALPHA) {
+				ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+				goto End;
+			}
+	}
+
+End:
+	return ret;
+}
+
+static int is_valid_calib_addr(void *addr, u32 operation)
 {
 	int ret = 0;
-	unsigned int ptr;
-	ptr = (unsigned int) addr;
-	/* if request is outside the MDP reg-map or is not aligned 4 */
-	if (ptr > 0x5138 || ptr % 0x4)
-		goto end;
-	if (ptr >= 0x100 && ptr <= 0x5138) {
-		/* if ptr is in dspp range */
-		if (ptr >= 0x4600 && ptr <= 0x5138) {
-			/* if ptr is in dspp0 range*/
-			if (ptr >= 0x4600 && ptr <= 0x4938)
-				ptr -= 0x4600;
-			/* if ptr is in dspp1 range */
-			else if (ptr >= 0x4a00 && ptr <= 0x4d38)
-				ptr -= 0x4a00;
-			/* if ptr is in dspp2 range */
-			else if (ptr >= 0x4e00 && ptr <= 0x5138)
-				ptr -= 0x4e00;
-			/* if ptr is in pcc plane rgb coeff.range */
-			if (ptr >= 0x30 && ptr <= 0xe8)
-				ret = 1;
-			/* if ptr is in ARLUT red range */
-			else if (ptr >= 0x2b0 && ptr <= 0x2b8)
-				ret = 1;
-			/* if ptr is in PA range */
-			else if (ptr >= 0x238 && ptr <= 0x244)
-				ret = 1;
-			 /* if ptr is in ARLUT green range */
-			else if (ptr >= 0x2c0 && ptr <= 0x2c8)
-				ret = 1;
-			/* if ptr is in ARLUT blue range or
-			    gamut map table range */
-			else if (ptr >= 0x2d0 && ptr <= 0x338)
-				ret = 1;
-			/* if ptr is dspp0,dspp1,dspp2 op mode
-						register */
-			else if (ptr == 0)
-				ret = 1;
-		} else if (ptr >= 0x600 && ptr <= 0x608)
-				ret = 1;
-		else if (ptr >= 0x400 && ptr <= 0x408)
-				ret = 1;
-		else if ((ptr == 0x1830) || (ptr == 0x1c30) ||
-				(ptr == 0x1430) || (ptr == 0x1e38))
-				ret = 1;
-		else if ((ptr == 0x1e3c) || (ptr == 0x1e30))
-				ret = 1;
-		else if (ptr >= 0x3220 && ptr <= 0x3228)
-				ret = 1;
-		else if (ptr == 0x3200 || ptr == 0x100)
-				ret = 1;
-		else if (ptr == 0x104 || ptr == 0x614 || ptr == 0x714 ||
-			ptr == 0x814 || ptr == 0x914 || ptr == 0xa14)
-				ret = 1;
-		else if (ptr == 0x618 || ptr == 0x718 || ptr == 0x818 ||
-				 ptr == 0x918 || ptr == 0xa18)
-				ret = 1;
-		else if (ptr == 0x2234 || ptr == 0x1e34 || ptr == 0x2634)
-				ret = 1;
-	} else if (ptr == 0x0)
-		ret = 1;
-end:
-	return ret;
+	char __iomem *ptr = addr;
+	char __iomem *mixer_base = mdss_res->mixer_intf->base;
+	char __iomem *rgb_base   = mdss_res->rgb_pipes->base;
+	char __iomem *dma_base   = mdss_res->dma_pipes->base;
+	char __iomem *vig_base   = mdss_res->vig_pipes->base;
+	char __iomem *ctl_base   = mdss_res->ctl_off->base;
+	char __iomem *dspp_base  = mdss_res->mixer_intf->dspp_base;
+
+	if ((unsigned int)addr % 4) {
+		ret = 0;
+	} else if (ptr == (mdss_res->mdp_base + MDSS_MDP_REG_HW_VERSION) ||
+	    ptr == (mdss_res->mdp_base + MDSS_MDP_REG_DISP_INTF_SEL)) {
+		ret = MDP_PP_OPS_READ;
+	} else if (ptr >= (mdss_res->mdp_base + MDSS_MDP_REG_IGC_DSPP_BASE) &&
+		    ptr < (mdss_res->mdp_base + MDSS_MDP_REG_IGC_DSPP_BASE +
+						MDSS_MDP_IGC_DSPP_COLORS)) {
+		ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+	} else if (ptr >= dspp_base && ptr < (dspp_base +
+		(mdss_res->nmixers_intf * MDSS_MDP_DSPP_ADDRESS_OFFSET))) {
+		ret = is_valid_calib_dspp_addr(ptr);
+	} else if (ptr >= ctl_base && ptr < (ctl_base + (mdss_res->nctl
+					* MDSS_MDP_CTL_ADDRESS_OFFSET))) {
+		ret = is_valid_calib_ctrl_addr(ptr);
+	} else if (ptr >= vig_base && ptr < (vig_base + (mdss_res->nvig_pipes
+					* MDSS_MDP_SSPP_ADDRESS_OFFSET))) {
+		ret = is_valid_calib_vig_addr(ptr);
+	} else if (ptr >= rgb_base && ptr < (rgb_base + (mdss_res->nrgb_pipes
+					* MDSS_MDP_SSPP_ADDRESS_OFFSET))) {
+		ret = is_valid_calib_rgb_addr(ptr);
+	} else if (ptr >= dma_base && ptr < (dma_base + (mdss_res->ndma_pipes
+					* MDSS_MDP_SSPP_ADDRESS_OFFSET))) {
+		ret = is_valid_calib_dma_addr(ptr);
+	} else if (ptr >= mixer_base && ptr < (mixer_base +
+		(mdss_res->nmixers_intf * MDSS_MDP_LM_ADDRESS_OFFSET))) {
+		ret = is_valid_calib_mixer_addr(ptr);
+	}
+
+	return ret & operation;
 }
 
 int mdss_mdp_calib_config(struct mdp_calib_config_data *cfg, u32 *copyback)
@@ -4353,11 +4848,12 @@ int mdss_mdp_calib_config(struct mdp_calib_config_data *cfg, u32 *copyback)
 	int ret = -1;
 	void *ptr = (void *) cfg->addr;
 
-	if (is_valid_calib_addr(ptr))
+	ptr = (void *)(((unsigned int) ptr) + (mdss_res->mdp_base));
+	if (is_valid_calib_addr(ptr, cfg->ops))
 		ret = 0;
 	else
 		return ret;
-	ptr = (void *)(((unsigned int) ptr) + (mdss_res->mdp_base));
+
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 
 	if (cfg->ops & MDP_PP_OPS_READ) {
@@ -4420,65 +4916,50 @@ int mdss_mdp_calib_config_buffer(struct mdp_calib_config_buffer *cfg,
 	int i = 0;
 
 	if (!cfg) {
-		pr_err("Invalid buffer pointer");
+		pr_err("Invalid buffer pointer\n");
 		return ret;
 	}
 
-	if (cfg->size == 0 || cfg->size > PAGE_SIZE) {
-		pr_err("Invalid buffer size %d", cfg->size);
+	if (cfg->size == 0) {
+		pr_err("Invalid buffer size\n");
 		return ret;
 	}
 
 	counter = cfg->size / (sizeof(uint32_t) * 2);
 	buff_org = buff = kzalloc(cfg->size, GFP_KERNEL);
 	if (buff == NULL) {
-		pr_err("Allocation failed");
+		pr_err("Config buffer allocation failed\n");
 		return ret;
 	}
 
 	if (copy_from_user(buff, cfg->buffer, cfg->size)) {
 		kfree(buff);
-		pr_err("Copy failed");
+		pr_err("config buffer copy failed\n");
 		return ret;
 	}
 
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 
-	if (cfg->ops & MDP_PP_OPS_READ) {
-		for (i = 0 ; i < counter ; i++) {
-			if (is_valid_calib_addr((void *) *buff)) {
-				ret = 0;
-			} else {
-				ret = -1;
-				pr_err("Address validation failed");
-				break;
-			}
+	for (i = 0; i < counter; i++) {
+		ptr = (void *) (((unsigned int) *buff) + mdss_res->mdp_base);
 
-			ptr = (void *)(((unsigned int) *buff) +
-					 (mdss_res->mdp_base));
-			buff++;
+		if (!is_valid_calib_addr(ptr, cfg->ops)) {
+			ret = -1;
+			pr_err("Address validation failed or access not permitted\n");
+			break;
+		}
+
+		buff++;
+		if (cfg->ops & MDP_PP_OPS_READ)
 			*buff = readl_relaxed(ptr);
-			buff++;
-		}
-		if (!ret)
-			ret = copy_to_user(cfg->buffer, buff_org, cfg->size);
-		*copyback = 1;
-	} else if (cfg->ops & MDP_PP_OPS_WRITE) {
-		for (i = 0 ; i < counter ; i++) {
-			if (is_valid_calib_addr((void *) *buff)) {
-				ret = 0;
-			} else {
-				ret = -1;
-				pr_err("Address validation failed");
-				break;
-			}
-
-			ptr = (void *)(((unsigned int) *buff) +
-					 (mdss_res->mdp_base));
-			buff++;
+		else if (cfg->ops & MDP_PP_OPS_WRITE)
 			writel_relaxed(*buff, ptr);
-			buff++;
-		}
+		buff++;
+	}
+
+	if (ret & MDP_PP_OPS_READ) {
+		ret = copy_to_user(cfg->buffer, buff_org, cfg->size);
+		*copyback = 1;
 	}
 
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);

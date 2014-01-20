@@ -57,6 +57,7 @@
 /include/ "msm8226-mdss.dtsi"
 /include/ "msm8226-coresight.dtsi"
 /include/ "msm8226-iommu-domains.dtsi"
+/include/ "msm-rdbg.dtsi"
 
 &soc {
 	#address-cells = <1>;
@@ -216,13 +217,13 @@
 		reg = <0xf991f000 0x1000>;
 		interrupts = <0 109 0>;
 		status = "disabled";
-	};
 
-	serial@f995e000 {
-		compatible = "qcom,msm-lsuart-v14";
-		reg = <0xf995e000 0x1000>;
-		interrupts = <0 114 0>;
-		status = "disabled";
+		qcom,msm-bus,name = "blsp1_uart2";
+		qcom,msm-bus,num-cases = <2>;
+		qcom,msm-bus,num-paths = <1>;
+		qcom,msm-bus,vectors-KBps =
+				<86 512 0 0>,
+				<86 512 500 800>;
 	};
 
 	qcom,msm-imem@fe805000 {
@@ -281,7 +282,6 @@
 		qcom,hsusb-otg-phy-type = <2>;
 		qcom,hsusb-otg-mode = <1>;
 		qcom,hsusb-otg-otg-control = <2>;
-		qcom,hsusb-otg-disable-reset;
 		qcom,dp-manual-pullup;
 		qcom,ahb-async-bridge-bypass;
 
@@ -429,19 +429,20 @@
 		qcom,tapan-codec-9302;
 	};
 
-	qcom,msm-pcm {
-		compatible = "qcom,msm-pcm-dsp";
-		qcom,msm-pcm-dsp-id = <0>;
+	qti,msm-pcm {
+		compatible = "qti,msm-pcm-dsp";
+		qti,msm-pcm-dsp-id = <0>;
 	};
 
 	qcom,msm-pcm-routing {
 		compatible = "qcom,msm-pcm-routing";
 	};
 
-	qcom,msm-pcm-low-latency {
-		compatible = "qcom,msm-pcm-dsp";
-		qcom,msm-pcm-dsp-id = <1>;
-		qcom,msm-pcm-low-latency;
+	qti,msm-pcm-low-latency {
+		compatible = "qti,msm-pcm-dsp";
+		qti,msm-pcm-dsp-id = <1>;
+		qti,msm-pcm-low-latency;
+		qti,latency-level = "regular";
 	};
 
 	qcom,msm-pcm-lpa {
@@ -972,6 +973,9 @@
 		interrupt-names = "qup_err_intr";
 		qcom,i2c-bus-freq = <400000>;
 		qcom,i2c-src-freq = <19200000>;
+		qcom,sda-gpio = <&msmgpio 10 0>;
+		qcom,scl-gpio = <&msmgpio 11 0>;
+		qcom,master-id = <86>;
 	};
 	i2c@f9926000 { /* BLSP-1 QUP-4 */
 		cell-index = <0>;
@@ -1007,30 +1011,39 @@
 		clock-names = "clk-4", "clk-5";
 		qcom,speed0-bin-v0 =
 			<         0 0>,
-			< 384000000 1>,
-			< 787200000 2>,
-			<1190400000 3>;
+			< 384000000 2>,
+			< 787200000 4>,
+			<1190400000 7>;
 
 		cpu-vdd-supply = <&apc_vreg_corner>;
+	};
+
+	qcom,cpubw {
+		compatible = "qcom,cpubw";
+		qcom,cpu-mem-ports = <1 512>;
+		qcom,bw-tbl =
+			< 1525 /* 200 MHz */ >,
+			< 2441 /* 320 MHz */ >,
+			< 3051 /* 400 MHz */ >,
+			< 4066 /* 533 MHz */ >;
 	};
 
 	qcom,msm-cpufreq@0 {
 		reg = <0 4>;
 		compatible = "qcom,msm-cpufreq";
-		qcom,cpu-mem-ports = <1 512>;
 		qcom,cpufreq-table =
-			<  300000 1600 /* 200 MHz */ >,
-			<  384000 1600 /* 200 MHz */ >,
-			<  600000 3200 /* 320 MHz */ >,
-			<  787200 4264 /* 533 MHz */ >,
-			<  998400 4264 /* 533 MHz */ >,
-			< 1094400 4264 /* 533 MHz */ >,
-			< 1190400 4264 /* 533 MHz */ >,
-			< 1305600 4264 /* 533 MHz */ >,
-			< 1344000 4264 /* 533 MHz */ >,
-			< 1401600 4264 /* 533 MHz */ >,
-			< 1497600 4264 /* 533 MHz */ >,
-			< 1593600 4264 /* 533 MHz */ >;
+			<  300000 1525 >,
+			<  384000 1525 >,
+			<  600000 1525 >,
+			<  787200 3051 >,
+			<  998400 4066 >,
+			< 1094400 4066 >,
+			< 1190400 4066 >,
+			< 1305600 4066 >,
+			< 1344000 4066 >,
+			< 1401600 4066 >,
+			< 1497600 4066 >,
+			< 1593600 4066 >;
 	};
 
 	qcom,ocmem@fdd00000 {

@@ -1828,10 +1828,12 @@ int sec_debug_subsys_init(void)
 	kernel_cmdline = saved_command_line;
 	ADD_STR_TO_INFOMON(kernel_cmdline);
 
+#if 0
 #ifdef CONFIG_ARCH_MSM8974
 	ADD_VAR_TO_VARMON(boost_uv);
 	ADD_VAR_TO_VARMON(speed_bin);
 	ADD_VAR_TO_VARMON(pvs_bin);
+#endif
 #endif
 #ifdef CONFIG_ARCH_MSM8974PRO
 	ADD_VAR_TO_VARMON(pmc8974_rev);

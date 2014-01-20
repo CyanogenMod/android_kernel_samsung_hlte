@@ -189,3 +189,9 @@ config EDP_EXTERNAL_POWER
 	default n
 
 
+config FB_MSM_MDSS_MDP3
+	depends on FB_MSM_MDSS
+	bool "MDP3 display controller"
+	---help---
+	The MDP3 provides support for an older version display controller
+	included in latest display sub-system, known as MDSS.

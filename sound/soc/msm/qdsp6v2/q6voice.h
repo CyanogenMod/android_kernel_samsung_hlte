@@ -1394,6 +1394,8 @@ struct common_data {
 	uint32_t default_vol_step_val;
 	uint32_t default_vol_ramp_duration_ms;
 	uint32_t default_mute_ramp_duration_ms;
+	bool ec_ref_ext;
+	uint16_t ec_port_id;
 
 	/* APR to MVM in the Q6 */
 	void *apr_q6_mvm;
@@ -1536,4 +1538,6 @@ int voc_start_record(uint32_t port_id, uint32_t set, uint32_t session_id);
 int voice_get_idx_for_session(u32 session_id);
 int voc_get_loopback_enable(void);
 void voc_set_loopback_enable(int loopback_enable);
+int voc_set_ext_ec_ref(uint16_t port_id, bool state);
+
 #endif

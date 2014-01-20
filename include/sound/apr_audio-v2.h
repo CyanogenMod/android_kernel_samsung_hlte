@@ -7271,6 +7271,8 @@ struct afe_svc_cmd_set_clip_bank_selection {
 #define US_POINT_EPOS_FORMAT_V2 0x0001272D
 #define US_RAW_FORMAT_V2        0x0001272C
 #define US_PROX_FORMAT_V2       0x0001272E
+#define US_RAW_SYNC_FORMAT      0x0001272F
+#define US_GES_SYNC_FORMAT      0x00012730
 
 #ifdef CONFIG_SND_SOC_MAX98504 // Vinay
 /* Integrating DSM specific AMD IDs */

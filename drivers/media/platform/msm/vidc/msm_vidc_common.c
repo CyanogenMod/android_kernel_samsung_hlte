@@ -277,21 +277,17 @@ static void handle_sys_init_done(enum command_response cmd, void *data)
 		dprintk(VIDC_ERR, "Wrong device_id received\n");
 		return;
 	}
-//	dprintk(VIDC_DBG, "index = %d\n", index);
-//	dprintk(VIDC_DBG, "ptr = %p\n", &(core->completions[index]));
-//	complete(&(core->completions[index]));
 	sys_init_msg = response->data;
 	if (!sys_init_msg) {
 		dprintk(VIDC_ERR, "sys_init_done message not proper\n");
 		return;
 	}
-	core->enc_codec_supported = sys_init_msg->enc_codec_supported;						
-	core->dec_codec_supported = sys_init_msg->dec_codec_supported;						
-	dprintk(VIDC_DBG, "supported_codecs: enc = 0x%x, dec = 0x%x\n", 					
-	core->enc_codec_supported, core->dec_codec_supported);								
-	dprintk(VIDC_DBG, "ptr[%d] = %p\n", index, &(core->completions[index]));			
-	complete(&(core->completions[index]));																																	
-	
+	core->enc_codec_supported = sys_init_msg->enc_codec_supported;
+	core->dec_codec_supported = sys_init_msg->dec_codec_supported;
+	dprintk(VIDC_DBG, "supported_codecs: enc = 0x%x, dec = 0x%x\n",
+		core->enc_codec_supported, core->dec_codec_supported);
+	dprintk(VIDC_DBG, "ptr[%d] = %p\n", index, &(core->completions[index]));
+	complete(&(core->completions[index]));
 }
 
 static void handle_session_release_buf_done(enum command_response cmd,
@@ -522,13 +518,14 @@ static void handle_event_change(enum command_response cmd, void *data)
 					__func__, inst,
 					event_notify->packet_buffer,
 					event_notify->exra_data_buffer);
+
 				if (inst->state == MSM_VIDC_CORE_INVALID ||
 					inst->core->state ==
 						VIDC_CORE_INVALID) {
 					dprintk(VIDC_DBG,
 						"Event release buf ref received in invalid state - discard\n");
 					return;
-				}				
+				}
 
 				/*
 				* Get the buffer_info entry for the
@@ -955,6 +952,12 @@ static void handle_ebd(enum command_response cmd, void *data)
 					V4L2_QCOM_BUF_DATA_CORRUPT;
 			}
 		}
+		dprintk(VIDC_DBG,
+			"Got ebd from hal: device_addr: 0x%x, alloc: %d, status: 0x%x, pic_type: 0x%x, flags: 0x%x\n",
+			(u32)empty_buf_done->packet_buffer,
+			empty_buf_done->alloc_len, empty_buf_done->status,
+			empty_buf_done->picture_type, empty_buf_done->flags);
+
 		mutex_lock(&inst->bufq[OUTPUT_PORT].lock);
 		vb2_buffer_done(vb, VB2_BUF_STATE_DONE);
 		mutex_unlock(&inst->bufq[OUTPUT_PORT].lock);
@@ -1113,6 +1116,7 @@ static void handle_fbd(enum command_response cmd, void *data)
 	struct vb2_buffer *vb = NULL;
 	struct vidc_hal_fbd *fill_buf_done;
 	enum hal_buffer buffer_type;
+	int64_t time_usec = 0;
 
 	if (!response) {
 		dprintk(VIDC_ERR, "Invalid response from vidc_hal\n");
@@ -1152,7 +1156,7 @@ static void handle_fbd(enum command_response cmd, void *data)
 		if (!(fill_buf_done->flags1 &
 			HAL_BUFFERFLAG_TIMESTAMPINVALID) &&
 			fill_buf_done->filled_len1) {
-			int64_t time_usec = fill_buf_done->timestamp_hi;
+			time_usec = fill_buf_done->timestamp_hi;
 			time_usec = (time_usec << 32) |
 				fill_buf_done->timestamp_lo;
 			vb->v4l2_buf.timestamp =
@@ -1205,10 +1209,14 @@ static void handle_fbd(enum command_response cmd, void *data)
 			msm_vidc_debugfs_update(inst,
 				MSM_VIDC_DEBUGFS_EVENT_FBD);
 
-		dprintk(VIDC_DBG, "Filled length = %d; offset = %d; flags %x\n",
-				vb->v4l2_planes[0].bytesused,
-				vb->v4l2_planes[0].data_offset,
-				vb->v4l2_buf.flags);
+		dprintk(VIDC_DBG,
+		"Got fbd from hal: device_addr: 0x%x, alloc: %d, filled: %d, offset: %d, ts: %lld, flags: 0x%x, crop: %d %d %d %d, pic_type: 0x%x\n",
+		(u32)fill_buf_done->packet_buffer1, fill_buf_done->alloc_len1,
+		fill_buf_done->filled_len1, fill_buf_done->offset1, time_usec,
+		fill_buf_done->flags1, fill_buf_done->start_x_coord,
+		fill_buf_done->start_y_coord, fill_buf_done->frame_width,
+		fill_buf_done->frame_height, fill_buf_done->picture_type);
+
 		mutex_lock(&inst->bufq[CAPTURE_PORT].lock);
 		vb2_buffer_done(vb, VB2_BUF_STATE_DONE);
 		mutex_unlock(&inst->bufq[CAPTURE_PORT].lock);
@@ -1612,7 +1620,6 @@ static enum hal_domain get_hal_domain(int session_type)
 	return domain;
 }
 
-//static enum hal_video_codec get_hal_codec_type(int fourcc)
 enum hal_video_codec get_hal_codec_type(int fourcc)
 {
 	enum hal_video_codec codec;
@@ -2445,11 +2452,10 @@ int msm_comm_qbuf(struct vb2_buffer *vb)
 				V4L2_QCOM_BUF_TIMESTAMP_INVALID)
 				frame_data.timestamp = LLONG_MAX;
 			dprintk(VIDC_DBG,
-				"Sending etb to hal: device_addr: 0x%x"
-				"Alloc: %d, filled: %d, offset: %d\n",
-				frame_data.device_addr,
-				frame_data.alloc_len, frame_data.filled_len,
-				frame_data.offset);
+				"Sending etb to hal: device_addr: 0x%x, alloc: %d, filled: %d, offset: %d, ts: %lld, flags = 0x%x\n",
+				frame_data.device_addr, frame_data.alloc_len,
+				frame_data.filled_len, frame_data.offset,
+				frame_data.timestamp, frame_data.flags);
 			rc = call_hfi_op(hdev, session_etb, (void *)
 					inst->session, &frame_data);
 			if (!rc)
@@ -2474,11 +2480,10 @@ int msm_comm_qbuf(struct vb2_buffer *vb)
 					vb->v4l2_planes[extra_idx].length;
 			}
 			dprintk(VIDC_DBG,
-				"Sending ftb to hal: Alloc: %d :filled: %d",
-				frame_data.alloc_len, frame_data.filled_len);
-			dprintk(VIDC_DBG,
-				" extradata_addr: %d\n",
-				frame_data.extradata_addr);
+				"Sending ftb to hal: device_addr: 0x%x, alloc: %d, buffer_type: %d, ts: %lld, flags = 0x%x\n",
+				frame_data.device_addr, frame_data.alloc_len,
+				frame_data.buffer_type, frame_data.timestamp,
+				frame_data.flags);
 			if (!inst->ftb_count &&
 			   inst->session_type == MSM_VIDC_ENCODER) {
 				seq_hdr.seq_hdr = (u8 *) vb->v4l2_planes[0].
@@ -2494,9 +2499,9 @@ int msm_comm_qbuf(struct vb2_buffer *vb)
 			} else {
 				rc = call_hfi_op(hdev, session_ftb,
 					(void *) inst->session, &frame_data);
-			if (!rc)
-				msm_vidc_debugfs_update(inst,
-					MSM_VIDC_DEBUGFS_EVENT_FTB);
+				if (!rc)
+					msm_vidc_debugfs_update(inst,
+						MSM_VIDC_DEBUGFS_EVENT_FTB);
 			}
 			inst->ftb_count++;
 		} else {
@@ -3166,7 +3171,7 @@ int msm_vidc_trigger_ssr(struct msm_vidc_core *core,
 {
 	int rc = 0;
 	struct hfi_device *hdev;
-	if (!core && !core->device) {
+	if (!core || !core->device) {
 		dprintk(VIDC_WARN, "Invalid parameters: %p\n", core);
 		return -EINVAL;
 	}

@@ -45,11 +45,13 @@
 #endif
 
 #define DEVICE "wcnss_wlan"
+#define CTRL_DEVICE "wcnss_ctrl"
 #define VERSION "1.01"
 #define WCNSS_PIL_DEVICE "wcnss"
 
 /* module params */
 #define WCNSS_CONFIG_UNSPECIFIED (-1)
+#define UINT32_MAX (0xFFFFFFFFU)
 
 static int has_48mhz_xo = WCNSS_CONFIG_UNSPECIFIED;
 module_param(has_48mhz_xo, int, S_IWUSR | S_IRUGO);
@@ -155,6 +157,15 @@ static DEFINE_SPINLOCK(reg_spinlock);
 #define WCNSS_CTRL_CHANNEL			"WCNSS_CTRL"
 #define WCNSS_MAX_FRAME_SIZE		(4*1024)
 #define WCNSS_VERSION_LEN			30
+#define WCNSS_MAX_BUILD_VER_LEN		256
+#define WCNSS_MAX_CMD_LEN		(128)
+#define WCNSS_MIN_CMD_LEN		(3)
+#define WCNSS_MIN_SERIAL_LEN		(6)
+
+/* control messages from userspace */
+#define WCNSS_USR_CTRL_MSG_START  0x00000000
+#define WCNSS_USR_SERIAL_NUM      (WCNSS_USR_CTRL_MSG_START + 1)
+#define WCNSS_USR_HAS_CAL_DATA    (WCNSS_USR_CTRL_MSG_START + 2)
 
 /* message types */
 #define WCNSS_CTRL_MSG_START	0x01000000
@@ -167,6 +178,8 @@ static DEFINE_SPINLOCK(reg_spinlock);
 #define	WCNSS_CALDATA_DNLD_REQ        (WCNSS_CTRL_MSG_START + 6)
 #define	WCNSS_CALDATA_DNLD_RSP        (WCNSS_CTRL_MSG_START + 7)
 #define	WCNSS_VBATT_LEVEL_IND         (WCNSS_CTRL_MSG_START + 8)
+#define	WCNSS_BUILD_VER_REQ           (WCNSS_CTRL_MSG_START + 9)
+#define	WCNSS_BUILD_VER_RSP           (WCNSS_CTRL_MSG_START + 10)
 
 
 #define VALID_VERSION(version) \
@@ -344,7 +357,6 @@ static struct {
 	void __iomem *wlan_tx_phy_aborts;
 	void __iomem *wlan_brdg_err_source;
 	void __iomem *fiq_reg;
-	int	ssr_boot;
 	int	nv_downloaded;
 	unsigned char *fw_cal_data;
 	unsigned char *user_cal_data;
@@ -353,12 +365,14 @@ static struct {
 	int	fw_cal_available;
 	int	user_cal_read;
 	int	user_cal_available;
-	int	user_cal_rcvd;
+	u32	user_cal_rcvd;
 	int	user_cal_exp_size;
 	int	device_opened;
 	int	iris_xo_mode_set;
 	int	fw_vbatt_state;
+	int	ctrl_device_opened;
 	struct mutex dev_lock;
+	struct mutex ctrl_lock;
 	wait_queue_head_t read_wait;
 	struct qpnp_adc_tm_btm_param vbat_monitor_params;
 	struct qpnp_adc_tm_chip *adc_tm_dev;
@@ -759,8 +773,6 @@ static void wcnss_smd_notify_event(void *data, unsigned int event)
 	case SMD_EVENT_CLOSE:
 		pr_debug("wcnss: closing WCNSS SMD channel :%s",
 				WCNSS_CTRL_CHANNEL);
-		/* This SMD is closed only during SSR */
-		penv->ssr_boot = true;
 		penv->nv_downloaded = 0;
 		break;
 
@@ -1352,6 +1364,17 @@ void extract_cal_data(int len)
 		goto exit;
 	}
 
+	if (penv->fw_cal_available) {
+		/* ignore cal upload from SSR */
+		smd_read(penv->smd_ch, NULL, calhdr.frag_size);
+		penv->fw_cal_exp_frag++;
+		if (calhdr.msg_flags & LAST_FRAGMENT) {
+			penv->fw_cal_exp_frag = 0;
+			goto exit;
+		}
+		return;
+	}
+
 	if (0 == calhdr.frag_number) {
 		if (calhdr.total_size > MAX_CALIBRATED_DATA_SIZE) {
 			pr_err("wcnss: Invalid cal data size %d",
@@ -1415,7 +1438,9 @@ static void wcnssctrl_rx_handler(struct work_struct *worker)
 	int len = 0;
 	int rc = 0;
 	unsigned char buf[sizeof(struct wcnss_version)];
+	unsigned char build[WCNSS_MAX_BUILD_VER_LEN+1];
 	struct smd_msg_hdr *phdr;
+	struct smd_msg_hdr smd_msg;
 	struct wcnss_version *pversion;
 	int hw_type;
 	unsigned char fw_status = 0;
@@ -1472,6 +1497,12 @@ static void wcnssctrl_rx_handler(struct work_struct *worker)
 			break;
 
 		case WCNSS_PRONTO_HW:
+			smd_msg.msg_type = WCNSS_BUILD_VER_REQ;
+			smd_msg.msg_len = sizeof(smd_msg);
+			rc = wcnss_smd_tx(&smd_msg, smd_msg.msg_len);
+			if (rc < 0)
+				pr_err("wcnss: smd tx failed: %s\n", __func__);
+
 			/* supported only if pronto major >= 1 and minor >= 4 */
 			if ((pversion->major >= 1) && (pversion->minor >= 4)) {
 				pr_info("wcnss: schedule dnld work for pronto\n");
@@ -1484,6 +1515,21 @@ static void wcnssctrl_rx_handler(struct work_struct *worker)
 				hw_type);
 			break;
 		}
+		break;
+
+	case WCNSS_BUILD_VER_RSP:
+		if (len > WCNSS_MAX_BUILD_VER_LEN) {
+			pr_err("wcnss: invalid build version data from wcnss %d\n",
+					len);
+			return;
+		}
+		rc = smd_read(penv->smd_ch, build, len);
+		if (rc < len) {
+			pr_err("wcnss: incomplete data read from smd\n");
+			return;
+		}
+		build[len] = 0;
+		pr_info("wcnss: build version %s\n", build);
 		break;
 
 	case WCNSS_NVBIN_DNLD_RSP:
@@ -1502,7 +1548,6 @@ static void wcnssctrl_rx_handler(struct work_struct *worker)
 		break;
 
 	case WCNSS_CALDATA_UPLD_REQ:
-		penv->fw_cal_available = 0;
 		extract_cal_data(len);
 		break;
 
@@ -1752,21 +1797,12 @@ static void wcnss_nvbin_dnld_main(struct work_struct *worker)
 		while (!penv->user_cal_available && retry++ < 5)
 			msleep(500);
 	}
-
-	/* only cal data is sent during ssr (if available) */
-	if (penv->fw_cal_available && penv->ssr_boot) {
-		pr_info_ratelimited("wcnss: cal download during SSR, using fw cal");
-		wcnss_caldata_dnld(penv->fw_cal_data, penv->fw_cal_rcvd, false);
-		return;
-
-	} else if (penv->user_cal_available && penv->ssr_boot) {
-		pr_info_ratelimited("wcnss: cal download during SSR, using user cal");
-		wcnss_caldata_dnld(penv->user_cal_data,
-		penv->user_cal_rcvd, false);
-		return;
+	if (penv->fw_cal_available) {
+		pr_info_ratelimited("wcnss: cal download, using fw cal");
+		wcnss_caldata_dnld(penv->fw_cal_data, penv->fw_cal_rcvd, true);
 
 	} else if (penv->user_cal_available) {
-		pr_info_ratelimited("wcnss: cal download during cold boot, using user cal");
+		pr_info_ratelimited("wcnss: cal download, using user cal");
 		wcnss_caldata_dnld(penv->user_cal_data,
 		penv->user_cal_rcvd, true);
 	}
@@ -1796,6 +1832,80 @@ static int wcnss_pm_notify(struct notifier_block *b,
 
 static struct notifier_block wcnss_pm_notifier = {
 	.notifier_call = wcnss_pm_notify,
+};
+
+static int wcnss_ctrl_open(struct inode *inode, struct file *file)
+{
+	int rc = 0;
+
+	if (!penv || penv->ctrl_device_opened)
+		return -EFAULT;
+
+	penv->ctrl_device_opened = 1;
+
+	return rc;
+}
+
+
+void process_usr_ctrl_cmd(u8 *buf, size_t len)
+{
+	u16 cmd = buf[0] << 8 | buf[1];
+
+	switch (cmd) {
+
+	case WCNSS_USR_SERIAL_NUM:
+		if (WCNSS_MIN_SERIAL_LEN > len) {
+			pr_err("%s: Invalid serial number\n", __func__);
+			return;
+		}
+		penv->serial_number = buf[2] << 24 | buf[3] << 16
+			| buf[4] << 8 | buf[5];
+		break;
+
+	case WCNSS_USR_HAS_CAL_DATA:
+		if (1 < buf[2])
+			pr_err("%s: Invalid data for cal %d\n", __func__,
+				buf[2]);
+		has_calibrated_data = buf[2];
+		break;
+
+	default:
+		pr_err("%s: Invalid command %d\n", __func__, cmd);
+		break;
+	}
+}
+
+static ssize_t wcnss_ctrl_write(struct file *fp, const char __user
+			*user_buffer, size_t count, loff_t *position)
+{
+	int rc = 0;
+	u8 buf[WCNSS_MAX_CMD_LEN];
+
+	if (!penv || !penv->ctrl_device_opened || WCNSS_MAX_CMD_LEN < count
+			|| WCNSS_MIN_CMD_LEN > count)
+		return -EFAULT;
+
+	mutex_lock(&penv->ctrl_lock);
+	rc = copy_from_user(buf, user_buffer, count);
+	if (0 == rc)
+		process_usr_ctrl_cmd(buf, count);
+
+	mutex_unlock(&penv->ctrl_lock);
+
+	return rc;
+}
+
+
+static const struct file_operations wcnss_ctrl_fops = {
+	.owner = THIS_MODULE,
+	.open = wcnss_ctrl_open,
+	.write = wcnss_ctrl_write,
+};
+
+static struct miscdevice wcnss_usr_ctrl = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = CTRL_DEVICE,
+	.fops = &wcnss_ctrl_fops,
 };
 
 static int
@@ -2110,7 +2220,7 @@ static ssize_t wcnss_wlan_write(struct file *fp, const char __user
 			*user_buffer, size_t count, loff_t *position)
 {
 	int rc = 0;
-	int size = 0;
+	size_t size = 0;
 
 	if (!penv || !penv->device_opened || penv->user_cal_available)
 		return -EFAULT;
@@ -2118,7 +2228,7 @@ static ssize_t wcnss_wlan_write(struct file *fp, const char __user
 	if (penv->user_cal_rcvd == 0 && count >= 4
 			&& !penv->user_cal_data) {
 		rc = copy_from_user((void *)&size, user_buffer, 4);
-		if (size > MAX_CALIBRATED_DATA_SIZE) {
+		if (!size || size > MAX_CALIBRATED_DATA_SIZE) {
 			pr_err(DEVICE " invalid size to write %d\n", size);
 			return -EFAULT;
 		}
@@ -2137,7 +2247,8 @@ static ssize_t wcnss_wlan_write(struct file *fp, const char __user
 	} else if (penv->user_cal_rcvd == 0 && count < 4)
 		return -EFAULT;
 
-	if (MAX_CALIBRATED_DATA_SIZE < count + penv->user_cal_rcvd) {
+	if ((UINT32_MAX - count < penv->user_cal_rcvd) ||
+	     MAX_CALIBRATED_DATA_SIZE < count + penv->user_cal_rcvd) {
 		pr_err(DEVICE " invalid size to write %d\n", count +
 				penv->user_cal_rcvd);
 		rc = -ENOMEM;
@@ -2199,6 +2310,7 @@ wcnss_wlan_probe(struct platform_device *pdev)
 	}
 
 	mutex_init(&penv->dev_lock);
+	mutex_init(&penv->ctrl_lock);
 	mutex_init(&penv->vbat_monitor_mutex);
 	init_waitqueue_head(&penv->read_wait);
 
@@ -2211,6 +2323,9 @@ wcnss_wlan_probe(struct platform_device *pdev)
 	 * place
 	 */
 	pr_info(DEVICE " probed in built-in mode\n");
+
+	misc_register(&wcnss_usr_ctrl);
+
 	return misc_register(&wcnss_misc);
 
 }
