@@ -24,7 +24,6 @@
 		coresight-id = <0>;
 		coresight-name = "coresight-tmc-etr";
 		coresight-nr-inports = <1>;
-		coresight-default-sink;
 		coresight-ctis = <&cti0 &cti8>;
 	};
 
@@ -72,6 +71,7 @@
 		coresight-outports = <0>;
 		coresight-child-list = <&replicator>;
 		coresight-child-ports = <0>;
+		coresight-default-sink;
 		coresight-ctis = <&cti0 &cti8>;
 	};
 
