@@ -15,7 +15,14 @@
 		compatible = "qcom,msm-ion";
 		#address-cells = <1>;
 		#size-cells = <0>;
-
+    vqcom,ion-heap@16 { /* Camera*/
+      compatible = "qcom,msm-ion-reserve";
+      reg = <16>;
+      qcom,heap-align = <0x1000>;
+      qcom,memory-reservation-type = "EBI1"; /* reserve EBI memory */
+      qcom,memory-reservation-size = <0x1E00000>;
+      qcom,ion-heap-type = "CARVEOUT";
+    };
 		qcom,ion-heap@25 {
 			reg = <25>;
 			qcom,ion-heap-type = "SYSTEM";
