@@ -896,7 +896,6 @@ config USB_DUN_SUPPORT
 config USB_ANDROID_SAMSUNG_MTP
 	boolean "Samsung MTP function"
 	depends on USB_G_ANDROID && !FACTORY_KERNEL
-	default n
 	help
 		Provides Media Transfer Protocol (MTP) support
 		for samsung gadget driver.
