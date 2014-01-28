@@ -438,6 +438,7 @@ enum mdss_mdp_dspp_index {
 #define MDSS_MDP_REG_DSPP_HIST_CTL_BASE			0x210
 #define MDSS_MDP_REG_DSPP_HIST_LUT_BASE			0x230
 #define MDSS_MDP_REG_DSPP_PA_BASE			0x238
+#define MDSS_MDP_REG_DSPP_SIX_ZONE_BASE			0x248
 #define MDSS_MDP_REG_DSPP_GAMUT_BASE			0x2DC
 #define MDSS_MDP_REG_DSPP_GC_BASE			0x2B0
 
@@ -578,5 +579,9 @@ enum mdss_mdp_pingpong_index {
 #define MDSS_MDP_LP_MISR_SEL_LMIX3_GC		0x0F
 #define MDSS_MDP_LP_MISR_SEL_LMIX4_BLEND	0x10
 #define MDSS_MDP_LP_MISR_SEL_LMIX4_GC		0x11
+
+/* following offsets are with respect to MDP VBIF base */
+#define MMSS_VBIF_XIN_HALT_CTRL0	0x200
+#define MMSS_VBIF_XIN_HALT_CTRL1	0x204
 
 #endif

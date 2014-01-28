@@ -527,6 +527,7 @@ static DEFINE_CLK_MEASURE(apc1_m_clk);
 static DEFINE_CLK_MEASURE(apc2_m_clk);
 static DEFINE_CLK_MEASURE(apc3_m_clk);
 static DEFINE_CLK_MEASURE(l2_m_clk);
+static DEFINE_CLK_MEASURE(wcnss_m_clk);
 
 #define APCS_SH_PLL_MODE        0x000
 #define APCS_SH_PLL_L_VAL       0x004
@@ -2509,6 +2510,7 @@ static struct measure_mux_entry measure_mux[] = {
 	{                   &bimc_clk.c, GCC_BASE, 0x0155},
 	{          &gcc_bimc_smmu_clk.c, GCC_BASE, 0x015e},
 	{       &gcc_lpass_q6_axi_clk.c, GCC_BASE, 0x0160},
+	{                  &wcnss_m_clk, GCC_BASE, 0x0198},
 
 	{     &mmssnoc_ahb_clk.c, MMSS_BASE, 0x0001},
 	{   &mmss_misc_ahb_clk.c, MMSS_BASE, 0x0003},
@@ -3111,12 +3113,17 @@ static struct clk_lookup msm_clocks_8610[] = {
 	CLK_LOOKUP("xo",        cxo_acpu_clk.c, "f9011050.qcom,acpuclk"),
 	CLK_LOOKUP("gpll0", gpll0_ao_clk_src.c, "f9011050.qcom,acpuclk"),
 	CLK_LOOKUP("a7sspll",        a7sspll.c, "f9011050.qcom,acpuclk"),
+	CLK_LOOKUP("clk-4",  gpll0_ao_clk_src.c, "f9011050.qcom,clock-a7"),
+	CLK_LOOKUP("clk-5", a7sspll.c, "f9011050.qcom,clock-a7"),
 
 	CLK_LOOKUP("measure_clk", apc0_m_clk, ""),
 	CLK_LOOKUP("measure_clk", apc1_m_clk, ""),
 	CLK_LOOKUP("measure_clk", apc2_m_clk, ""),
 	CLK_LOOKUP("measure_clk", apc3_m_clk, ""),
 	CLK_LOOKUP("measure_clk",   l2_m_clk, ""),
+
+	CLK_LOOKUP("measure",   measure_clk.c, "fb000000.qcom,wcnss-wlan"),
+	CLK_LOOKUP("wcnss_debug", wcnss_m_clk, "fb000000.qcom,wcnss-wlan"),
 
 	CLK_LOOKUP("xo",     cxo_wlan_clk.c, "fb000000.qcom,wcnss-wlan"),
 	CLK_LOOKUP("rf_clk",       cxo_a1.c, "fb000000.qcom,wcnss-wlan"),

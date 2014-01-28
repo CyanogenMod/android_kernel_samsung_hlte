@@ -12,16 +12,72 @@
  */
 #include "msm_sensor.h"
 #define OV8825_SENSOR_NAME "ov8825"
-#undef CDBG
-#ifdef OV8825_DEBUG
-#define CDBG(fmt, args...) pr_err(fmt, ##args)
-#else
-#define CDBG(fmt, args...) pr_debug(fmt, ##args)
-#endif
 DEFINE_MSM_MUTEX(ov8825_mut);
 
 static struct msm_sensor_ctrl_t ov8825_s_ctrl;
 
+static struct msm_sensor_power_setting ov8825_power_setting[] = {
+	{
+		.seq_type = SENSOR_VREG,
+		.seq_val = CAM_VIO,
+		.config_val = 0,
+		.delay = 1,
+	},
+	{
+		.seq_type = SENSOR_VREG,
+		.seq_val = CAM_VANA,
+		.config_val = 0,
+		.delay = 1,
+	},
+	{
+		.seq_type = SENSOR_VREG,
+		.seq_val = CAM_VDIG,
+		.config_val = 0,
+		.delay = 1,
+	},
+	{
+		.seq_type = SENSOR_VREG,
+		.seq_val = CAM_VAF,
+		.config_val = 0,
+		.delay = 5,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_STANDBY,
+		.config_val = GPIO_OUT_LOW,
+		.delay = 1,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_LOW,
+		.delay = 5,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_STANDBY,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 5,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 10,
+	},
+	{
+		.seq_type = SENSOR_CLK,
+		.seq_val = SENSOR_CAM_MCLK,
+		.config_val = 24000000,
+		.delay = 10,
+	},
+	{
+		.seq_type = SENSOR_I2C_MUX,
+		.seq_val = 0,
+		.config_val = 0,
+		.delay = 0,
+	},
+};
 
 static struct v4l2_subdev_info ov8825_subdev_info[] = {
 	{
@@ -42,6 +98,7 @@ static int32_t msm_ov8825_i2c_probe(struct i2c_client *client,
 {
 	return msm_sensor_i2c_probe(client, id, &ov8825_s_ctrl);
 }
+
 static struct i2c_driver ov8825_i2c_driver = {
 	.id_table = ov8825_i2c_id,
 	.probe  = msm_ov8825_i2c_probe,
@@ -81,19 +138,18 @@ static int32_t ov8825_platform_probe(struct platform_device *pdev)
 static int __init ov8825_init_module(void)
 {
 	int32_t rc = 0;
-	CDBG("%s:%d Enter\n", __func__, __LINE__);
+	pr_info("%s:%d\n", __func__, __LINE__);
 	rc = platform_driver_probe(&ov8825_platform_driver,
 		ov8825_platform_probe);
-	if (!rc) {
-		pr_info("%s: probe success\n", __func__);
+	if (!rc)
 		return rc;
-	}
+	pr_err("%s:%d rc %d\n", __func__, __LINE__, rc);
 	return i2c_add_driver(&ov8825_i2c_driver);
 }
 
 static void __exit ov8825_exit_module(void)
 {
-	CDBG("%s:%d\n", __func__, __LINE__);
+	pr_info("%s:%d\n", __func__, __LINE__);
 	if (ov8825_s_ctrl.pdev) {
 		msm_sensor_free_sensor_data(&ov8825_s_ctrl);
 		platform_driver_unregister(&ov8825_platform_driver);
@@ -104,6 +160,8 @@ static void __exit ov8825_exit_module(void)
 
 static struct msm_sensor_ctrl_t ov8825_s_ctrl = {
 	.sensor_i2c_client = &ov8825_sensor_i2c_client,
+	.power_setting_array.power_setting = ov8825_power_setting,
+	.power_setting_array.size = ARRAY_SIZE(ov8825_power_setting),
 	.msm_sensor_mutex = &ov8825_mut,
 	.sensor_v4l2_subdev_info = ov8825_subdev_info,
 	.sensor_v4l2_subdev_info_size = ARRAY_SIZE(ov8825_subdev_info),
