@@ -743,11 +743,8 @@ static int msm_thermal_get_freq_table(void)
 
 	while (table[i].frequency != CPUFREQ_TABLE_END)
 		i++;
-//#ifdef CONFIG_SEC_PM
-//	limit_idx_low = 7;
-//#else
+
 	limit_idx_low = 0;
-//#endif
 	limit_idx_high = limit_idx = i - 1;
 	BUG_ON(limit_idx_high <= 0 || limit_idx_high <= limit_idx_low);
 fail:
@@ -1110,11 +1107,7 @@ static void __ref do_freq_control(long temp)
 		if (limit_idx < limit_idx_low)
 			limit_idx = limit_idx_low;
 		max_freq = table[limit_idx].frequency;
-
-#ifdef CONFIG_SEC_PM_DEBUG
-		pr_info("%s: down Limit=%d Temp: %ld\n",
-				KBUILD_MODNAME, limit_idx, temp);
-#endif
+		pr_info("%s: limit frequency to %d, temp: %ld\n", KBUILD_MODNAME, max_freq, temp);
 	} else if (temp < msm_thermal_info.limit_temp_degC -
 		 msm_thermal_info.temp_hysteresis_degC) {
 		if (limit_idx == limit_idx_high)
@@ -1126,11 +1119,6 @@ static void __ref do_freq_control(long temp)
 			max_freq = UINT_MAX;
 		} else
 			max_freq = table[limit_idx].frequency;
-
-#ifdef CONFIG_SEC_PM_DEBUG
-		pr_info("%s: up Limit=%d Temp: %ld\n",
-				KBUILD_MODNAME, limit_idx, temp);
-#endif
 	}
 
 	if (max_freq == cpus[cpu].limited_max_freq)
@@ -1524,14 +1512,7 @@ static void __ref disable_msm_thermal(void)
 	uint32_t cpu = 0;
 
 	/* make sure check_temp is no longer running */
-	/* kor_ts@sec
-	 * flush_scheduled_work () should be avoided.
-	 */
 	cancel_delayed_work_sync(&check_temp_work);
-	/*
-	cancel_delayed_work(&check_temp_work);
-	flush_scheduled_work();
-	*/
 
 	get_online_cpus();
 	for_each_possible_cpu(cpu) {
@@ -2595,17 +2576,11 @@ static int __devinit msm_thermal_dev_probe(struct platform_device *pdev)
 	 * Need to make sure sysfs node is created again
 	 */
 	if (psm_nodes_called) {
-		ret = msm_thermal_add_psm_nodes();
-		if (ret)
-			pr_err("%s:%d msm_thermal_add_psm_nodes err",
-					__func__, __LINE__);
+		msm_thermal_add_psm_nodes();
 		psm_nodes_called = false;
 	}
 	if (vdd_rstr_nodes_called) {
-		ret = msm_thermal_add_vdd_rstr_nodes();
-		if (ret)
-			pr_err("%s:%d msm_thermal_add_vdd_rstr_nodes err",
-					__func__, __LINE__);
+		msm_thermal_add_vdd_rstr_nodes();
 		vdd_rstr_nodes_called = false;
 	}
 	if (ocr_nodes_called) {
