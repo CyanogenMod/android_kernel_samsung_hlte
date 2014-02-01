@@ -1987,6 +1987,7 @@ fail_cmd:
 #ifdef CONFIG_RTAC
 int adm_get_copp_id(int port_index)
 {
+	int copp_id;
 	pr_debug("%s\n", __func__);
 
 	if (port_index < 0) {
@@ -1994,7 +1995,11 @@ int adm_get_copp_id(int port_index)
 		return -EINVAL;
 	}
 
-	return atomic_read(&this_adm.copp_id[port_index]);
+	copp_id = atomic_read(&this_adm.copp_id[port_index]);
+	if (copp_id == RESET_COPP_ID)
+		copp_id = atomic_read(
+			&this_adm.copp_low_latency_id[port_index]);
+	return copp_id;
 }
 
 int adm_get_lowlatency_copp_id(int port_index)
