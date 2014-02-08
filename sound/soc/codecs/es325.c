@@ -2676,10 +2676,7 @@ int es325_set_VEQ_max_gain(int volume)
 	/* 8 level Voice Rx volume for VZW */
 	static char VEQ_max_gain[8] = {3, 3, 3, 5, 7, 9, 7, 4}; /* index 0 means max volume */
 	static char VEQ_adj_gain[8] = {30, 2, 2, 2, 2, 2, 2, 2};
-#elif defined(CONFIG_MACH_HLTETMO)
-	static char VEQ_max_gain[6] = {3, 5, 7, 9, 7, 4}; /* index 0 means max volume */
-	static char VEQ_adj_gain[6] = {25, 2, 2, 2, 2, 2};
-#elif defined(CONFIG_MACH_HLTEATT) || defined(CONFIG_MACH_HLTEEUR) || defined(CONFIG_MACH_H3GDUOS)
+#elif defined(CONFIG_MACH_HLTEATT) || defined(CONFIG_MACH_HLTEEUR) || defined(CONFIG_MACH_H3GDUOS) || (CONFIG_MACH_HLTETMO)
 	static char VEQ_max_gain[6] = {3, 5, 7, 9, 7, 4}; /* index 0 means max volume */
 	static char VEQ_adj_gain[6] = {25, 2, 2, 2, 2, 2};
 #elif defined(CONFIG_MACH_HLTESPR)
