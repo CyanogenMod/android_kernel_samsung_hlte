@@ -3327,6 +3327,7 @@ static int venus_hfi_load_fw(void *dev)
 		return -EINVAL;
 	}
 	device->clk_gating_level = VCODEC_CLK;
+
 	rc = venus_hfi_iommu_attach(device);
 	if (rc) {
 		dprintk(VIDC_ERR, "Failed to attach iommu");
