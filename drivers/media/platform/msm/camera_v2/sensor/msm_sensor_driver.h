@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,19 +10,11 @@
  * GNU General Public License for more details.
  */
 
-/dts-v1/;
-/include/ "msm8226-v1.dtsi"
-/include/ "msm8226-qrd-skuf.dtsi"
+#ifndef MSM_SENSOR_DRIVER_H
+#define MSM_SENSOR_DRIVER_H
 
-/ {
-	model = "Qualcomm MSM 8226v1 QRD PVT";
-	compatible = "qcom,msm8226-qrd", "qcom,msm8226", "qcom,skuf", "qcom,qrd";
-	qcom,board-id = <0x2000b 2>;
-};
+#include "msm_sensor.h"
 
-&slim_msm {
-	tapan_codec {
-		qcom,cdc-micbias1-ext-cap;
-		qcom,cdc-micbias3-ext-cap;
-	};
-};
+int32_t msm_sensor_driver_probe(void *setting);
+
+#endif
