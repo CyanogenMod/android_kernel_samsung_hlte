@@ -1820,7 +1820,7 @@ int sec_debug_subsys_init(void)
 #endif
 
 	ADD_STR_TO_INFOMON(unit_name);
-	ADD_VAR_TO_INFOMON(system_rev);
+	//ADD_VAR_TO_INFOMON(system_rev);
 	if (___build_root_init(build_root) == 0)
 		ADD_STR_TO_INFOMON(build_root);
 	ADD_STR_TO_INFOMON(linux_banner);
