@@ -215,7 +215,7 @@
 		vdd-supply = <&gdsc_venus>;
 		qcom,hfi = "venus";
 		qcom,has-ocmem;
-		qcom,max-hw-load = <1224450>; /* 4k @ 30 + 1080p @ 30*/
+		qcom,max-hw-load = <1216800>; /* 3840 x 2160 @ 30 + 1080p @ 30*/
 	};
 
 	qcom,vidc {
@@ -1520,7 +1520,9 @@
 		compatible = "qcom,cpubw";
 		qcom,cpu-mem-ports = <1 512>, <2 512>;
 		qcom,bw-tbl =
+			<  381 /*  50 MHz */ >,
 			<  572 /*  75 MHz */ >,
+			<  762 /* 100 MHz */ >,
 			< 1144 /* 150 MHz */ >,
 			< 1525 /* 200 MHz */ >,
 			< 2342 /* 307 MHz */ >,
@@ -2001,8 +2003,8 @@
 		qcom,msm-bus,num-cases = <2>;
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps =
-				<1 618 0 0>,
-				<1 618 0 800>;
+				<88 618 0 0>,
+				<88 618 0 800>;
         };
 
 	qseecom: qcom,qseecom@7b00000 {
