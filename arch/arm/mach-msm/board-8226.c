@@ -15,6 +15,7 @@
 #include <linux/errno.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
+#include <linux/i2c/i2c-qup.h>
 #include <linux/gpio.h>
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
@@ -24,6 +25,9 @@
 #include <linux/of_fdt.h>
 #include <linux/of_irq.h>
 #include <linux/memory.h>
+#include <linux/regulator/cpr-regulator.h>
+#include <linux/regulator/fan53555.h>
+#include <linux/regulator/onsemi-ncp6335d.h>
 #include <linux/regulator/qpnp-regulator.h>
 #include <linux/msm_tsens.h>
 #include <linux/export.h>
@@ -32,6 +36,7 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/time.h>
 #include <mach/board.h>
+#include <mach/msm_bus.h>
 #include <mach/gpiomux.h>
 #include <mach/msm_iomap.h>
 #include <mach/restart.h>
@@ -59,6 +64,7 @@
 #include "spm.h"
 #include "pm.h"
 #include "modem_notifier.h"
+#include "spm-regulator.h"
 
 #ifdef CONFIG_PROC_AVC
 #include <linux/proc_avc.h>
@@ -151,10 +157,16 @@ void __init msm8226_add_drivers(void)
 	msm_pm_sleep_status_init();
 	rpm_regulator_smd_driver_init();
 	qpnp_regulator_init();
+	spm_regulator_init();
 	if (of_board_is_rumi())
 		msm_clock_init(&msm8226_rumi_clock_init_data);
 	else
 		msm_clock_init(&msm8226_clock_init_data);
+	msm_bus_fabric_init_driver();
+	qup_i2c_init_driver();
+	ncp6335d_regulator_init();
+	fan53555_regulator_init();
+	cpr_regulator_init();
 	tsens_tm_init_driver();
 	msm_thermal_device_init();
 }

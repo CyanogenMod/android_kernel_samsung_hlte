@@ -33,8 +33,6 @@
 #include <mach/dma.h>
 
 #include "mdss.h"
-#include "mdss_panel.h"
-#include "mdss_mdp.h"
 #include "mdss_edp.h"
 #include "mdss_debug.h"
 #include <linux/qpnp/pin.h>
@@ -722,7 +720,7 @@ void mdss_edp_lane_power_ctrl(struct mdss_edp_drv_pdata *ep, int up)
 void mdss_edp_clock_synchrous(struct mdss_edp_drv_pdata *ep, int sync)
 {
 	u32 data;
-	int color;
+	u32 color;
 
 	/* EDP_MISC1_MISC0 */
 	data = edp_read(ep->base + 0x02c);
@@ -734,20 +732,18 @@ void mdss_edp_clock_synchrous(struct mdss_edp_drv_pdata *ep, int sync)
 
 	/* only legacy rgb mode supported */
 	color = 0; /* 6 bits */
-
 	if (ep->edid.color_depth == 8)
-	       color = 0x01;
+		color = 0x01;
 	else if (ep->edid.color_depth == 10)
-	       color = 0x02;
+		color = 0x02;
 	else if (ep->edid.color_depth == 12)
-	       color = 0x03;
+		color = 0x03;
 	else if (ep->edid.color_depth == 16)
-	       color = 0x04;
+		color = 0x04;
 
-	color <<= 5;	/* bit 5 to bit 7 */
+	color <<= 5;    /* bit 5 to bit 7 */
 
 	data |= color;
-
 	/* EDP_MISC1_MISC0 */
 	edp_write(ep->base + 0x2c, data);
 }
@@ -882,12 +878,11 @@ int mdss_edp_on(struct mdss_panel_data *pdata)
 
 	pr_info("%s:+, cont_splash=%d\n", __func__, edp_drv->cont_splash);
 
-	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
-
 #if defined(CONFIG_FB_MSM_EDP_SAMSUNG)
 	mutex_lock(&edp_power_state_chagne);
 	INIT_COMPLETION(edp_power_sync);
 #endif
+
 	if (!edp_drv->cont_splash) { /* vote for clocks */
 		qpnp_pin_config(edp_drv->gpio_panel_pwm, &LCD_PWM_PM_GPIO_WAKE);
 		qpnp_pin_config(edp_drv->gpio_panel_en, &LCD_EN_PM_GPIO_WAKE);
@@ -973,7 +968,10 @@ int mdss_edp_off(struct mdss_panel_data *pdata)
 		pr_err("%s: Invalid input data\n", __func__);
 		return -EINVAL;
 	}
-	pr_info("%s:+, cont_splash=%d\n", __func__, edp_drv->cont_splash);
+	pr_debug("%s:+, cont_splash=%d\n", __func__, edp_drv->cont_splash);
+
+	/* wait until link training is completed */
+	mutex_lock(&edp_drv->train_mutex);
 
 	INIT_COMPLETION(edp_drv->idle_comp);
 	mdss_edp_state_ctrl(edp_drv, ST_PUSH_IDLE);
@@ -1003,8 +1001,6 @@ int mdss_edp_off(struct mdss_panel_data *pdata)
 
 	mdss_edp_clk_disable(edp_drv);
 	mdss_edp_unprepare_clocks(edp_drv);
-
-	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 
 	mdss_edp_aux_ctrl(edp_drv, 0);
 
@@ -1053,7 +1049,10 @@ int mdss_edp_off_cont_splash(struct mdss_panel_data *pdata)
 
 	mdss_edp_regulator_off(edp_drv);
 
-	pr_info("%s:-\n", __func__);
+	pr_debug("%s-: state_ctrl=%x\n", __func__,
+				edp_read(edp_drv->base + 0x8));
+
+	mutex_unlock(&edp_drv->train_mutex);
 	return 0;
 }
 
@@ -1178,6 +1177,9 @@ static int mdss_edp_device_register(struct mdss_edp_drv_pdata *edp_drv)
 	edp_drv->panel_data.panel_info.brightness_max =
 		(!ret ? tmp : MDSS_MAX_BL_BRIGHTNESS);
 
+	edp_drv->panel_data.panel_info.edp.frame_rate =
+				DEFAULT_FRAME_RATE;/* 60 fps */
+
 	edp_drv->panel_data.event_handler = mdss_edp_event_handler;
 	edp_drv->panel_data.set_backlight = mdss_edp_set_backlight;
 
@@ -1263,7 +1265,6 @@ static void mdss_edp_do_link_train(struct mdss_edp_drv_pdata *ep)
 	if (ep->cont_splash)
 		return;
 
-	INIT_COMPLETION(ep->train_comp);
 	mdss_edp_link_train(ep);
 }
 
@@ -1667,10 +1668,6 @@ static int __devinit mdss_edp_probe(struct platform_device *pdev)
 
 	pr_info("%s:cont_splash=%d\n", __func__, edp_drv->cont_splash);
 
-	/* need mdss clock to receive irq */
-	if (!edp_drv->cont_splash)
-		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
-
 	/* only need aux and ahb clock for aux channel */
 	mdss_edp_prepare_aux_clocks(edp_drv);
 	mdss_edp_aux_clk_enable(edp_drv);
@@ -1704,9 +1701,6 @@ static int __devinit mdss_edp_probe(struct platform_device *pdev)
 
 	mdss_edp_aux_clk_disable(edp_drv);
 	mdss_edp_unprepare_aux_clocks(edp_drv);
-
-	if (!edp_drv->cont_splash)
-		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 
 	if (edp_drv->cont_splash) { /* vote for clocks */
 		mdss_edp_regulator_on(edp_drv);
