@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,27 +10,16 @@
  * GNU General Public License for more details.
  */
 
-/dts-v1/;
-/include/ "msm8226-v1.dtsi"
-/include/ "msm8226-qrd.dtsi"
+#ifndef MSM_SENSOR_INIT_H
+#define MSM_SENSOR_INIT_H
 
-/ {
-	model = "Qualcomm MSM 8226 QRD";
-	compatible = "qcom,msm8226-qrd", "qcom,msm8226", "qcom,qrd";
-	qcom,board-id = <11 0>;
+#include "msm_sensor.h"
+
+struct msm_sensor_init_t {
+	struct mutex imutex;
+	struct msm_sd_subdev msm_sd;
+	int module_init_status;
+	wait_queue_head_t state_wait;
 };
 
-&mdss_dsi0 {
-	qcom,dsi-pref-prim-pan = <&dsi_nt35590_720_vid>;
-};
-
-&dsi_nt35590_720_vid {
-	qcom,cont-splash-enabled;
-};
-
-&slim_msm {
-	tapan_codec {
-		qcom,cdc-micbias1-ext-cap;
-		qcom,cdc-micbias3-ext-cap;
-	};
-};
+#endif
