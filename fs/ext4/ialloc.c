@@ -296,10 +296,8 @@ out:
 		if (!fatal)
 			fatal = err;
 		ext4_mark_super_dirty(sb);
-	} else {
-		print_bh(sb, bitmap_bh, 0, EXT4_BLOCK_SIZE(sb));
+	} else
 		ext4_error(sb, "bit already cleared for inode %lu", ino);
-	}
 
 error_return:
 	brelse(bitmap_bh);
@@ -680,16 +678,9 @@ got_group:
 		if (!gdp)
 			goto fail;
 
-		if (inode_bitmap_bh) {
-			ext4_handle_release_buffer(handle, inode_bitmap_bh);
-			brelse(inode_bitmap_bh);
-		}
+		brelse(inode_bitmap_bh);
 		inode_bitmap_bh = ext4_read_inode_bitmap(sb, group);
 		if (!inode_bitmap_bh)
-			goto fail;
-		BUFFER_TRACE(inode_bitmap_bh, "get_write_access");
-		err = ext4_journal_get_write_access(handle, inode_bitmap_bh);
-		if (err)
 			goto fail;
 
 repeat_in_this_group:
@@ -719,7 +710,6 @@ next_group:
 		if (++group == ngroups)
 			group = 0;
 	}
-	ext4_handle_release_buffer(handle, inode_bitmap_bh);
 	err = -ENOSPC;
 	goto out;
 
