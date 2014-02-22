@@ -3191,7 +3191,7 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 		atomic_dec(&data->ioctl_count);
 		wake_up_all(&data->abort_wq);
 		if (ret)
-			pr_err("failed qseecom_receive_req: %d\n", ret);
+			pr_debug("failed qseecom_receive_req: %d\n", ret);
 		break;
 	}
 	case QSEECOM_IOCTL_SEND_RESP_REQ: {
