@@ -120,7 +120,7 @@
 		qcom,phase-port = <0x1>;
 		qcom,pfm-port = <0x2>;
 		qcom,saw2-spm-cmd-ret = [1f 00 03 00 0f];
-		qcom,saw2-spm-cmd-gdhs = [00 32 42 07 44 50 02 32 50 0f];
+		qcom,saw2-spm-cmd-gdhs = [00 32 42 03 44 50 02 32 50 0f];
 		qcom,saw2-spm-cmd-pc = [00 10 32 b0 11 42 07 01 b0 12 44
 				50 02 32 50 0f];
 		qcom,L2-spm-is-apcs-master;
@@ -174,11 +174,11 @@
 
 			qcom,system-mode@0 {
 				qcom,l2 = "l2_cache_gdhs";
-				qcom,latency-us = <20000>;
+				qcom,latency-us = <500>;
 				qcom,ss-power = <163>;
-				qcom,energy-overhead = <1577736>;
-				qcom,time-overhead = <5067>;
-				qcom,min-cpu-mode= "pc";
+				qcom,energy-overhead = <577736>;
+				qcom,time-overhead = <1000>;
+				qcom,min-cpu-mode= "standalone_pc";
 				qcom,sync-cpus;
 			};
 
@@ -190,6 +190,7 @@
 				qcom,time-overhead = <6605>;
 				qcom,min-cpu-mode = "pc";
 				qcom,sync-cpus;
+				qcom,send-rpm-sleep-set;
 			};
 		};
 	};
@@ -214,6 +215,10 @@
 			<50 172>, /* usb1_hs_async_wakeup_irq */
 			<53 104>, /* mdss_irq */
 			<62 222>, /* ee0_krait_hlos_spmi_periph_irq */
+			<0xff 18>,  /* APCx_qgicQTmrSecPhysIrptReq */
+			<0xff 19>,  /* APCx_qgicQTmrSecPhysIrptReq */
+			<0xff 25>,  /* APCx_qgicExtFaultIrptReq */
+			<0xff 33>,  /* APCC_qgicL2PerfMonIrptReq */
 			<0xff 34>,  /* APCC_qgicL2ErrorIrptReq */
 			<0xff 35>,  /* WDT_barkInt */
 			<0xff 40>,  /* qtimer_phy_irq */
@@ -236,7 +241,10 @@
 			<0xff 105>, /* iommu_pmon_nonsecure_irq */
 			<0xff 109>,  /* ocmem_dm_nonsec_irq */
 			<0xff 126>,  /* bam_irq[0] */
+			<0xff 140>,  /* uart_dm_intr */
 			<0xff 155>,  /* sdcc_irq[0] */
+			<0xff 157>,  /* sdcc_irq[0] */
+			<0xff 159>,  /* sdcc_irq[0] */
 			<0xff 163>,  /* usb30_ee1_irq */
 			<0xff 170>,  /* sdcc_pwr_cmd_irq */
 			<0xff 173>, /* o_wcss_apss_smd_hi */
@@ -269,6 +277,8 @@
 			<0xff 207>, /* rpm_ipc(27) */
 			<0xff 211>, /* usb_dwc3_otg */
 			<0xff 240>, /* summary_irq_kpss */
+			<0xff 253>, /* sdcc_pwr_cmd_irq */
+			<0xff 256>, /* sdcc_pwr_cmd_irq */
 			<0xff 268>, /* bam_irq[1] */
 			<0xff 270>, /* bam_irq[0] */
 			<0xff 271>; /* bam_irq[0] */

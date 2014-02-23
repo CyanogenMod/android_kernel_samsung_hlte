@@ -38,26 +38,30 @@
 
 &krait0_vreg {
 		regulator-max-microvolt = <1120000>;
-		qcom,ldo-delta-voltage = <25000>;
+		qcom,ldo-delta-voltage = <12500>;
 };
 
 &krait1_vreg {
 		regulator-max-microvolt = <1120000>;
-		qcom,ldo-delta-voltage = <25000>;
+		qcom,ldo-delta-voltage = <12500>;
 };
 
 &krait2_vreg {
 		regulator-max-microvolt = <1120000>;
-		qcom,ldo-delta-voltage = <25000>;
+		qcom,ldo-delta-voltage = <12500>;
 };
 
 &krait3_vreg {
 		regulator-max-microvolt = <1120000>;
-		qcom,ldo-delta-voltage = <25000>;
+		qcom,ldo-delta-voltage = <12500>;
 };
 
 &tspp {
 	vdd_cx-supply = <&pm8841_s2_corner>;
+};
+
+&pm8841_s2_corner {
+	qcom,init-smps-mode = <0>;	/* Allow AUTO mode for VDD_CX. */
 };
 
 &krait_regulator_pmic {

@@ -745,7 +745,7 @@
 			qcom,cdc-micbias-ldoh-v = <0x3>;
 			qcom,cdc-micbias-cfilt1-mv = <1800>;
 			qcom,cdc-micbias-cfilt2-mv = <2700>;
-			qcom,cdc-micbias-cfilt3-mv = <1800>;
+			qcom,cdc-micbias-cfilt3-mv = <2700>;
 			qcom,cdc-micbias1-cfilt-sel = <0x0>;
 			qcom,cdc-micbias2-cfilt-sel = <0x1>;
 			qcom,cdc-micbias3-cfilt-sel = <0x2>;
@@ -2014,7 +2014,7 @@
 		qcom,disk-encrypt-pipe-pair = <2>;
 		qcom,hlos-ce-hw-instance = <1>;
 		qcom,qsee-ce-hw-instance = <0>;
-		qcom,support-bus-scaling = <1>;
+		qcom,support-bus-scaling;
 		qcom,msm-bus,name = "qseecom-noc";
 		qcom,msm-bus,num-cases = <4>;
 		qcom,msm-bus,num-paths = <1>;
@@ -2135,9 +2135,13 @@
 		interrupts = <0 236 0>;
 		qcom,bam-pipe-pair = <2>;
 		qcom,ce-hw-instance = <1>;
+		qcom,clk-mgmt-sus-res;
                 qcom,msm-bus,name = "qcrypto-noc";
 		qcom,msm-bus,num-cases = <2>;
 		qcom,msm-bus,num-paths = <1>;
+                qcom,use-sw-aes-cbc-ecb-ctr-algo;
+                qcom,use-sw-aes-xts-algo;
+                qcom,use-sw-ahash-algo;
 		qcom,msm-bus,vectors-KBps =
 				<56 512 0 0>,
 				<56 512 3936000 393600>;
@@ -2347,6 +2351,22 @@
 
 	qcom,bcl {
 		compatible = "qcom,bcl";
+	};
+
+	i2c@f9928000 { /* BLSP-1 QUP-6 */
+		cell-index = <3>;
+		compatible = "qcom,i2c-qup";
+		reg = <0xf9928000 0x1000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg-names = "qup_phys_addr";
+		interrupts = <0 100 0>;
+		interrupt-names = "qup_err_intr";
+		qcom,i2c-bus-freq = <400000>;
+		qcom,i2c-src-freq = <19200000>;
+		qcom,scl-gpio = <&msmgpio 30 0>;
+		qcom,sda-gpio = <&msmgpio 29 0>;
+		qcom,master-id = <86>;
 	};
 
 	qcom,ssm {
