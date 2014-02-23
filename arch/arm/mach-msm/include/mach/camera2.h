@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -37,14 +37,6 @@ enum msm_bus_perf_setting {
 	S_EXIT
 };
 
-#if defined(CONFIG_ARCH_MSM8610)
-enum cci_i2c_master_t {
-	MASTER_0,
-	MASTER_1,
-	MASTER_MAX,
-};
-#endif
-
 struct msm_camera_slave_info {
 	uint16_t sensor_slave_addr;
 	uint16_t sensor_id_reg_addr;
@@ -75,6 +67,8 @@ struct msm_camera_power_ctrl_t {
 	struct device *dev;
 	struct msm_sensor_power_setting *power_setting;
 	uint16_t power_setting_size;
+	struct msm_sensor_power_setting *power_down_setting;
+	uint16_t power_down_setting_size;
 	struct msm_camera_gpio_conf *gpio_conf;
 	struct camera_vreg_t *cam_vreg;
 	int num_vreg;
@@ -85,17 +79,16 @@ struct msm_camera_power_ctrl_t {
 
 struct msm_camera_sensor_board_info {
 	const char *sensor_name;
+	const char *eeprom_name;
+	const char *actuator_name;
 	struct msm_camera_slave_info *slave_info;
 	struct msm_camera_csi_lane_params *csi_lane_params;
-	struct camera_vreg_t *cam_vreg;
-	int num_vreg;
 	struct msm_camera_sensor_strobe_flash_data *strobe_flash_data;
-	struct msm_camera_gpio_conf *gpio_conf;
 	struct msm_actuator_info *actuator_info;
-	struct msm_camera_i2c_conf *i2c_conf;
 	struct msm_sensor_info_t *sensor_info;
-	struct msm_sensor_init_params *sensor_init_params;
 	const char *misc_regulator;
+	struct msm_camera_power_ctrl_t power_info;
+	struct msm_camera_sensor_slave_info *cam_slave_info;
 };
 #else
 struct msm_camera_power_ctrl_t {
@@ -155,7 +148,7 @@ struct eeprom_map_t {
 };
 
 #if defined(CONFIG_ARCH_MSM8610)
-struct eeprom_memory_map_t {
+struct msm_eeprom_memory_map_t {
 	struct eeprom_map_t page;
 	struct eeprom_map_t pageen;
 	struct eeprom_map_t poll;
@@ -176,12 +169,18 @@ struct msm_eeprom_memory_block_t {
 	uint32_t num_data;	/* size of total mapdata */
 };
 
+struct msm_eeprom_mm_t {
+	uint32_t mm_support;
+	uint32_t mm_compression;
+	uint32_t mm_offset;
+	uint32_t mm_size;
+};
+
 struct msm_eeprom_board_info {
 	const char *eeprom_name;
 	uint16_t i2c_slaveaddr;
-	uint32_t num_blocks;
-	struct eeprom_memory_map_t *eeprom_map;
 	struct msm_camera_power_ctrl_t power_info;
+	struct msm_eeprom_mm_t mm_data;
 };
 
 #endif

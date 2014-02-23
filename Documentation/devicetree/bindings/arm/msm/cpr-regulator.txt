@@ -140,7 +140,15 @@ Optional properties:
 				  1 => equal to PVS corner ceiling voltage
 				  2 => equal to slow speed corner ceiling
 				  3 => equal to qcom,vdd-mx-vmax
+				  4 => equal to VDD_APC corner mapped vdd-mx voltage
 				This is required when vdd-mx-supply is present.
+- qcom,vdd-mx-corner-map:	Array of 3 elements which defines the mapping from VDD_APC
+				fuse voltage corners to vdd-mx-supply voltages.
+				The 3 elements with index[0..2] are:
+				[0] => voltage to set for vdd-mx when VDD_APC is running at SVS corner
+				[1] => voltage to set for vdd-mx when VDD_APC is running at NOM corner
+				[2] => voltage to set for vdd-mx when VDD_APC is running at TURBO corner
+				This is required when the qcom,vdd-mx-vmin-method property has a value of 4.
 - qcom,cpr-fuse-redun-bp-cpr-disable:	Redundant bit position of the bit to indicate if CPR should be disable
 - qcom,cpr-fuse-redun-bp-scheme:	Redundant bit position of the bit to indicate if it's a global/local scheme
 					This property is required if cpr-fuse-redun-bp-cpr-disable
@@ -213,10 +221,14 @@ Optional properties:
 				the virtual corner value. For example, the first element in the list is the fuse corner
 				value that virtual corner 1 maps to.
 				This is required if qcom,cpr-quot-adjust-table is present.
-- qcom,cpr-quotient-adjustment:	Present: CPR adjusts quotient value. The
-				adjustment equals to the quotient adjustment
-				in millivolts multiply the KV value.
-				Not Present: CPR will not adjust quotient value.
+- qcom,cpr-quotient-adjustment:	Array of three elements of CPR quotient adjustments for each corner.
+				The 3 quotient adjustments with index[0..2] are:
+				[0] => amount to add to the SVS quotient
+				[1] => amount to add to the NORM quotient
+				[2] => amount to add to the TURBO quotient
+				If this property is specified, then the quotient adjustment values are added to the target
+				quotient values read from fuses before writing them into the CPR GCNT target control registers.
+				This property can be used to add static margin to the voltage rail managed by the CPR controller.
 - vdd-apc-optional-prim-supply:	Present: Regulator of highest priority to supply VDD APC power
 				Not Present: No such regulator.
 - vdd-apc-optional-sec-supply:	Present: Regulator of second highest priority to supply VDD APC power.

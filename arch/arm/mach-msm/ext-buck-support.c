@@ -14,93 +14,88 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/io.h>
 #include <linux/platform_device.h>
 #include <linux/of_platform.h>
 #include <mach/rpm-smd.h>
 
-#define RPM_REQUEST_TYPE_GPIO  0x6F697067
-#define RPM_GPIO_NUMB_KEY      0x626d756e
-#define RPM_GPIO_STAT_KEY      0x74617473
-#define RPM_GPIO_SETT_KEY      0x74746573
+#define RPM_REQUEST_TYPE_GPIO  0x6f697067 /* gpio */
+#define RPM_GPIO_NUMB_KEY      0x626d756e /* numb */
+#define RPM_GPIO_STAT_KEY      0x74617473 /* stat */
+#define RPM_GPIO_SETT_KEY      0x74746573 /* sett */
 #define RPM_GPIO_RESOURCE_ID   3
-#define GPIO_SET               1
-#define GPIO_RESET             0
+#define GPIO_ON                1
+#define GPIO_OFF               0
 
-static void msm_send_ext_buck_votes(int gpio_num, int settling_time)
+static int msm_send_ext_buck_votes(int gpio_num, int settling_time)
 {
 	int rc;
-	int gpio_status_sleep = GPIO_RESET;
-	int gpio_status_active = GPIO_SET;
+	int gpio_status_sleep = GPIO_OFF;
+	int gpio_status_active = GPIO_ON;
 
 	struct msm_rpm_kvp kvp_sleep[] = {
 		{
-		.key = RPM_GPIO_NUMB_KEY,
-		.data = (void *)&gpio_num,
-		.length = sizeof(gpio_num),
-		},
-		{
-		.key = RPM_GPIO_STAT_KEY,
-		.data = (void *)&gpio_status_sleep,
-		.length = sizeof(gpio_status_sleep),
-		},
-		{
-		.key = RPM_GPIO_SETT_KEY,
-		.data = (void *)&settling_time,
-		.length = sizeof(settling_time),
-		},
+			.key = RPM_GPIO_STAT_KEY,
+			.data = (void *)&gpio_status_sleep,
+			.length = sizeof(gpio_status_sleep),
+		}
 	};
 
 	struct msm_rpm_kvp kvp_active[] = {
 		{
-		.key = RPM_GPIO_NUMB_KEY,
-		.data = (void *)&gpio_num,
-		.length = sizeof(gpio_num),
+			.key = RPM_GPIO_NUMB_KEY,
+			.data = (void *)&gpio_num,
+			.length = sizeof(gpio_num),
 		},
 		{
-		.key = RPM_GPIO_STAT_KEY,
-		.data = (void *)&gpio_status_active,
-		.length = sizeof(gpio_status_active),
+			.key = RPM_GPIO_STAT_KEY,
+			.data = (void *)&gpio_status_active,
+			.length = sizeof(gpio_status_active),
 		},
 		{
-		.key = RPM_GPIO_SETT_KEY,
-		.data = (void *)&settling_time,
-		.length = sizeof(settling_time),
+			.key = RPM_GPIO_SETT_KEY,
+			.data = (void *)&settling_time,
+			.length = sizeof(settling_time),
 		},
 	};
 
+	rc = msm_rpm_send_message(MSM_RPM_CTX_ACTIVE_SET,
+		RPM_REQUEST_TYPE_GPIO, RPM_GPIO_RESOURCE_ID, kvp_active,
+							ARRAY_SIZE(kvp_active));
+	WARN(rc < 0, "RPM GPIO toggling (active set) did not enable!\n");
+
 	rc = msm_rpm_send_message(MSM_RPM_CTX_SLEEP_SET,
-		RPM_REQUEST_TYPE_GPIO, RPM_GPIO_RESOURCE_ID, kvp_sleep, 3);
+		RPM_REQUEST_TYPE_GPIO, RPM_GPIO_RESOURCE_ID, kvp_sleep,
+							ARRAY_SIZE(kvp_sleep));
 	WARN(rc < 0, "RPM GPIO toggling (sleep set) did not enable!\n");
 
-	rc = msm_rpm_send_message(MSM_RPM_CTX_ACTIVE_SET,
-		RPM_REQUEST_TYPE_GPIO, RPM_GPIO_RESOURCE_ID, kvp_active, 3);
-	WARN(rc < 0, "RPM GPIO toggling (active set) did not enable!\n");
+	return rc;
 }
 
 static int msm_ext_buck_probe(struct platform_device *pdev)
 {
 	char *key = NULL;
-	static bool ext_buck;
+	int gpio_num;
+	int settling_time;
+	int ret = 0;
 
-	key = "qcom,ext-buck";
-	ext_buck = of_property_read_bool(pdev->dev.of_node, key);
-	if (ext_buck) {
-		int gpio_num;
-		int settling_time;
-
-		key = "qcom,gpio-num";
-		of_property_read_u32(pdev->dev.of_node, key,
-							&gpio_num);
-
-		key = "qcom,sett-time";
-		of_property_read_u32(pdev->dev.of_node, key,
-						&settling_time);
-
-		msm_send_ext_buck_votes(gpio_num, settling_time);
+	key = "qcom,gpio-num";
+	ret = of_property_read_u32(pdev->dev.of_node, key, &gpio_num);
+	if (ret) {
+		pr_debug("%s: Cannot read %s from dt", __func__, key);
+		return ret;
 	}
 
-	return 0;
+	key = "qcom,settling-time";
+	ret = of_property_read_u32(pdev->dev.of_node, key,
+					&settling_time);
+	if (ret) {
+		pr_debug("%s: Cannot read %s from dt", __func__, key);
+		return ret;
+	}
+
+	ret = msm_send_ext_buck_votes(gpio_num, settling_time);
+
+	return ret;
 }
 
 static struct of_device_id msm_ext_buck_table[] = {
@@ -121,4 +116,4 @@ static int __init msm_ext_buck_init(void)
 {
 	return platform_driver_register(&msm_ext_buck_driver);
 }
-device_initcall(msm_ext_buck_init);
+late_initcall(msm_ext_buck_init);

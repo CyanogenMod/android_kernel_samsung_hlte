@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -180,6 +180,7 @@ struct cpr_regulator {
 	int			vdd_mx_vmax;
 	int			vdd_mx_vmin_method;
 	int			vdd_mx_vmin;
+	int			vdd_mx_corner_map[CPR_FUSE_CORNER_MAX];
 
 	/* CPR parameters */
 	u64		cpr_fuse_bits;
@@ -223,7 +224,6 @@ struct cpr_regulator {
 	int		*corner_map;
 	u32		num_corners;
 	int		*quot_adjust;
-	u32		quotient_adjustment;
 };
 
 #define CPR_DEBUG_MASK_IRQ	BIT(0)
@@ -501,6 +501,9 @@ static int cpr_mx_get(struct cpr_regulator *cpr_vreg, int corner, int apc_volt)
 	case VDD_MX_VMIN_MX_VMAX:
 		vdd_mx = cpr_vreg->vdd_mx_vmax;
 		break;
+	case VDD_MX_VMIN_APC_CORNER_MAP:
+		vdd_mx = cpr_vreg->vdd_mx_corner_map[fuse_corner];
+		break;
 	default:
 		vdd_mx = 0;
 		break;
@@ -601,6 +604,10 @@ static void cpr_scale(struct cpr_regulator *cpr_vreg,
 					RBCPR_CTL_UP_THRESHOLD_SHIFT;
 			reg_val = reg_mask;
 			cpr_ctl_modify(cpr_vreg, reg_mask, reg_val);
+
+			/* Disable UP interrupt */
+			cpr_irq_set(cpr_vreg, CPR_INT_DEFAULT & ~CPR_INT_UP);
+
 			return;
 		}
 
@@ -696,6 +703,9 @@ static void cpr_scale(struct cpr_regulator *cpr_vreg,
 		reg_val = cpr_vreg->up_threshold <<
 				RBCPR_CTL_UP_THRESHOLD_SHIFT;
 		cpr_ctl_modify(cpr_vreg, reg_mask, reg_val);
+
+		/* Re-enable default interrupts */
+		cpr_irq_set(cpr_vreg, CPR_INT_DEFAULT);
 
 		/* Ack */
 		cpr_irq_clr_ack(cpr_vreg);
@@ -1088,7 +1098,7 @@ static int __devinit cpr_pvs_init(struct platform_device *pdev,
 	u64 efuse_bits;
 	int rc, process;
 	u32 pvs_fuse[4], pvs_fuse_redun_sel[5];
-	u32 init_v, quot_adjust;
+	u32 init_v;
 	bool redundant;
 	size_t pvs_bins;
 
@@ -1165,11 +1175,6 @@ static int __devinit cpr_pvs_init(struct platform_device *pdev,
 
 	cpr_vreg->process = process;
 
-	rc = of_property_read_u32(of_node,
-			"qcom,cpr-quotient-adjustment", &quot_adjust);
-	if (!rc)
-		cpr_vreg->quotient_adjustment = quot_adjust;
-
 	return 0;
 }
 
@@ -1233,11 +1238,23 @@ static int __devinit cpr_apc_init(struct platform_device *pdev,
 			pr_err("vdd-mx-vmin-method missing: rc=%d\n", rc);
 			return rc;
 		}
-		if (cpr_vreg->vdd_mx_vmin_method > VDD_MX_VMIN_MX_VMAX) {
+		if (cpr_vreg->vdd_mx_vmin_method > VDD_MX_VMIN_APC_CORNER_MAP) {
 			pr_err("Invalid vdd-mx-vmin-method(%d)\n",
 				cpr_vreg->vdd_mx_vmin_method);
 			return -EINVAL;
 		}
+
+		rc = of_property_read_u32_array(of_node,
+					"qcom,vdd-mx-corner-map",
+					&cpr_vreg->vdd_mx_corner_map[1],
+					CPR_FUSE_CORNER_MAX - 1);
+		if (rc && cpr_vreg->vdd_mx_vmin_method ==
+			VDD_MX_VMIN_APC_CORNER_MAP) {
+			pr_err("qcom,vdd-mx-corner-map missing: rc=%d\n",
+				rc);
+			return rc;
+		}
+
 	}
 
 	return 0;
@@ -1384,6 +1401,7 @@ static int __devinit cpr_init_cpr_efuse(struct platform_device *pdev,
 	int bp_ro_sel[CPR_FUSE_CORNER_MAX];
 	u32 ro_sel, val;
 	u64 fuse_bits, fuse_bits_2;
+	u32 quot_adjust[CPR_FUSE_CORNER_MAX];
 
 	rc = of_property_read_u32_array(of_node, "qcom,cpr-fuse-redun-sel",
 					cpr_fuse_redun_sel, 5);
@@ -1485,11 +1503,20 @@ static int __devinit cpr_init_cpr_efuse(struct platform_device *pdev,
 				& CPR_FUSE_RO_SEL_BITS_MASK;
 		val = (fuse_bits >> bp_target_quot[i])
 				& CPR_FUSE_TARGET_QUOT_BITS_MASK;
-		val += cpr_vreg->quotient_adjustment;
 		cpr_vreg->cpr_fuse_target_quot[i] = val;
 		cpr_vreg->cpr_fuse_ro_sel[i] = ro_sel;
 		pr_info("Corner[%d]: ro_sel = %d, target quot = %d\n",
 			i, ro_sel, val);
+	}
+
+	rc = of_property_read_u32_array(of_node, "qcom,cpr-quotient-adjustment",
+				&quot_adjust[1], CPR_FUSE_CORNER_MAX - 1);
+	if (!rc) {
+		for (i = CPR_FUSE_CORNER_SVS; i < CPR_FUSE_CORNER_MAX; i++) {
+			cpr_vreg->cpr_fuse_target_quot[i] += quot_adjust[i];
+			pr_info("Corner[%d]: adjusted target quot = %d\n",
+				i, cpr_vreg->cpr_fuse_target_quot[i]);
+		}
 	}
 
 	if (cpr_vreg->flags & FLAGS_UPLIFT_QUOT_VOLT) {
