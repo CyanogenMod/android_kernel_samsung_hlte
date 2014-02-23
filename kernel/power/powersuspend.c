@@ -213,7 +213,7 @@ static ssize_t power_suspend_mode_store(struct kobject *kobj,
 		default:
 			return -EINVAL;
 	}
-	
+
 }
 
 static struct kobj_attribute power_suspend_mode_attribute =
@@ -247,7 +247,8 @@ static struct attribute_group power_suspend_attr_group =
 
 static struct kobject *power_suspend_kobj;
 
-// ------------------ sysfs interface -----------------------
+// ------------------------------------------ sysfs interface ------------------------------------------
+
 static int __init power_suspend_init(void)
 {
 
@@ -275,7 +276,7 @@ static int __init power_suspend_init(void)
 		return -ENOMEM;
 	}
 
-	mode = POWER_SUSPEND_USERSPACE;
+	mode = POWER_SUSPEND_KERNEL; // Yank555.lu : Default to kernel mode
 
 	return 0;
 }
