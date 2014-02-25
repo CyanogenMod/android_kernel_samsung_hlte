@@ -644,7 +644,7 @@ static bool mdss_mdp_ctl_perf_bw_released(struct mdss_mdp_ctl *ctl)
 	} else if (ctl->perf_status <= 2) {
 		ctl->perf_status++;
 	} else {
-		pr_err("pervious commit was not done\n");
+		pr_debug("pervious commit was not done\n");
 	}
 
 	pr_debug("perf_status=%d\n", ctl->perf_status);
