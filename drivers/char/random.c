@@ -739,8 +739,6 @@ struct timer_rand_state {
 	unsigned dont_count_entropy:1;
 };
 
-#define INIT_TIMER_RAND_STATE { INITIAL_JIFFIES, };
-
 /*
  * Add device- or boot-specific data to the input and nonblocking
  * pools to help initialize them to unique values.
@@ -766,8 +764,6 @@ void add_device_randomness(const void *buf, unsigned int size)
 	spin_unlock_irqrestore(&nonblocking_pool.lock, flags);
 }
 EXPORT_SYMBOL(add_device_randomness);
-
-static struct timer_rand_state input_timer_state = INIT_TIMER_RAND_STATE;
 
 /*
  * This function adds entropy to the entropy "pool" by using timing
@@ -1284,10 +1280,8 @@ void rand_initialize_disk(struct gendisk *disk)
 	 * source.
 	 */
 	state = kzalloc(sizeof(struct timer_rand_state), GFP_KERNEL);
-	if (state) {
-		state->last_time = INITIAL_JIFFIES;
+	if (state)
 		disk->random = state;
-	}
 }
 #endif
 
