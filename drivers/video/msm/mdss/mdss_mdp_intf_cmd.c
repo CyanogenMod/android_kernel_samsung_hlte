@@ -219,14 +219,8 @@ static inline void mdss_mdp_cmd_clk_on(struct mdss_mdp_cmd_ctx *ctx)
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 	int rc;
 	mutex_lock(&ctx->clk_mtx);
-<<<<<<< HEAD
-#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
-	xlog(__func__, ctx->panel_ndx, ctx->koff_cnt, ctx->clk_enabled, ctx->rdptr_enabled, 0, 0);
-#endif
-=======
 	MDSS_XLOG(ctx->pp_num, ctx->koff_cnt, ctx->clk_enabled,
 						ctx->rdptr_enabled);
->>>>>>> 97206e0... msm: mdss: add real time debug log
 	if (!ctx->clk_enabled) {
 		ctx->clk_enabled = 1;
 
@@ -253,14 +247,8 @@ static inline void mdss_mdp_cmd_clk_off(struct mdss_mdp_cmd_ctx *ctx)
 	int set_clk_off = 0;
 
 	mutex_lock(&ctx->clk_mtx);
-<<<<<<< HEAD
-#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
-	xlog(__func__,ctx->panel_ndx, ctx->koff_cnt, ctx->clk_enabled, ctx->rdptr_enabled, 0, 0);
-#endif
-=======
 	MDSS_XLOG(ctx->pp_num, ctx->koff_cnt, ctx->clk_enabled,
 						ctx->rdptr_enabled);
->>>>>>> 97206e0... msm: mdss: add real time debug log
 	spin_lock_irqsave(&ctx->clk_lock, flags);
 	if (!ctx->rdptr_enabled)
 		set_clk_off = 1;
@@ -318,8 +306,6 @@ static void mdss_mdp_cmd_readptr_done(void *arg)
 		}
 	}
 #endif
-
-	mdss_mdp_ctl_perf_taken(ctl);
 
 	vsync_time = ktime_get();
 	ctl->vsync_cnt++;
@@ -401,7 +387,8 @@ static void mdss_mdp_cmd_pingpong_done(void *arg)
 		return;
 	}
 
-	mdss_mdp_ctl_perf_done(ctl);
+	mdss_mdp_ctl_perf_set_transaction_status(ctl,
+		PERF_HW_MDP_STATE, PERF_STATUS_DONE);
 
 	spin_lock(&ctx->clk_lock);
 	list_for_each_entry(tmp, &ctx->vsync_handlers, list) {
@@ -411,14 +398,8 @@ static void mdss_mdp_cmd_pingpong_done(void *arg)
 	mdss_mdp_irq_disable_nosync(MDSS_MDP_IRQ_PING_PONG_COMP, ctx->pp_num);
 
 	complete_all(&ctx->pp_comp);
-<<<<<<< HEAD
-#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
-	xlog(__func__, ctl->num, ctx->koff_cnt, ctx->clk_enabled, ctx->rdptr_enabled, 0, 0);
-#endif
-=======
 	MDSS_XLOG(ctl->num, ctx->koff_cnt, ctx->clk_enabled,
 					ctx->rdptr_enabled);
->>>>>>> 97206e0... msm: mdss: add real time debug log
 
 	if (ctx->koff_cnt) {
 		atomic_inc(&ctx->pp_done_cnt);
@@ -477,14 +458,8 @@ static int mdss_mdp_cmd_add_vsync_handler(struct mdss_mdp_ctl *ctl,
 		return -ENODEV;
 	}
 
-<<<<<<< HEAD
-#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
-	xlog(__func__, ctl->num, ctx->koff_cnt, ctx->clk_enabled, ctx->rdptr_enabled, 0, 0);
-#endif
-=======
 	MDSS_XLOG(ctl->num, ctx->koff_cnt, ctx->clk_enabled,
 					ctx->rdptr_enabled);
->>>>>>> 97206e0... msm: mdss: add real time debug log
 
 	spin_lock_irqsave(&ctx->clk_lock, flags);
 	if (!handle->enabled) {
@@ -596,11 +571,6 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 	if (ctx->koff_cnt > 0)
 		need_wait = 1;
 	spin_unlock_irqrestore(&ctx->clk_lock, flags);
-<<<<<<< HEAD
-#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
-	xlog(__func__, ctl->num, ctx->koff_cnt, ctx->clk_enabled, ctx->rdptr_enabled, 0, 0);
-#endif
-=======
 
 	ctl->roi_bkup.w = ctl->width;
 	ctl->roi_bkup.h = ctl->height;
@@ -609,7 +579,6 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 			ctx->rdptr_enabled, ctl->roi_bkup.w,
 			ctl->roi_bkup.h);
 
->>>>>>> 97206e0... msm: mdss: add real time debug log
 	pr_debug("%s: need_wait=%d  intf_num=%d ctx=%p\n",
 			__func__, need_wait, ctl->intf_num, ctx);
 
@@ -620,19 +589,9 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 		if (rc <= 0) {
 			WARN(1, "cmd kickoff timed out (rc = %d) ctl=%d\n",
 						rc, ctl->num);
-<<<<<<< HEAD
-#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
-			dumpreg();
-			mdp5_dump_regs();
-			mdss_mdp_debug_bus();
-			xlog_dump();
-			panic("Pingpong Timeout");
-#endif
-=======
 			mdss_dsi_debug_check_te(pdata);
 			MDSS_XLOG_TOUT_HANDLER("mdp", "dsi0", "dsi1",
 						"edp", "hdmi", "panic");
->>>>>>> 97206e0... msm: mdss: add real time debug log
 			rc = -EPERM;
 			mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_TIMEOUT);
 		} else {
@@ -676,7 +635,8 @@ int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 		return -ENODEV;
 	}
 
-	pr_debug("%s:+\n", __func__);
+	mdss_mdp_ctl_perf_set_transaction_status(ctl,
+		PERF_HW_MDP_STATE, PERF_STATUS_BUSY);
 
 	if (ctx->panel_on == 0) {
 		rc = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_UNBLANK, NULL);
@@ -719,6 +679,8 @@ int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 	INIT_COMPLETION(ctx->pp_comp);
 	mdss_mdp_irq_enable(MDSS_MDP_IRQ_PING_PONG_COMP, ctx->pp_num);
 	mdss_mdp_ctl_write(ctl, MDSS_MDP_REG_CTL_START, 1);
+	mdss_mdp_ctl_perf_set_transaction_status(ctl,
+		PERF_SW_COMMIT_STATE, PERF_STATUS_DONE);
 	mb();
 	MDSS_XLOG(ctl->num,  ctx->koff_cnt, ctx->clk_enabled,
 						ctx->rdptr_enabled);
@@ -819,15 +781,9 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl)
 	ctl->wait_pingpong = NULL;
 	ctl->add_vsync_handler = NULL;
 	ctl->remove_vsync_handler = NULL;
-<<<<<<< HEAD
-#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
-	xlog(__func__, ctl->num, ctx->koff_cnt, ctx->clk_enabled, ctx->rdptr_enabled, 0, 0x222222);
-#endif
-=======
 
 	MDSS_XLOG(ctl->num, ctx->koff_cnt, ctx->clk_enabled,
 				ctx->rdptr_enabled, XLOG_FUNC_EXIT);
->>>>>>> 97206e0... msm: mdss: add real time debug log
 	pr_debug("%s:-\n", __func__);
 
 	return 0;
@@ -885,17 +841,8 @@ int mdss_mdp_cmd_start(struct mdss_mdp_ctl *ctl)
 
 	pr_debug("%s: ctx=%p num=%d mixer=%d\n", __func__,
 				ctx, ctx->pp_num, mixer->num);
-<<<<<<< HEAD
-#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
-	xlog(__func__, ctl->num, ctx->koff_cnt, ctx->clk_enabled, ctx->rdptr_enabled, 0, 0);
-#endif
-=======
 	MDSS_XLOG(ctl->num, ctx->koff_cnt, ctx->clk_enabled,
 					ctx->rdptr_enabled);
-
-	mdss_mdp_set_intr_callback(MDSS_MDP_IRQ_PING_PONG_RD_PTR, ctx->pp_num,
-				   mdss_mdp_cmd_readptr_done, ctl);
->>>>>>> 97206e0... msm: mdss: add real time debug log
 
 	mdss_mdp_set_intr_callback(MDSS_MDP_IRQ_PING_PONG_COMP, ctx->pp_num,
 				   mdss_mdp_cmd_pingpong_done, ctl);
