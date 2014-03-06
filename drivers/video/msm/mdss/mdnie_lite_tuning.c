@@ -451,6 +451,14 @@ void mDNIe_Set_Mode(void)
 
 }
 
+//gm
+void mdnie_toggle_negative(void)
+{
+	mdnie_tun_state.accessibility = !mdnie_tun_state.accessibility;
+
+	mDNIe_Set_Mode();
+}
+
 void is_play_speed_1_5(int enable)
 {
 	play_speed_1_5 = enable;
