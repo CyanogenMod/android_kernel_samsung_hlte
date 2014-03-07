@@ -45,9 +45,6 @@
 #include <mach/socinfo.h>
 #include <mach/msm_smem.h>
 #include <linux/module.h>
-#ifdef CONFIG_ANDROID_PERSISTENT_RAM
-#include <linux/persistent_ram.h>
-#endif
 
 #include "board-dt.h"
 #include "clock.h"
@@ -91,24 +88,6 @@ extern int msm_show_resume_irq_mask;
 #ifdef CONFIG_SEC_THERMISTOR
 #include <mach/sec_thermistor.h>
 #include <mach/msm8974-thermistor.h>
-#endif
-
-#ifdef CONFIG_ANDROID_PERSISTENT_RAM
-/* CONFIG_SEC_DEBUG reserving memory for persistent RAM*/
-#define RAMCONSOLE_PHYS_ADDR 0x1FB00000
-static struct persistent_ram_descriptor per_ram_descs[] __initdata = {
-{
-	.name = "ram_console",
-	.size = SZ_1M,
-}
-};
-
-static struct persistent_ram per_ram __initdata = {
-	.descs = per_ram_descs,
-	.num_descs = ARRAY_SIZE(per_ram_descs),
-	.start = RAMCONSOLE_PHYS_ADDR,
-	.size = SZ_1M
-};
 #endif
 
 extern int poweroff_charging;
@@ -346,9 +325,6 @@ void __init msm_8974_reserve(void)
 	reserve_info = &msm8974_reserve_info;
 	of_scan_flat_dt(dt_scan_for_memory_reserve, msm8974_reserve_table);
 	msm_reserve();
-#ifdef CONFIG_ANDROID_PERSISTENT_RAM
-	persistent_ram_early_init(&per_ram);
-#endif
 }
 
 static void __init msm8974_early_memory(void)
