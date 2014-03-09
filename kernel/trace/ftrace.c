@@ -233,11 +233,13 @@ static void ftrace_sync(struct work_struct *work)
 	 */
 }
 
+#if 0
 static void ftrace_sync_ipi(void *data)
 {
 	/* Probably not needed, but do it anyway */
 	smp_rmb();
 }
+#endif
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 static void update_function_graph_func(void);
