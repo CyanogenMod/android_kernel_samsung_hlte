@@ -925,6 +925,8 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 		}
 		break;
 	}
+	/* Notify listeners */
+	sysfs_notify(&mfd->fbi->dev->kobj, NULL, "show_blank_event");
 
 	pr_info("MDSS_FB_%s -- \n", blank_mode?"BLANK":"UNBLANK");
 
