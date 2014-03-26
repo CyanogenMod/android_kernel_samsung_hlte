@@ -18,7 +18,7 @@ mdss-mdp-objs += mdss_mdp_wb.o
 obj-$(CONFIG_FB_MSM_MDSS) += mdss-mdp.o
 
 ifeq ($(CONFIG_FB_MSM_MDSS),y)
-obj-$(CONFIG_DEBUG_FS) += mdss_debug.o
+obj-$(CONFIG_DEBUG_FS) += mdss_debug.o mdss_debug_xlog.o
 endif
 
 ifeq ($(CONFIG_FB_MSM_MDSS_DSI_DBG),y)
