@@ -55,6 +55,9 @@
 #include "mdss_panel.h"
 #include "mdss_debug.h"
 
+#define CREATE_TRACE_POINTS
+#include "mdss_mdp_trace.h"
+
 struct mdss_data_type *mdss_res;
 static int mdp_clk_cnt;
 
