@@ -241,6 +241,9 @@ struct msm_fb_data_type {
 	u32 dcm_state;
 	struct list_head proc_list;
 
+	struct ion_client *fb_ion_client;
+	struct ion_handle *fb_ion_handle;
+
 	u32 wait_for_kickoff;
 };
 
@@ -298,6 +301,7 @@ int mdss_fb_register_mdp_instance(struct msm_mdp_interface *mdp);
 #if defined(CONFIG_MDNIE_TFT_MSM8X26)
 void mdss_negative_color(int is_negative_on);
 #endif
+int mdss_fb_alloc_fb_ion_memory(struct msm_fb_data_type *mfd);
 int mdss_fb_dcm(struct msm_fb_data_type *mfd, int req_state);
 int mdss_fb_suspres_panel(struct device *dev, void *data);
 #endif /* MDSS_FB_H */
