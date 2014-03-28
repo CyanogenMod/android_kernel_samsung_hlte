@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,14 +16,12 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		qcom,ion-heap@16 { /* Camera*/
-			compatible = "qcom,msm-ion-reserve";
-			reg = <16>;
-			qcom,heap-align = <0x1000>;
-			qcom,memory-reservation-type = "EBI1"; /* reserve EBI memory */
-			qcom,memory-reservation-size = <0x1E00000>;
-			qcom,ion-heap-type = "CARVEOUT";
-		};
+                qcom,ion-heap@16 { /* Camera*/
+                        compatible = "qcom,msm-ion-reserve";
+                        reg = <16>;
+                        linux,contiguous-region = <&camera_mem>;
+                        qcom,ion-heap-type = "DMA";
+                };
 
 		qcom,ion-heap@25 {
 			reg = <25>;
@@ -62,18 +60,15 @@
 		qcom,ion-heap@28 { /* AUDIO HEAP */
 			compatible = "qcom,msm-ion-reserve";
 			reg = <28>;
-			qcom,heap-align = <0x1000>;
-			qcom,memory-reservation-type = "EBI1"; /* reserve EBI memory */
-			qcom,memory-reservation-size = <0x614000>;
-			qcom,ion-heap-type = "CARVEOUT";
+			linux,contiguous-region = <&audio_mem>;
+			qcom,ion-heap-type = "DMA";
 		};
 
 		qcom,ion-heap@23 { /* OTHER PIL HEAP */
 			compatible = "qcom,msm-ion-reserve";
 			reg = <23>;
-			qcom,heap-align = <0x1000>;
-			qcom,memory-fixed = <0x0F500000 0x500000>;
-			qcom,ion-heap-type = "CARVEOUT";
+			linux,contiguous-region = <&peripheral_mem>;
+			qcom,ion-heap-type = "DMA";
 		};
 	};
 };

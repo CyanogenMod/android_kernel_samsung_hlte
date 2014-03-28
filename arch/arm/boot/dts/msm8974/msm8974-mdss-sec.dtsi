@@ -93,9 +93,7 @@
 		mdss_fb0: qcom,mdss_fb_primary {
 			cell-index = <0>;
 			compatible = "qcom,mdss-fb";
-			qcom,memory-reservation-type = "EBI1";
-			qcom,memory-reservation-size = <0x0000000>;	/* 0 MB allocaed for fb0 */
-			qcom,memory-alt-reservation-size = <0x1F40000>;	 /* Framebuffer reservation only for LPM or recovery boot mode */
+			linux,contiguous-region = <&fb_mem>;
 		};
 
 		mdss_fb1: qcom,mdss_fb_external {
