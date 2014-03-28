@@ -71,21 +71,48 @@
 
 	memory {
 		secure_mem: secure_region {
-			linux,contiguous-region;
+			linux,reserve-contiguous-region;
 			reg = <0 0xFC00000>;
 			label = "secure_mem";
 		};
 
 		adsp_mem: adsp_region {
-			linux,contiguous-region;
+			linux,reserve-contiguous-region;
 			reg = <0 0x3F00000>;
 			label = "adsp_mem";
 		};
 
 		qsecom_mem: qsecom_region {
-			linux,contiguous-region;
+			linux,reserve-contiguous-region;
 			reg = <0 0x1100000>;
 			label = "qseecom_mem";
+		};
+
+		fb_mem: fb_region {
+			linux,reserve-contiguous-region;
+			reg = <0 0x800000>;
+			label = "fb_mem";
+		};
+
+		audio_mem: audio_region {
+			linux,reserve-contiguous-region;
+			linux,reserve-region;
+			reg = <0 0x614000>;
+			label = "audio_mem";
+		};
+
+		peripheral_mem: peripheral_region@5d00000 {
+			linux,reserve-contiguous-region;
+			linux,reserve-region;
+			linux,remove-completely;
+			reg = <0x6c00000 0xa600000>;
+			label = "peripheral_mem";
+		};
+
+		camera_mem: camera_region {
+			linux,reserve-contiguous-region;
+			reg = <0 0x1E00000>;
+			label = "camera_mem";
 		};
 
 	};
@@ -214,7 +241,7 @@
 		interrupts = <0 44 0>;
 		vdd-supply = <&gdsc_venus>;
 		qcom,hfi = "venus";
-		qcom,has-ocmem;
+		qcom,ocmem-size = <524288>; /* 512 * 1024 */
 		qcom,max-hw-load = <1216800>; /* 3840 x 2160 @ 30 + 1080p @ 30*/
 	};
 
@@ -1812,23 +1839,23 @@
 		compatible = "qcom,msm-audio-ion";
 	};
 
-	qti,msm-pcm {
-		compatible = "qti,msm-pcm-dsp";
-		qti,msm-pcm-dsp-id = <0>;
+	qcom,msm-pcm {
+		compatible = "qcom,msm-pcm-dsp";
+		qcom,msm-pcm-dsp-id = <0>;
 	};
 
-	qti,msm-pcm-low-latency {
-		compatible = "qti,msm-pcm-dsp";
-		qti,msm-pcm-dsp-id = <1>;
-		qti,msm-pcm-low-latency;
-		qti,latency-level = "regular";
+	qcom,msm-pcm-low-latency {
+		compatible = "qcom,msm-pcm-dsp";
+		qcom,msm-pcm-dsp-id = <1>;
+		qcom,msm-pcm-low-latency;
+		qcom,latency-level = "regular";
 	};
 
-	qti,msm-pcm-jack-low-latency {
-		compatible = "qti,msm-pcm-dsp";
-		qti,msm-pcm-dsp-id = <2>;
-		qti,msm-pcm-low-latency;
-		qti,latency-level = "regular";
+	qcom,msm-pcm-jack-low-latency {
+		compatible = "qcom,msm-pcm-dsp";
+		qcom,msm-pcm-dsp-id = <2>;
+		qcom,msm-pcm-low-latency;
+		qcom,latency-level = "regular";
 	};
 
 	qcom,msm-pcm-routing {
@@ -1876,8 +1903,8 @@
 		compatible = "qcom,msm-lsm-client";
 	};
 
-	qti,msm-pcm-loopback {
-		compatible = "qti,msm-pcm-loopback";
+	qcom,msm-pcm-loopback {
+		compatible = "qcom,msm-pcm-loopback";
 	};
 
 	qcom,msm-dai-q6 {
@@ -2269,8 +2296,7 @@
 
 	qcom,msm-rtb {
 		compatible = "qcom,msm-rtb";
-		qcom,memory-reservation-type = "EBI1";
-		qcom,memory-reservation-size = <0x100000>; /* 1M EBI1 buffer */
+		qcom,rtb-size = <0x100000>; /* 1M EBI1 buffer */
 	};
 
 	qcom,msm-contig-mem {
@@ -2411,11 +2437,6 @@
 		reg = <0xfc834000 0x7000>;
 		interrupts = <0 29 1>;
 		qcom,rx-ring-size = <64>;
-	};
-
-	memory_hole: qcom,msm-mem-hole {
-		compatible = "qcom,msm-mem-hole";
-		qcom,memblock-remove = <0x6c00000 0xa600000>; /* Address and Size of Hole */
 	};
 
 	ram_console {
