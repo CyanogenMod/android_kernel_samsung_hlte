@@ -42,7 +42,9 @@ static int ssp_push_17bytes_buffer(struct iio_dev *indio_dev,
 		memcpy(buf + 4 * i, &q[i], sizeof(q[i]));
 	buf[16] = (u8)q[5];
 	memcpy(buf + 17, &t, sizeof(t));
+	mutex_lock(&indio_dev->mlock);
 	iio_push_to_buffer(indio_dev->buffer, buf, 0);
+	mutex_unlock(&indio_dev->mlock);
 
 	return 0;
 }
@@ -56,7 +58,9 @@ static int ssp_push_12bytes_buffer(struct iio_dev *indio_dev, u64 t,
 	for (i = 0; i < 3; i++)
 		memcpy(buf + 4 * i, &q[i], sizeof(q[i]));
 	memcpy(buf + 12, &t, sizeof(t));
+	mutex_lock(&indio_dev->mlock);
 	iio_push_to_buffer(indio_dev->buffer, buf, 0);
+	mutex_unlock(&indio_dev->mlock);
 
 	return 0;
 }
@@ -71,7 +75,9 @@ static int ssp_push_6bytes_buffer(struct iio_dev *indio_dev,
 		memcpy(buf + i * 2, &d[i], sizeof(d[i]));
 
 	memcpy(buf + 6, &t, sizeof(t));
+	mutex_lock(&indio_dev->mlock);
 	iio_push_to_buffer(indio_dev->buffer, buf, 0);
+	mutex_unlock(&indio_dev->mlock);
 
 	return 0;
 }
@@ -83,7 +89,9 @@ static int ssp_push_1bytes_buffer(struct iio_dev *indio_dev,
 
 	memcpy(buf, d, sizeof(u8));
 	memcpy(buf + 1, &t, sizeof(t));
+	mutex_lock(&indio_dev->mlock);
 	iio_push_to_buffer(indio_dev->buffer, buf, 0);
+	mutex_unlock(&indio_dev->mlock);
 
 	return 0;
 }

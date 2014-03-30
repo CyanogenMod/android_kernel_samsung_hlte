@@ -166,7 +166,6 @@ invalid_option:
 static struct dentry *sdcardfs_d_alloc_root(struct super_block *sb)
 {
 	struct dentry *ret = NULL;
-	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(sb);
 
 	if (sb) {
 		static const struct qstr name = {
@@ -176,11 +175,7 @@ static struct dentry *sdcardfs_d_alloc_root(struct super_block *sb)
 
 		ret = __d_alloc(sb, &name);
 		if (ret) {
-			if (sbi->options.lower_fs == LOWER_FS_EXT4) {
-				d_set_d_op(ret, &sdcardfs_ci_dops);
-			} else if (sbi->options.lower_fs == LOWER_FS_FAT) {
-				d_set_d_op(ret, &sdcardfs_dops);
-			}
+			d_set_d_op(ret, &sdcardfs_ci_dops);
 			ret->d_parent = ret;
 		}
 	}
