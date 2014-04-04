@@ -217,7 +217,6 @@ int mdss_register_irq(struct mdss_hw *hw);
 void mdss_enable_irq(struct mdss_hw *hw);
 void mdss_disable_irq(struct mdss_hw *hw);
 void mdss_disable_irq_nosync(struct mdss_hw *hw);
-void mdss_bus_bandwidth_ctrl(int enable);
 void mdss_mdp_dump_power_clk(void);
 
 #if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
@@ -231,6 +230,7 @@ void mdss_dbg_tick_save(int op_name);
 #endif
 
 int mdss_bus_scale_set_quota(int client, u64 ab_quota, u64 ib_quota);
+int mdss_bus_bandwidth_ctrl(int enable);
 
 static inline struct ion_client *mdss_get_ionclient(void)
 {

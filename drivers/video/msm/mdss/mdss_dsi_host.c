@@ -1452,6 +1452,11 @@ void mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp)
 	 * fetch dcs commands from axi bus
 	 */
 	mdss_bus_scale_set_quota(MDSS_HW_DSI0, SZ_1M, SZ_1M);
+	ret = mdss_bus_bandwidth_ctrl(1);
+	if (ret) {
+		pr_err("bus bandwidth request failed ret=%d\n", ret);
+		goto need_lock;
+	}
 
 #if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
 	xlog(__func__,ctrl->ndx, from_mdp, 0, 0, 0, current->pid);
