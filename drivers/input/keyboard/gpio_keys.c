@@ -568,6 +568,8 @@ static void flip_cover_work(struct work_struct *work)
 	}
 }
 #else // CONFIG_SEC_FACTORY
+static struct input_dev *powerkey_device;
+
 static void flip_cover_work(struct work_struct *work)
 {
 	struct gpio_keys_drvdata *ddata =
@@ -581,6 +583,25 @@ static void flip_cover_work(struct work_struct *work)
 	input_report_switch(ddata->input,
 		SW_FLIP, ddata->flip_cover);
 	input_sync(ddata->input);
+
+	if (ddata->flip_cover == 0 && !suspended) {
+		pr_info("%s: flip cover closed. Going to sleep ...\n", __func__);
+	        input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
+	        input_event(powerkey_device, EV_SYN, 0, 0);
+	        msleep(100);
+
+	        input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
+	        input_event(powerkey_device, EV_SYN, 0, 0);
+	}
+	if (ddata->flip_cover == 1 && suspended) {
+		pr_info("%s: flip cover opened. Waking up ...\n", __func__);
+	        input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
+	        input_event(powerkey_device, EV_SYN, 0, 0);
+	        msleep(500);
+
+	        input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
+	        input_event(powerkey_device, EV_SYN, 0, 0);
+	}
 }
 #endif // CONFIG_SEC_FACTORY
 
@@ -1124,6 +1145,12 @@ static struct platform_driver gpio_keys_device_driver = {
 
 static int __init gpio_keys_init(void)
 {
+	powerkey_device = input_allocate_device();
+	input_set_capability(powerkey_device, EV_KEY, KEY_POWER);
+	powerkey_device->name = "flip_powerkey";
+	powerkey_device->phys = "flip_powerkey/input0";
+	if(!input_register_device(powerkey_device))
+		pr_info("%s: failed to register flip_powerkey\n", __func__);
 	return platform_driver_register(&gpio_keys_device_driver);
 }
 
