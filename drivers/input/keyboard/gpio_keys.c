@@ -1201,14 +1201,17 @@ static struct platform_driver gpio_keys_device_driver = {
 
 static int __init gpio_keys_init(void)
 {
-        register_power_suspend(&gpio_suspend);
+	int ret = platform_driver_register(&gpio_keys_device_driver);
+
+	register_power_suspend(&gpio_suspend);
 	powerkey_device = input_allocate_device();
 	input_set_capability(powerkey_device, EV_KEY, KEY_POWER);
 	powerkey_device->name = "flip_powerkey";
 	powerkey_device->phys = "flip_powerkey/input0";
 	if(!input_register_device(powerkey_device))
 		pr_info("%s: failed to register flip_powerkey\n", __func__);
-	return platform_driver_register(&gpio_keys_device_driver);
+
+	return ret;
 }
 
 static void __exit gpio_keys_exit(void)
