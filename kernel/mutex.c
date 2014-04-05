@@ -37,10 +37,15 @@
 #endif
 
 /*
- * A negative mutex count indicates that waiters are sleeping waiting for the
- * mutex.
+ * A mutex count of -1 indicates that waiters are sleeping waiting for the
+ * mutex. Some architectures can allow any negative number, not just -1, for
+ * this purpose.
  */
+#ifdef __ARCH_ALLOW_ANY_NEGATIVE_MUTEX_COUNT
 #define	MUTEX_SHOW_NO_WAITER(mutex)	(atomic_read(&(mutex)->count) >= 0)
+#else
+#define	MUTEX_SHOW_NO_WAITER(mutex)	(atomic_read(&(mutex)->count) != -1)
+#endif
 
 void
 __mutex_init(struct mutex *lock, const char *name, struct lock_class_key *key)
