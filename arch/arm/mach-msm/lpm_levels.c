@@ -1124,10 +1124,6 @@ static int lpm_probe(struct platform_device *pdev)
 	get_cpu();
 	on_each_cpu(setup_broadcast_timer, (void *)true, 1);
 	put_cpu();
-	if (num_online_cpus() == 1)
-		allowed_l2_mode = MSM_SPM_L2_MODE_POWER_COLLAPSE;
-	else
-		allowed_l2_mode = default_l2_mode;
 
 	register_hotcpu_notifier(&lpm_cpu_nblk);
 
