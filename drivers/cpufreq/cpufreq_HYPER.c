@@ -640,8 +640,8 @@ static ssize_t store_freq_responsiveness(struct kobject *a, struct attribute *b,
 	if (ret != 1)
 		return -EINVAL;
 
-	if (input > 2496000)
-		input = 2496000;
+	if (input > 2726400)
+		input = 2726400;
 
 	if (input < 300000)
 		input = 300000;
