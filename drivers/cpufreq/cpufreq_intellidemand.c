@@ -41,7 +41,7 @@
  * It helps to keep variable names smaller, simpler
  */
 
-#define DEF_SAMPLING_RATE                        (50000)
+#define DEF_SAMPLING_RATE                        (40000)
 #define DEF_FREQUENCY_DOWN_DIFFERENTIAL                (10)
 #define DEF_FREQUENCY_UP_THRESHOLD                (60)
 #define DEF_SAMPLING_DOWN_FACTOR                (1)
