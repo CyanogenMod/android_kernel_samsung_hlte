@@ -183,18 +183,11 @@ static unsigned long highmem_dirtyable_memory(unsigned long total)
 	unsigned long x = 0;
 
 	for_each_node_state(node, N_HIGH_MEMORY) {
-		unsigned long nr_pages;
 		struct zone *z =
 			&NODE_DATA(node)->node_zones[ZONE_HIGHMEM];
 
-		nr_pages = zone_page_state(z, NR_FREE_PAGES) +
-		  zone_reclaimable_pages(z);
-		/*
-		 * make sure that the number of pages for this node
-		 * is never "negative".
-		 */
-		nr_pages -= min(nr_pages, z->dirty_balance_reserve);
-		x += nr_pages;
+		x += zone_page_state(z, NR_FREE_PAGES) +
+		     zone_reclaimable_pages(z) - z->dirty_balance_reserve;
 	}
 	/*
 	 * Unreclaimable memory (kernel memory or anonymous memory
@@ -234,7 +227,7 @@ unsigned long global_dirtyable_memory(void)
 	x -= min(x, dirty_balance_reserve);
 
 	if (!vm_highmem_is_dirtyable)
-		x -= min(x, highmem_dirtyable_memory(x));
+		x -= highmem_dirtyable_memory(x);
 
 	return x + 1;	/* Ensure that we never return 0 */
 }
@@ -1082,11 +1075,11 @@ static unsigned long dirty_poll_interval(unsigned long dirty,
 	return 1;
 }
 
-static unsigned long bdi_max_pause(struct backing_dev_info *bdi,
-				   unsigned long bdi_dirty)
+static long bdi_max_pause(struct backing_dev_info *bdi,
+			  unsigned long bdi_dirty)
 {
-	unsigned long bw = bdi->avg_write_bandwidth;
-	unsigned long t;
+	long bw = bdi->avg_write_bandwidth;
+	long t;
 
 	/*
 	 * Limit pause time for small memory systems. If sleeping for too long
@@ -1098,7 +1091,7 @@ static unsigned long bdi_max_pause(struct backing_dev_info *bdi,
 	t = bdi_dirty / (1 + bw / roundup_pow_of_two(1 + HZ / 8));
 	t++;
 
-	return min_t(unsigned long, t, MAX_PAUSE);
+	return min_t(long, t, MAX_PAUSE);
 }
 
 static long bdi_min_pause(struct backing_dev_info *bdi,
@@ -2003,12 +1996,11 @@ int __set_page_dirty_nobuffers(struct page *page)
 	if (!TestSetPageDirty(page)) {
 		struct address_space *mapping = page_mapping(page);
 		struct address_space *mapping2;
-		unsigned long flags;
 
 		if (!mapping)
 			return 1;
 
-		spin_lock_irqsave(&mapping->tree_lock, flags);
+		spin_lock_irq(&mapping->tree_lock);
 		mapping2 = page_mapping(page);
 		if (mapping2) { /* Race with truncate? */
 			BUG_ON(mapping2 != mapping);
@@ -2017,7 +2009,7 @@ int __set_page_dirty_nobuffers(struct page *page)
 			radix_tree_tag_set(&mapping->page_tree,
 				page_index(page), PAGECACHE_TAG_DIRTY);
 		}
-		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+		spin_unlock_irq(&mapping->tree_lock);
 		if (mapping->host) {
 			/* !PageAnon && !swapper_space */
 			__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
