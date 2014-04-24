@@ -631,8 +631,12 @@ static void flip_cover_work(struct work_struct *work)
 	struct gpio_keys_drvdata *ddata =
 		container_of(work, struct gpio_keys_drvdata,
 				flip_cover_dwork.work);
+	bool flip_cover_tmp = gpio_get_value(ddata->gpio_flip_cover);
 
-	ddata->flip_cover = gpio_get_value(ddata->gpio_flip_cover);
+	if (ddata->flip_cover == flip_cover_tmp)
+		return;
+
+	ddata->flip_cover = flip_cover_tmp;
 	printk(KERN_DEBUG "[keys] %s : %d\n",
 		__func__, ddata->flip_cover);
 
