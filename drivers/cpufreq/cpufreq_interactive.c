@@ -122,7 +122,7 @@ static u64 boostpulse_endtime;
  * Max additional time to wait in idle, beyond timer_rate, at speeds above
  * minimum before wakeup to reduce speed, or -1 if unnecessary.
  */
-#define DEFAULT_TIMER_SLACK (4 * DEFAULT_TIMER_RATE)
+#define DEFAULT_TIMER_SLACK (1 * DEFAULT_TIMER_RATE)
 static int timer_slack_val = DEFAULT_TIMER_SLACK;
 
 #define DEFAULT_SCREEN_OFF_MAX 2265600
@@ -136,9 +136,9 @@ static bool io_is_busy;
  * up_threshold_any_cpu_freq then do not let the frequency to drop below
  * sync_freq
  */
-static unsigned int up_threshold_any_cpu_load = 60;
+static unsigned int up_threshold_any_cpu_load = 50;
 static unsigned int sync_freq = 1036800;
-static unsigned int up_threshold_any_cpu_freq = 1728000;
+static unsigned int up_threshold_any_cpu_freq = 1190400;
 
 static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		unsigned int event);
