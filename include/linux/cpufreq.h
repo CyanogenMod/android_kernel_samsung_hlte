@@ -438,6 +438,9 @@ extern struct cpufreq_governor cpufreq_gov_ondemandplus;
 #elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_YANKDEMAND)
 extern struct cpufreq_governor cpufreq_gov_yankdemand;
 #define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_yankdemand)
+#elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_YANKACTIVE)
+extern struct cpufreq_governor cpufreq_gov_yankactive;
+#define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_yankactive)
 #endif
 
 
