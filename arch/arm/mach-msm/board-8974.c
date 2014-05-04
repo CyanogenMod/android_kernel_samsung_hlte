@@ -92,21 +92,38 @@ extern int msm_show_resume_irq_mask;
 
 #ifdef CONFIG_ANDROID_PERSISTENT_RAM
 /* CONFIG_SEC_DEBUG reserving memory for persistent RAM*/
-#define RAMCONSOLE_PHYS_ADDR 0x1FB00000
+#define PERSISTENT_RAM_BASE 0xbff00000
+#define PERSISTENT_RAM_SIZE SZ_1M
+#define RAM_CONSOLE_SIZE (124*SZ_1K * 2)
+
 static struct persistent_ram_descriptor per_ram_descs[] __initdata = {
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
 {
 	.name = "ram_console",
-	.size = SZ_1M,
+	.size = RAM_CONSOLE_SIZE,
 }
+#endif /* CONFIG_ANDROID_RAM_CONSOLE */
 };
 
 static struct persistent_ram per_ram __initdata = {
 	.descs = per_ram_descs,
 	.num_descs = ARRAY_SIZE(per_ram_descs),
-	.start = RAMCONSOLE_PHYS_ADDR,
-	.size = SZ_1M
+	.start = PERSISTENT_RAM_BASE,
+	.size = PERSISTENT_RAM_SIZE
 };
-#endif
+
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+static struct platform_device ram_console_device = {
+        .name = "ram_console",
+        .id = -1,
+};
+
+void __init add_ramconsole_devices(void)
+{
+    platform_device_register(&ram_console_device);
+}
+#endif /* CONFIG_ANDROID_RAM_CONSOLE */
+#endif /* CONFIG_ANDROID_PERSISTENT_RAM */
 
 extern int poweroff_charging;
 
@@ -469,6 +486,9 @@ void __init msm8974_init(void)
 	samsung_sys_class_init();
 	msm_8974_init_gpiomux();
 	regulator_has_full_constraints();
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+        add_ramconsole_devices();
+#endif
 	board_dt_populate(adata);
 	msm8974_add_drivers();
 
