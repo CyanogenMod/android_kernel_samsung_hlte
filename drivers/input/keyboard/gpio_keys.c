@@ -646,21 +646,21 @@ static void flip_cover_work(struct work_struct *work)
 
 	if (ddata->flip_cover == 0 && !suspended) {
 		pr_info("%s: flip cover closed. Going to sleep ...\n", __func__);
-	        input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
-	        input_event(powerkey_device, EV_SYN, 0, 0);
-	        msleep(100);
+		input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
+		input_event(powerkey_device, EV_SYN, 0, 0);
+		msleep(100);
 
-	        input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
-	        input_event(powerkey_device, EV_SYN, 0, 0);
+		input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
+		input_event(powerkey_device, EV_SYN, 0, 0);
 	}
 	if (ddata->flip_cover == 1 && suspended) {
 		pr_info("%s: flip cover opened. Waking up ...\n", __func__);
-	        input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
-	        input_event(powerkey_device, EV_SYN, 0, 0);
-	        msleep(500);
+		input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
+		input_event(powerkey_device, EV_SYN, 0, 0);
+		msleep(500);
 
-	        input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
-	        input_event(powerkey_device, EV_SYN, 0, 0);
+		input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
+		input_event(powerkey_device, EV_SYN, 0, 0);
 	}
 }
 #endif // CONFIG_SEC_FACTORY
