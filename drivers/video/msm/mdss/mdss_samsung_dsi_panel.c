@@ -25,6 +25,9 @@
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
+#ifdef CONFIG_POWERSUSPEND
+#include <linux/powersuspend.h>
+#endif
 #include "mdss_dsi.h"
 #include "mdss_samsung_dsi_panel.h"
 #include "mdss_fb.h"
@@ -2469,6 +2472,10 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	msd.dstat.on = 1;
 #endif
 
+#ifdef CONFIG_POWERSUSPEND
+	set_power_suspend_state_panel_hook(POWER_SUSPEND_INACTIVE);
+#endif
+
 	return 0;
 }
 
@@ -2505,6 +2512,10 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 
 #if defined(CONFIG_DUAL_LCD)
 	msd.lcd_panel_cmds = 0;
+#endif
+
+#ifdef CONFIG_POWERSUSPEND
+	set_power_suspend_state_panel_hook(POWER_SUSPEND_ACTIVE);
 #endif
 
 	return 0;
