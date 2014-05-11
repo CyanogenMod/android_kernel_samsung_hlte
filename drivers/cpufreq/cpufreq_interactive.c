@@ -638,9 +638,12 @@ static void cpufreq_interactive_idle_start(void)
 		return;
 	}
 
+	now = ktime_to_us(ktime_get());
 	pending = timer_pending(&pcpu->cpu_timer);
 
-	if (pcpu->target_freq != pcpu->policy->min) {
+	if (pcpu->target_freq > pcpu->policy->min ||
+	    (pcpu->target_freq == pcpu->policy->min &&
+	    now < boostpulse_endtime)) {
 		/*
 		 * Entering idle while not at lowest speed.  On some
 		 * platforms this can hold the other CPU(s) at that speed
@@ -652,7 +655,6 @@ static void cpufreq_interactive_idle_start(void)
 		if (!pending) {
 			cpufreq_interactive_timer_resched(pcpu);
 
-			now = ktime_to_us(ktime_get());
 			if ((pcpu->policy->cur == pcpu->policy->max) &&
 				(now - pcpu->hispeed_validate_time) >
 							MIN_BUSY_TIME) {
