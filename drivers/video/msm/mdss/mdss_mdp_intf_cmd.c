@@ -28,7 +28,7 @@
 /* wait for at most 2 vsync for lowest refresh rate (24hz) */
 #define KOFF_TIMEOUT msecs_to_jiffies(84)
 
-#define STOP_TIMEOUT msecs_to_jiffies(16 * (VSYNC_EXPIRE_TICK + 2))
+#define STOP_TIMEOUT(hz) msecs_to_jiffies((1000 / hz) * (VSYNC_EXPIRE_TICK + 2))
 /*
  * STOP_TIMEOUT need to wait for cmd stop depends on fps
  * if the command panel support 60fps the timeout value
@@ -701,6 +701,7 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl)
 	struct mdss_mdp_vsync_handler *tmp, *handle;
 	int need_wait = 0;
 	int ret = 0;
+	int hz;
 	u8 timeout_status = 0;
 
 	pr_debug("%s:+\n", __func__);
@@ -735,9 +736,11 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl)
 		if (pinfo->alpm_event)
 			timeout_status = wait_for_completion_timeout(&ctx->stop_comp,\
 							STOP_TIMEOUT_FOR_ALPM);
-		else
+		else {
+			hz = mdss_panel_get_framerate(&ctl->panel_data->panel_info);
 			timeout_status = wait_for_completion_timeout(&ctx->stop_comp,\
-							STOP_TIMEOUT);
+							STOP_TIMEOUT(hz));
+		}
 		if (timeout_status <= 0) {
 			WARN(1, "stop cmd time out\n");
 
