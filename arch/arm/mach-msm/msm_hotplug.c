@@ -26,7 +26,7 @@
 #include <linux/rq_stats.h>
 
 #define MSM_HOTPLUG		"msm_hotplug"
-#define HOTPLUG_ENABLED		1
+#define HOTPLUG_ENABLED		0
 #define DEFAULT_UPDATE_RATE	HZ / 10
 #define START_DELAY		HZ * 20
 #define MIN_INPUT_INTERVAL	150 * 1000L
