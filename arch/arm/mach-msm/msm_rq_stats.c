@@ -436,9 +436,9 @@ static int __init msm_rq_stats_init(void)
 		struct cpu_load_data *pcpu = &per_cpu(cpuload, i);
 		mutex_init(&pcpu->cpu_load_mutex);
 		cpufreq_get_policy(&cpu_policy, i);
-		pcpu->policy_max = cpu_policy.cpuinfo.max_freq;
+		pcpu->policy_max = cpu_policy.max;
 		if (cpu_online(i))
-			pcpu->cur_freq = cpufreq_quick_get(i);
+			pcpu->cur_freq = cpu_policy.cur;
 		cpumask_copy(pcpu->related_cpus, cpu_policy.cpus);
 	}
 	freq_transition.notifier_call = cpufreq_transition_handler;
