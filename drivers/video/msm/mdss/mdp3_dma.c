@@ -590,20 +590,13 @@ static int mdp3_dmap_update(struct mdp3_dma *dma, void *buf,
 {
 	unsigned long flag;
 	int cb_type = MDP3_DMA_CALLBACK_TYPE_VSYNC;
-	int rc = 0;
 
 	pr_debug("mdp3_dmap_update\n");
 
 	if (dma->output_config.out_sel == MDP3_DMA_OUTPUT_SEL_DSI_CMD) {
 		cb_type = MDP3_DMA_CALLBACK_TYPE_DMA_DONE;
-		if (intf->active) {
-			rc = wait_for_completion_timeout(&dma->dma_comp,
-				KOFF_TIMEOUT);
-			if (rc <= 0) {
-				WARN(1, "cmd kickoff timed out (%d)\n", rc);
-				rc = -1;
-			}
-		}
+		if (intf->active)
+			wait_for_completion_killable(&dma->dma_comp);
 	}
 	spin_lock_irqsave(&dma->dma_lock, flag);
 	MDP3_REG_WRITE(MDP3_REG_DMA_P_IBUF_ADDR, (u32)buf);
@@ -626,14 +619,10 @@ static int mdp3_dmap_update(struct mdp3_dma *dma, void *buf,
 
 	mdp3_dma_callback_enable(dma, cb_type);
 	pr_debug("mdp3_dmap_update wait for vsync_comp in\n");
-	if (dma->output_config.out_sel == MDP3_DMA_OUTPUT_SEL_DSI_VIDEO) {
-		rc = wait_for_completion_timeout(&dma->vsync_comp,
-			KOFF_TIMEOUT);
-		if (rc <= 0)
-			rc = -1;
-	}
+	if (dma->output_config.out_sel == MDP3_DMA_OUTPUT_SEL_DSI_VIDEO)
+		wait_for_completion_killable(&dma->vsync_comp);
 	pr_debug("mdp3_dmap_update wait for vsync_comp out\n");
-	return rc;
+	return 0;
 }
 
 static int mdp3_dmas_update(struct mdp3_dma *dma, void *buf,

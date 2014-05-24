@@ -1717,23 +1717,6 @@ static int mdp3_ctrl_ioctl_handler(struct msm_fb_data_type *mfd,
 	return rc;
 }
 
-int mdp3_wait_for_dma_done(struct mdp3_session_data *session)
-{
-	int rc = 0;
-
-	if (session->dma_active) {
-		rc = wait_for_completion_timeout(&session->dma_completion,
-			KOFF_TIMEOUT);
-		if (rc > 0) {
-			session->dma_active = 0;
-			rc = 0;
-		} else if (rc == 0) {
-			rc = -ETIME;
-		}
-	}
-	return rc;
-}
-
 int mdp3_ctrl_init(struct msm_fb_data_type *mfd)
 {
 	struct device *dev = mfd->fbi->dev;
@@ -1765,7 +1748,6 @@ int mdp3_ctrl_init(struct msm_fb_data_type *mfd)
 	memset(mdp3_session, 0, sizeof(struct mdp3_session_data));
 	mutex_init(&mdp3_session->lock);
 	INIT_WORK(&mdp3_session->clk_off_work, mdp3_dispatch_clk_off);
-	INIT_WORK(&mdp3_session->dma_done_work, mdp3_dispatch_dma_done);
 	atomic_set(&mdp3_session->vsync_countdown, 0);
 	mutex_init(&mdp3_session->histo_lock);
 	mdp3_session->dma = mdp3_get_dma_pipe(MDP3_DMA_CAP_ALL);
@@ -1808,9 +1790,6 @@ int mdp3_ctrl_init(struct msm_fb_data_type *mfd)
 	mdp3_session->vsync_timer.data = (u32)mdp3_session;
 	mdp3_session->vsync_period = 1000 / mfd->panel_info->mipi.frame_rate;
 	mfd->mdp.private1 = mdp3_session;
-	init_completion(&mdp3_session->dma_completion);
-	if (intf_type != MDP3_DMA_OUTPUT_SEL_DSI_VIDEO)
-		mdp3_session->wait_for_dma_done = mdp3_wait_for_dma_done;
 
 	rc = sysfs_create_group(&dev->kobj, &vsync_fs_attr_group);
 	if (rc) {
