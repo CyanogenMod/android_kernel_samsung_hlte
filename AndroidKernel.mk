@@ -3,6 +3,11 @@ PERL		= perl
 
 ifeq ($(TARGET_PREBUILT_KERNEL),)
 
+# If graphite is enabled, export it so the kernel knows about it, otherwise it could stay to android environment only
+ifeq ($(ENABLE_GRAPHITE),true)
+export ENABLE_GRAPHITE := true
+endif
+
 KERNEL_OUT := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ
 KERNEL_CONFIG := $(KERNEL_OUT)/.config
 ifeq ($(TARGET_KERNEL_APPEND_DTB), true)
