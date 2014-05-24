@@ -216,7 +216,6 @@ void mdss_disable_irq(struct mdss_hw *hw);
 void mdss_disable_irq_nosync(struct mdss_hw *hw);
 void mdss_bus_bandwidth_ctrl(int enable);
 void mdss_mdp_dump_power_clk(void);
-void mdss_mdp_underrun_dump_info(void);
 
 #if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
 int mdss_mdp_debug_bus(void);

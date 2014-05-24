@@ -3296,26 +3296,3 @@ void mdss_dbg_tick_save(int op_name)
 }
 
 #endif
-/*
- * [srcx,srcy,srcw,srch]->[dstx,dsty,dstw,dsth][flags]|src_format|bpp|pipe_ndx|
- * mdp_clk = %ld, bus_ab = %llu, bus_ib = %llu
- */
-void mdss_mdp_underrun_dump_info(void)
-{
-	struct mdss_mdp_pipe *pipe;
-
-	pr_info(" ============ dump_start ===========\n");
-	if (pipes_used_dbg)
-		list_for_each_entry(pipe, pipes_used_dbg, used_list) {
-			pr_info(" [%4d, %4d, %4d, %4d] -> [%4d, %4d, %4d, %4d]"
-					"|flags = %8d|src_format = %2d|bpp = %2d|ndx = %3d|\n",
-			pipe->src.x, pipe->src.y, pipe->src.w, pipe->src.h,
-			pipe->dst.x, pipe->dst.y, pipe->dst.w, pipe->dst.h,
-			pipe->flags, pipe->src_fmt->format, pipe->src_fmt->bpp,
-			pipe->ndx);
-			pr_info("pipe addr : %p\n", pipe);
-		}
-	mdss_mdp_underrun_clk_info();
-	pr_info(" ============ dump_end =========== \n");
-}
-
