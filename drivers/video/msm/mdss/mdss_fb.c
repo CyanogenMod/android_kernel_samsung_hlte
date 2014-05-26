@@ -870,6 +870,16 @@ static int mdss_fb_pm_resume(struct device *dev)
 		dev_dbg(dev, "Ignore Resume\n");
 		return 0;
 	}
+
+	/*
+	 * It is possible that the runtime status of the fb device may
+	 * have been active when the system was suspended. Reset the runtime
+	 * status to suspended state after a complete system resume.
+	 */
+	pm_runtime_disable(dev);
+	pm_runtime_set_suspended(dev);
+	pm_runtime_enable(dev);
+
 	return mdss_fb_resume_sub(mfd);
 }
 #endif
