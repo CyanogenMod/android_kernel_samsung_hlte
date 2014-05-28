@@ -327,10 +327,10 @@ static void bluesleep_sleep_work(struct work_struct *work)
 
 			/*Deactivating UART */
 			/* UART clk is not turned off immediately. Release
-			 * wakelock after 500 ms.
-			 */
-			wake_lock_timeout(&bsi->wake_lock, HZ / 2);
-		} else {
+			* wakelock after 125 ms.
+			*/
+			wake_lock_timeout(&bsi->wake_lock, HZ / 8);
+			} else {
 			BT_DBG("host can enter sleep but some tx remained.");
 
 			mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));
@@ -448,7 +448,7 @@ static void bluesleep_abnormal_stop(void)
     if (disable_irq_wake(bsi->host_wake_irq))
         BT_ERR("Couldn't disable hostwake IRQ wakeup mode\n");
 
-    wake_lock_timeout(&bsi->wake_lock, HZ / 2);
+	wake_lock_timeout(&bsi->wake_lock, HZ / 8);
 
     clear_bit(BT_TXDATA, &flags);
     bsi->uport = NULL;
@@ -480,7 +480,7 @@ static void bluesleep_stop(void)
 	if (disable_irq_wake(bsi->host_wake_irq))
 		BT_ERR("Couldn't disable hostwake IRQ wakeup mode\n");
 
-	wake_lock_timeout(&bsi->wake_lock, HZ / 2);
+	wake_lock_timeout(&bsi->wake_lock, HZ / 8);
 
 	bsi->uport = NULL;
 }
