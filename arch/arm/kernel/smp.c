@@ -136,13 +136,25 @@ int __cpuinit __cpu_up(unsigned int cpu)
 }
 
 /* platform specific SMP operations */
-void __init smp_init_cpus(void)
+void __attribute__((weak)) __init smp_init_cpus(void)
 {
 	if (smp_ops.smp_init_cpus)
 		smp_ops.smp_init_cpus();
 }
 
-int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+void __attribute__((weak)) __init platform_smp_prepare_cpus(unsigned int max_cpus)
+{
+	if (smp_ops.smp_prepare_cpus)
+		smp_ops.smp_prepare_cpus(max_cpus);
+}
+
+void __attribute__((weak)) __cpuinit platform_secondary_init(unsigned int cpu)
+{
+	if (smp_ops.smp_secondary_init)
+		smp_ops.smp_secondary_init(cpu);
+}
+
+int __attribute__((weak)) __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
 	if (smp_ops.smp_boot_secondary)
 		return smp_ops.smp_boot_secondary(cpu, idle);
@@ -152,14 +164,20 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 #ifdef CONFIG_HOTPLUG_CPU
 static void percpu_timer_stop(void);
 
-static int platform_cpu_kill(unsigned int cpu)
+int __attribute__((weak)) platform_cpu_kill(unsigned int cpu)
 {
 	if (smp_ops.cpu_kill)
 		return smp_ops.cpu_kill(cpu);
 	return 1;
 }
 
-static int platform_cpu_disable(unsigned int cpu)
+void __attribute__((weak)) platform_cpu_die(unsigned int cpu)
+{
+	if (smp_ops.cpu_die)
+		smp_ops.cpu_die(cpu);
+}
+
+int __attribute__((weak)) platform_cpu_disable(unsigned int cpu)
 {
 	if (smp_ops.cpu_disable)
 		return smp_ops.cpu_disable(cpu);
@@ -175,7 +193,7 @@ static int platform_cpu_disable(unsigned int cpu)
 /*
  * __cpu_disable runs on the processor to be shutdown.
  */
-int __cpuinit __cpu_disable(void)
+int __cpu_disable(void)
 {
 	unsigned int cpu = smp_processor_id();
 	struct task_struct *p;
@@ -227,7 +245,7 @@ static DECLARE_COMPLETION(cpu_died);
  * called on the thread which is asking for a CPU to be shutdown -
  * waits until shutdown has completed, or it is timed out.
  */
-void __cpuinit __cpu_die(unsigned int cpu)
+void __cpu_die(unsigned int cpu)
 {
 	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
 		pr_err("CPU%u: cpu didn't die\n", cpu);
@@ -263,8 +281,7 @@ void __ref cpu_die(void)
 	 * actual CPU shutdown procedure is at least platform (if not
 	 * CPU) specific.
 	 */
-	if (smp_ops.cpu_die)
-		smp_ops.cpu_die(cpu);
+	platform_cpu_die(cpu);
 
 	/*
 	 * Do not return to the idle loop - jump back to the secondary
@@ -327,8 +344,7 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 	/*
 	 * Give the platform a chance to do its own initialisation.
 	 */
-	if (smp_ops.smp_secondary_init)
-		smp_ops.smp_secondary_init(cpu);
+	platform_secondary_init(cpu);
 
 	notify_cpu_starting(cpu);
 
@@ -403,8 +419,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		/*
 		 * Initialise the present map, which describes the set of CPUs
 		 * actually populated at the present time. A platform should
-		 * re-initialize the map in the platforms smp_prepare_cpus()
-		 * if present != possible (e.g. physical hotplug).
+		 * re-initialize the map in platform_smp_prepare_cpus() if
+		 * present != possible (e.g. physical hotplug).
 		 */
 		init_cpu_present(cpu_possible_mask);
 
@@ -412,8 +428,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		 * Initialise the SCU if there are more than one CPU
 		 * and let them know where to start.
 		 */
-		if (smp_ops.smp_prepare_cpus)
-			smp_ops.smp_prepare_cpus(max_cpus);
+		platform_smp_prepare_cpus(max_cpus);
 	}
 }
 
