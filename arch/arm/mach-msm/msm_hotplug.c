@@ -53,6 +53,8 @@ static struct cpu_hotplug {
 	unsigned int target_cpus;
 	unsigned int min_cpus_online;
 	unsigned int max_cpus_online;
+	unsigned int suspend_max_freq;
+	unsigned int suspend_max_cpus;
 	unsigned int cpus_boosted;
 	unsigned int offline_load;
 	unsigned int down_lock_dur;
@@ -451,20 +453,6 @@ reschedule:
 	reschedule_hotplug_work();
 }
 
-static void msm_hotplug_resume_work(struct work_struct *work)
-{
-	online_cpu(stats.total_cpus);
-}
-
-static int lcd_notifier_callback(struct notifier_block *nb,
-                                 unsigned long event, void *data)
-{
-        if (event == LCD_EVENT_ON_START)
-		schedule_work(&hotplug.resume_work);
-
-        return 0;
-}
-
 static void hotplug_input_event(struct input_handle *handle, unsigned int type,
 				unsigned int code, int value)
 {
@@ -534,6 +522,84 @@ static struct input_handler hotplug_input_handler = {
 	.name		= MSM_HOTPLUG,
 	.id_table	= hotplug_ids,
 };
+
+static void msm_hotplug_suspend(struct work_struct *work)
+{
+	int ret;
+	unsigned int cpu, max_freq = 0;
+	struct cpufreq_policy policy;
+
+	for_each_possible_cpu(cpu) {
+		ret = cpufreq_get_policy(&policy, cpu);
+		if (ret)
+			continue;
+		if (!cpu)
+			max_freq = policy.max;
+		cpufreq_verify_within_limits(&policy, policy.min,
+					     hotplug.suspend_max_freq);
+		if (hotplug.suspend_max_cpus == num_online_cpus())
+			break;
+		if (cpu && cpu_online(cpu))
+			cpu_down(cpu);
+	}
+
+	if (hotplug.suspend_max_cpus == 1) {
+		flush_workqueue(hotplug_wq);
+		cancel_delayed_work_sync(&hotplug_work);
+	}
+
+	dprintk("%s: Suspending %u cpus max to %uMHz\n", MSM_HOTPLUG,
+		hotplug.suspend_max_cpus > 0 ?
+		hotplug.suspend_max_cpus : stats.total_cpus,
+		(hotplug.suspend_max_freq > 0 ?
+		hotplug.suspend_max_freq : max_freq) / 1000);
+}
+
+static void msm_hotplug_resume(struct work_struct *work)
+{
+	int ret;
+	unsigned int cpu, max_freq = 0;
+	struct cpufreq_policy policy;
+
+	online_cpu(stats.total_cpus);
+
+	for_each_possible_cpu(cpu) {
+		ret = cpufreq_get_policy(&policy, cpu);
+		if (ret)
+			continue;
+		cpufreq_verify_within_cpu_limits(&policy);
+		if (!cpu)
+			max_freq = policy.max;
+	}
+
+	reschedule_hotplug_work();
+
+	dprintk("%s: Resuming cpus to %uMHz\n", MSM_HOTPLUG, max_freq / 1000);
+}
+
+static int lcd_notifier_callback(struct notifier_block *nb,
+                                 unsigned long event, void *data)
+{
+	if (!hotplug.enabled)
+		return NOTIFY_OK;
+
+	switch (event) {
+	case LCD_EVENT_ON_START:
+		schedule_work(&hotplug.resume_work);
+		break;
+	case LCD_EVENT_ON_END:
+		break;
+	case LCD_EVENT_OFF_START:
+		break;
+	case LCD_EVENT_OFF_END:
+		schedule_work(&hotplug.suspend_work);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
 
 /************************** sysfs interface ************************/
 
@@ -722,7 +788,7 @@ static ssize_t store_min_cpus_online(struct device *dev,
 	unsigned int val;
 
 	ret = sscanf(buf, "%u", &val);
-	if (ret != 1 || val < 1)
+	if (ret != 1 || val < 1 || val > stats.total_cpus)
 		return -EINVAL;
 
 	if (hotplug.max_cpus_online < val)
@@ -748,13 +814,68 @@ static ssize_t store_max_cpus_online(struct device *dev,
 	unsigned int val;
 
 	ret = sscanf(buf, "%u", &val);
-	if (ret != 1 || val < 1)
+	if (ret != 1 || val < 1 || val > stats.total_cpus)
 		return -EINVAL;
 
 	if (hotplug.min_cpus_online > val)
 		hotplug.min_cpus_online = val;
 
 	hotplug.max_cpus_online = val;
+
+	return count;
+}
+
+static ssize_t show_suspend_max_freq(struct device *dev,
+				     struct device_attribute *msm_hotplug_attrs,
+				     char *buf)
+{
+	return sprintf(buf, "%u\n", hotplug.suspend_max_freq);
+}
+
+static ssize_t store_suspend_max_freq(struct device *dev,
+				      struct device_attribute *msm_hotplug_attrs,
+				      const char *buf, size_t count)
+{
+	int ret;
+	unsigned int val;
+	struct cpufreq_policy *policy = cpufreq_cpu_get(0);
+
+	ret = sscanf(buf, "%u", &val);
+	if (ret != 1)
+		return -EINVAL;
+
+	if (val == 0)
+		goto out;
+
+	if (val < policy->min)
+		val = policy->min;
+	else if (val > policy->max)
+		val = policy->max;
+out:
+	hotplug.suspend_max_freq = val;
+
+	return count;
+}
+
+static ssize_t show_suspend_max_cpus(struct device *dev,
+				     struct device_attribute *msm_hotplug_attrs,
+				     char *buf)
+{
+	return sprintf(buf, "%u\n", hotplug.suspend_max_cpus);
+}
+
+static ssize_t store_suspend_max_cpus(struct device *dev,
+				      struct device_attribute *msm_hotplug_attrs,
+				      const char *buf, size_t count)
+{
+	int ret;
+	unsigned int val;
+
+	ret = sscanf(buf, "%u", &val);
+	if (ret != 1 || val < 0 || val > stats.total_cpus)
+		return -EINVAL;
+
+	hotplug.suspend_max_cpus = val;
 
 	return count;
 }
@@ -847,6 +968,10 @@ static DEVICE_ATTR(min_cpus_online, 644, show_min_cpus_online,
 		   store_min_cpus_online);
 static DEVICE_ATTR(max_cpus_online, 644, show_max_cpus_online,
 		   store_max_cpus_online);
+static DEVICE_ATTR(suspend_max_freq, 644, show_suspend_max_freq,
+		   store_suspend_max_freq);
+static DEVICE_ATTR(suspend_max_cpus, 644, show_suspend_max_cpus,
+		   store_suspend_max_cpus);
 static DEVICE_ATTR(cpus_boosted, 644, show_cpus_boosted, store_cpus_boosted);
 static DEVICE_ATTR(offline_load, 644, show_offline_load, store_offline_load);
 static DEVICE_ATTR(fast_lane_load, 644, show_fast_lane_load,
@@ -862,6 +987,8 @@ static struct attribute *msm_hotplug_attrs[] = {
 	&dev_attr_history_size.attr,
 	&dev_attr_min_cpus_online.attr,
 	&dev_attr_max_cpus_online.attr,
+	&dev_attr_suspend_max_freq.attr,
+	&dev_attr_suspend_max_cpus.attr,
 	&dev_attr_cpus_boosted.attr,
 	&dev_attr_offline_load.attr,
 	&dev_attr_fast_lane_load.attr,
@@ -928,7 +1055,8 @@ static int __devinit msm_hotplug_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&hotplug_work, msm_hotplug_work);
 	INIT_WORK(&hotplug.up_work, cpu_up_work);
 	INIT_WORK(&hotplug.down_work, cpu_down_work);
-	INIT_WORK(&hotplug.resume_work, msm_hotplug_resume_work);
+	INIT_WORK(&hotplug.resume_work, msm_hotplug_resume);
+	INIT_WORK(&hotplug.suspend_work, msm_hotplug_suspend);
 
 	for_each_possible_cpu(cpu) {
 		dl = &per_cpu(lock_info, cpu);
