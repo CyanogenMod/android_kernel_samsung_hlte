@@ -1605,8 +1605,10 @@ int dsi_panel_device_register(struct device_node *pan_node,
 		pinfo->new_fps = pinfo->mipi.frame_rate;
 	}
 
-		ctrl_pdata->disp_en_gpio = of_get_named_gpio(pan_node,
-						     "qcom,enable-gpio", 0);
+	pinfo->panel_max_fps = mdss_panel_get_framerate(pinfo);
+	pinfo->panel_max_vtotal = mdss_panel_get_vtotal(pinfo);
+	ctrl_pdata->disp_en_gpio = of_get_named_gpio(pan_node,
+				     "qcom,enable-gpio", 0);
 
 	pr_err("%s:%d, Disp_en_gpio (%d)",__func__, __LINE__,ctrl_pdata->disp_en_gpio );
 
