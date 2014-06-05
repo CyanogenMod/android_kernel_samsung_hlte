@@ -2218,10 +2218,11 @@ static int set_output_buffers(struct msm_vidc_inst *inst,
 				buffer_info.extradata_size =
 					extradata_buf->buffer_size;
 			}
-			dprintk(VIDC_DBG, "Output buffer address: 0x%pa\n",
-					&buffer_info.align_device_addr);
-			dprintk(VIDC_DBG, "Output extradata address: 0x%pa\n",
-					&buffer_info.extradata_addr);
+
+			dprintk(VIDC_DBG, "Output buffer address: %x",
+					buffer_info.align_device_addr);
+			dprintk(VIDC_DBG, "Output extradata address: %x",
+					buffer_info.extradata_addr);
 			rc = call_hfi_op(hdev, session_set_buffers,
 					(void *) inst->session, &buffer_info);
 			mutex_unlock(&inst->lock);
