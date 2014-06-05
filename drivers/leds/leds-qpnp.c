@@ -3524,8 +3524,13 @@ static void led_pat_on(struct qpnp_led_data *info, struct patt_registry *patt_re
 		    // Yank555.lu LED Extended Controls
                     //info[led_num].rgb_cfg->pwm_cfg->lut_params.lut_pause_hi = patt_led->hi_pause;
                     //info[led_num].rgb_cfg->pwm_cfg->lut_params.lut_pause_lo = patt_led->lo_pause;
-                    info[led_num].rgb_cfg->pwm_cfg->lut_params.lut_pause_hi = (int) (patt_led->hi_pause / led_speed_on );
-                    info[led_num].rgb_cfg->pwm_cfg->lut_params.lut_pause_lo = (int) (patt_led->lo_pause / led_speed_off);
+		    info[led_num].rgb_cfg->pwm_cfg->lut_params.lut_pause_hi = (int) (patt_led->hi_pause / led_speed_on );
+		    if (led_speed_off != 0) {
+			info[led_num].rgb_cfg->pwm_cfg->lut_params.lut_pause_lo = (int) (patt_led->lo_pause / led_speed_off);
+		    } else {
+			// Set lo pause to 0 (always on)
+			info[led_num].rgb_cfg->pwm_cfg->lut_params.lut_pause_lo = 0;
+		    }
                     if(!cnt)
                         info[led_num].rgb_cfg->pwm_cfg->lut_params.start_idx = 0;
                     else
@@ -3841,13 +3846,13 @@ static ssize_t led_lowpower_store(struct device *dev,
  *
  *     Set the relative intensity of the LED respecting the userspace's request
  *
- * /sys/class/sec/led/led_speed_on  : 1 - 5 (1 = stock)
+ * /sys/class/sec/led/led_speed_on  : 1 - 5 (0 = no on time / 1 = stock)
  *
  *     Devider for delayon  (1 - 5 times shorter than requested by userspace)
  *
- * /sys/class/sec/led/led_speed_off  : 1 - 5 (1 = stock)
+ * /sys/class/sec/led/led_speed_off  : 0 - 5 (0 = no off time / 1 = stock)
  *
- *     Devider for delayoff (1 - 5 times shorter than requested by userspace)
+ *     Devider for delayoff (no off time or 1 - 5 times shorter than requested by userspace)
  *
  * /sys/class/sec/led/led_xctrl_version :
  *
@@ -3898,6 +3903,7 @@ static ssize_t led_speed_off_store(struct device *dev,
 	sscanf(buf, "%u", &new_led_speed_off);
 
 	switch(new_led_speed_off) { /* Accept only if 1 - 5 */
+		case 0:
 		case 1:
 		case 2:
 		case 3:
@@ -3933,7 +3939,7 @@ static ssize_t led_intensity_store(struct device *dev,
 static ssize_t led_xctrl_info_show(struct device *dev,
                     struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "Extended LED Control v1.1 by Yank555.lu\n\n"
+	return sprintf(buf, "Extended LED Control v1.2 by Yank555.lu\n\n"
 			    "  LED  on speed : %ux\n"
 			    "  LED off speed : %ux\n"
 			    "  LED intensity : %u/255\n",
@@ -3945,7 +3951,7 @@ static ssize_t led_xctrl_info_show(struct device *dev,
 static ssize_t led_xctrl_version_show(struct device *dev,
                     struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "v1.1 by Yank555.lu\n");
+	return sprintf(buf, "v1.2 by Yank555.lu\n");
 }
 
 static DEVICE_ATTR(led_pattern, S_IRUGO | S_IWUSR | S_IWGRP, show_patt,
