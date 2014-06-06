@@ -121,7 +121,7 @@ struct candella_lux_map {
 };
 
 struct display_status {
-	unsigned char acl_on;
+	bool acl_on;
 	unsigned char curr_acl_cond;
 	unsigned char is_smart_dim_loaded;
 #if defined(CONFIG_LCD_HMT)

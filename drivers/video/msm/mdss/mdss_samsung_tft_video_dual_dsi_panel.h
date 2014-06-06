@@ -5,7 +5,7 @@
 #define RECOVERY_BRIGHTNESS 180
 
 struct display_status {
-	unsigned char acl_on;
+	bool acl_on;
 	unsigned char curr_acl_cond;
 	unsigned char is_mdnie_loaded;
 	unsigned char auto_brightness;
