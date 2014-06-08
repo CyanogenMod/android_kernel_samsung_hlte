@@ -144,7 +144,6 @@ Eoverflow:
 		m->buf = vmalloc(m->size);
 #else
 	kfree(m->buf);
-	m->count = 0;
 	m->buf = kmalloc(m->size <<= 1, GFP_KERNEL);
 #endif
 	return !m->buf ? -ENOMEM : -EAGAIN;
@@ -250,11 +249,11 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 			m->buf = vmalloc(m->size);
 #else
 		kfree(m->buf);
-		m->count = 0;
 		m->buf = kmalloc(m->size <<= 1, GFP_KERNEL);
 #endif
 		if (!m->buf)
 			goto Enomem;
+		m->count = 0;
 		m->version = 0;
 		pos = m->index;
 		p = m->op->start(m, &pos);
