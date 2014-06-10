@@ -3472,18 +3472,10 @@ int msm_vidc_check_session_supported(struct msm_vidc_inst *inst)
 		if (!rc && (inst->prop.width[CAPTURE_PORT] >
 			capability->width.max)) {
 			dprintk(VIDC_ERR,
-				"Unsupported width = %u supported max width = %u\n",
+				"Unsupported width = %u supported max width = %u",
 				inst->prop.width[CAPTURE_PORT],
 				capability->width.max);
 				rc = -ENOTSUPP;
-		}
-
-		if (!rc) {
-			rc = call_hfi_op(hdev, capability_check,
-					inst->fmts[OUTPUT_PORT]->fourcc,
-					inst->prop.width[CAPTURE_PORT],
-					&capability->width.max,
-					&capability->height.max);
 		}
 		if (!rc && (inst->prop.height[CAPTURE_PORT]
 			* inst->prop.width[CAPTURE_PORT] >
