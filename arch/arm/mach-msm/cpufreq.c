@@ -43,6 +43,18 @@
 #endif
 #include <mach/cpufreq.h>
 
+#ifdef CONFIG_INTELLI_THERMAL
+struct cpu_freq {
+	uint32_t max;
+	uint32_t min;
+	uint32_t allowed_max;
+	uint32_t allowed_min;
+	uint32_t limits_init;
+};
+
+static DEFINE_PER_CPU(struct cpu_freq, cpu_freq_info);
+#endif
+
 static DEFINE_MUTEX(l2bw_lock);
 
 static struct clk *cpu_clk[NR_CPUS];
@@ -275,6 +287,7 @@ unsigned int msm_cpufreq_get_freq(unsigned int cpu)
 	return 0;
 }
 
+#ifdef CONFIG_INTELLI_THERMAL
 static inline int msm_cpufreq_limits_init(void)
 {
 	int cpu = 0;
@@ -335,6 +348,7 @@ int msm_cpufreq_set_freq_limits(uint32_t cpu, uint32_t min, uint32_t max)
 	return 0;
 }
 EXPORT_SYMBOL(msm_cpufreq_set_freq_limits);
+#endif
 
 static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 {
