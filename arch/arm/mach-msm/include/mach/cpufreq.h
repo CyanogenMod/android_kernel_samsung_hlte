@@ -13,6 +13,8 @@
 #ifndef __MACH_CPUFREQ_H
 #define __MACH_CPUFREQ_H
 
+#define MSM_CPUFREQ_NO_LIMIT 0xFFFFFFFF
+
 #if defined(CONFIG_DEVFREQ_GOV_MSM_CPUFREQ)
 extern int devfreq_msm_cpufreq_update_bw(void);
 extern int register_devfreq_msm_cpufreq(void);
@@ -29,11 +31,19 @@ static int register_devfreq_msm_cpufreq(void)
 
 #if defined(CONFIG_CPU_FREQ_MSM)
 extern unsigned long msm_cpufreq_get_bw(void);
+#if defined(CONFIG_INTELLI_THERMAL)
+extern int msm_cpufreq_set_freq_limits(
+		uint32_t cpu, uint32_t min, uint32_t max);
+#endif // CONFIG_INTELLI_THERMAL
 #else
 extern unsigned long msm_cpufreq_get_bw(void)
 {
 	return ULONG_MAX;
 }
+#if defined(CONFIG_INTELLI_THERMAL)
+static inline int msm_cpufreq_set_freq_limits(
+		uint32_t cpu, uint32_t min, uint32_t max)
+#endif // CONFIG_INTELLI_THERMAL
 #endif
 
 #endif
