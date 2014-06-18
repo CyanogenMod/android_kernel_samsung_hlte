@@ -137,7 +137,7 @@ static spinlock_t timer_slack_lock;
 static int *timer_slack_vals = default_timer_slack_val;
 static int ntimer_slack_vals = ARRAY_SIZE(default_timer_slack_val);
 
-#define DEFAULT_SCREEN_OFF_MAX 652800
+#define DEFAULT_SCREEN_OFF_MAX 2265600
 static unsigned long screen_off_max = DEFAULT_SCREEN_OFF_MAX;
 
 static bool io_is_busy;
