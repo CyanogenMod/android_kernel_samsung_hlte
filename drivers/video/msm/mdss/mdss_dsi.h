@@ -401,4 +401,7 @@ void mdss_dsi_dump_power_clk(struct mdss_panel_data *pdata, int flag);
 void pwm_backlight_enable(void);
 void pwm_backlight_disable(void);
 
+int mdss_dsi_register_recovery_handler(struct mdss_dsi_ctrl_pdata *ctrl,
+		struct mdss_panel_recovery *recovery);
+
 #endif /* MDSS_DSI_H */
