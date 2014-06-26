@@ -11,6 +11,7 @@
 
 #include <linux/module.h>
 
+#include <linux/powersuspend.h>
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
@@ -18,12 +19,14 @@
 #include <linux/sched.h>
 #include <linux/pm.h>
 #include <linux/slab.h>
+#include <linux/syscalls.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <linux/gpio_keys.h>
+#include <linux/wakelock.h>
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
 #include <linux/of_platform.h>
@@ -37,9 +40,8 @@
 #if defined(CONFIG_MACH_MONTBLANC) || defined(CONFIG_MACH_VIKALCU)
 #include <linux/regulator/lp8720.h>
 #endif
-#ifdef CONFIG_POWERSUSPEND
-#include <linux/powersuspend.h>
-#endif
+#include <../kernel/power/power.h>
+
 
 struct gpio_button_data {
 	struct gpio_keys_button *button;
@@ -69,10 +71,25 @@ struct gpio_keys_drvdata {
 	struct gpio_button_data data[0];
 };
 
-#ifdef CONFIG_POWERSUSPEND
+static void sync_system(struct work_struct *work);
+static DECLARE_WORK(sync_system_work, sync_system);
+struct wake_lock sync_wake_lock;
+
 static bool suspended = false;
-#endif
+static bool flip_cover_suspended = false;
 static bool flip_cover_action = false;
+
+static void sync_system(struct work_struct *work)
+{
+	if (suspended)
+		msleep(5000);
+
+	pr_info("%s +\n", __func__);
+	wake_lock(&sync_wake_lock);
+	sys_sync();
+	wake_unlock(&sync_wake_lock);
+	pr_info("%s -\n", __func__);
+}
 
 /*
  * SYSFS interface for enabling/disabling keys and switches:
@@ -347,6 +364,23 @@ static struct attribute_group gpio_keys_attr_group = {
 	.attrs = gpio_keys_attrs,
 };
 
+void gpio_sync_worker(bool pwr)
+{
+	/* sys_sync(); */
+	if (suspended) {
+		if (pwr)
+			pr_info("%s: KEY_POWER pressed, calling sys_sync() in 5 sec...\n", __func__);
+		else
+			pr_info("%s: KEY_HOME pressed, calling sys_sync() in 5 sec...\n", __func__);
+	} else {
+		if (pwr)
+			pr_info("%s: KEY_POWER pressed, calling sys_sync()\n", __func__);
+		else
+			pr_info("%s: KEY_HOME pressed, calling sys_sync()\n", __func__);
+	}
+	schedule_work(&sync_system_work);
+}
+
 static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 {
 	const struct gpio_keys_button *button = bdata->button;
@@ -369,16 +403,17 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	input_sync(input);
 }
 
-#ifdef CONFIG_POWERSUSPEND
 static void gpio_keys_early_suspend(struct power_suspend *handler)
 {
 	suspended = true;
+	flip_cover_suspended = true;
 	return;
 }
 
 static void gpio_keys_late_resume(struct power_suspend *handler)
 {
 	suspended = false;
+	flip_cover_suspended = false;
 	return;
 }
 
@@ -386,7 +421,6 @@ static struct power_suspend gpio_suspend = {
 	.suspend = gpio_keys_early_suspend,
 	.resume = gpio_keys_late_resume,
 };
-#endif
 
 static void gpio_keys_gpio_work_func(struct work_struct *work)
 {
@@ -594,7 +628,6 @@ static void flip_cover_work(struct work_struct *work)
 	}
 }
 #else // CONFIG_SEC_FACTORY
-
 static struct input_dev *powerkey_device;
 
 static void flip_cover_work(struct work_struct *work)
@@ -615,35 +648,29 @@ static void flip_cover_work(struct work_struct *work)
 		SW_FLIP, ddata->flip_cover);
 	input_sync(ddata->input);
 
-#ifdef CONFIG_POWERSUSPEND
-	if (ddata->flip_cover == 0 && !flip_cover_action && !suspended) {
-#else
-	if (ddata->flip_cover == 0 && !flip_cover_action) {
-#endif
-		flip_cover_action = true; // Yank555.lu - use a semaphore, never do this more than once at the same time
+	if (ddata->flip_cover == 0 && !flip_cover_action && !flip_cover_suspended) {
+		flip_cover_action = true;
+		flip_cover_suspended = true;
 		pr_info("%s: flip cover closed. Going to sleep ...\n", __func__);
-	        input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
-	        input_event(powerkey_device, EV_SYN, 0, 0);
-	        msleep(60);
+		input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
+		input_event(powerkey_device, EV_SYN, 0, 0);
+		msleep(60);
 
-	        input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
-	        input_event(powerkey_device, EV_SYN, 0, 0);
-		flip_cover_action = false; // Yank555.lu - reset semaphore
+		input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
+		input_event(powerkey_device, EV_SYN, 0, 0);
+		flip_cover_action = false;
 	}
-#ifdef CONFIG_POWERSUSPEND
-	if (ddata->flip_cover == 1 && !flip_cover_action && suspended) {
-#else
-	if (ddata->flip_cover == 1 && !flip_cover_action) {
-#endif
-		flip_cover_action = true; // Yank555.lu - use a semaphore, never do this more than once at the same time
+	if (ddata->flip_cover == 1 && !flip_cover_action && flip_cover_suspended) {
+		flip_cover_action = true;
+		flip_cover_suspended = false;
 		pr_info("%s: flip cover opened. Waking up ...\n", __func__);
-	        input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
-	        input_event(powerkey_device, EV_SYN, 0, 0);
-	        msleep(60);
+		input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
+		input_event(powerkey_device, EV_SYN, 0, 0);
+		msleep(60);
 
-	        input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
-	        input_event(powerkey_device, EV_SYN, 0, 0);
-		flip_cover_action = false; // Yank555.lu - reset semaphore
+		input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
+		input_event(powerkey_device, EV_SYN, 0, 0);
+		flip_cover_action = false;
 	}
 }
 #endif // CONFIG_SEC_FACTORY
@@ -1190,10 +1217,7 @@ static int __init gpio_keys_init(void)
 {
 	int ret = platform_driver_register(&gpio_keys_device_driver);
 
-	// Yank555.lu : only register flip_powerkey if gpio_keys registered successfully
-#ifdef CONFIG_POWERSUSPEND
 	register_power_suspend(&gpio_suspend);
-#endif
 	powerkey_device = input_allocate_device();
 	input_set_capability(powerkey_device, EV_KEY, KEY_POWER);
 	powerkey_device->name = "flip_powerkey";
