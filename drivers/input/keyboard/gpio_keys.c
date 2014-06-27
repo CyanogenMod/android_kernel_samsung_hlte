@@ -11,7 +11,7 @@
 
 #include <linux/module.h>
 
-#include <linux/powersuspend.h>
+#include "../../../include/linux/powersuspend.h"
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
