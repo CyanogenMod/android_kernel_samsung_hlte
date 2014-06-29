@@ -11,6 +11,7 @@
 
 #include <linux/module.h>
 
+#include <linux/powersuspend.h>
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
@@ -18,12 +19,14 @@
 #include <linux/sched.h>
 #include <linux/pm.h>
 #include <linux/slab.h>
+#include <linux/syscalls.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <linux/gpio_keys.h>
+#include <linux/wakelock.h>
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
 #include <linux/of_platform.h>
@@ -37,6 +40,7 @@
 #if defined(CONFIG_MACH_MONTBLANC) || defined(CONFIG_MACH_VIKALCU)
 #include <linux/regulator/lp8720.h>
 #endif
+#include <../kernel/power/power.h>
 
 
 struct gpio_button_data {
@@ -66,6 +70,26 @@ struct gpio_keys_drvdata {
 #endif
 	struct gpio_button_data data[0];
 };
+
+static void sync_system(struct work_struct *work);
+static DECLARE_WORK(sync_system_work, sync_system);
+struct wake_lock sync_wake_lock;
+
+static bool suspended = false;
+static bool flip_cover_suspended = false;
+static bool flip_cover_action = false;
+
+static void sync_system(struct work_struct *work)
+{
+	if (suspended)
+		msleep(5000);
+
+	pr_info("%s +\n", __func__);
+	wake_lock(&sync_wake_lock);
+	sys_sync();
+	wake_unlock(&sync_wake_lock);
+	pr_info("%s -\n", __func__);
+}
 
 /*
  * SYSFS interface for enabling/disabling keys and switches:
@@ -340,6 +364,23 @@ static struct attribute_group gpio_keys_attr_group = {
 	.attrs = gpio_keys_attrs,
 };
 
+void gpio_sync_worker(bool pwr)
+{
+	/* sys_sync(); */
+	if (suspended) {
+		if (pwr)
+			pr_info("%s: KEY_POWER pressed, calling sys_sync() in 5 sec...\n", __func__);
+		else
+			pr_info("%s: KEY_HOME pressed, calling sys_sync() in 5 sec...\n", __func__);
+	} else {
+		if (pwr)
+			pr_info("%s: KEY_POWER pressed, calling sys_sync()\n", __func__);
+		else
+			pr_info("%s: KEY_HOME pressed, calling sys_sync()\n", __func__);
+	}
+	schedule_work(&sync_system_work);
+}
+
 static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 {
 	const struct gpio_keys_button *button = bdata->button;
@@ -361,6 +402,25 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	}
 	input_sync(input);
 }
+
+static void gpio_keys_early_suspend(struct power_suspend *handler)
+{
+	suspended = true;
+	flip_cover_suspended = true;
+	return;
+}
+
+static void gpio_keys_late_resume(struct power_suspend *handler)
+{
+	suspended = false;
+	flip_cover_suspended = false;
+	return;
+}
+
+static struct power_suspend gpio_suspend = {
+	.suspend = gpio_keys_early_suspend,
+	.resume = gpio_keys_late_resume,
+};
 
 static void gpio_keys_gpio_work_func(struct work_struct *work)
 {
@@ -568,19 +628,50 @@ static void flip_cover_work(struct work_struct *work)
 	}
 }
 #else // CONFIG_SEC_FACTORY
+static struct input_dev *powerkey_device;
+
 static void flip_cover_work(struct work_struct *work)
 {
 	struct gpio_keys_drvdata *ddata =
 		container_of(work, struct gpio_keys_drvdata,
 				flip_cover_dwork.work);
+	bool flip_cover_tmp = gpio_get_value(ddata->gpio_flip_cover);
 
-	ddata->flip_cover = gpio_get_value(ddata->gpio_flip_cover);
+	if (ddata->flip_cover == flip_cover_tmp)
+		return;
+
+	ddata->flip_cover = flip_cover_tmp;
 	printk(KERN_DEBUG "[keys] %s : %d\n",
 		__func__, ddata->flip_cover);
 
 	input_report_switch(ddata->input,
 		SW_FLIP, ddata->flip_cover);
 	input_sync(ddata->input);
+
+	if (ddata->flip_cover == 0 && !flip_cover_action && !flip_cover_suspended) {
+		flip_cover_action = true;
+		flip_cover_suspended = true;
+		pr_info("%s: flip cover closed. Going to sleep ...\n", __func__);
+		input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
+		input_event(powerkey_device, EV_SYN, 0, 0);
+		msleep(60);
+
+		input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
+		input_event(powerkey_device, EV_SYN, 0, 0);
+		flip_cover_action = false;
+	}
+	if (ddata->flip_cover == 1 && !flip_cover_action && flip_cover_suspended) {
+		flip_cover_action = true;
+		flip_cover_suspended = false;
+		pr_info("%s: flip cover opened. Waking up ...\n", __func__);
+		input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
+		input_event(powerkey_device, EV_SYN, 0, 0);
+		msleep(60);
+
+		input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
+		input_event(powerkey_device, EV_SYN, 0, 0);
+		flip_cover_action = false;
+	}
 }
 #endif // CONFIG_SEC_FACTORY
 
@@ -1124,7 +1215,17 @@ static struct platform_driver gpio_keys_device_driver = {
 
 static int __init gpio_keys_init(void)
 {
-	return platform_driver_register(&gpio_keys_device_driver);
+	int ret = platform_driver_register(&gpio_keys_device_driver);
+
+	register_power_suspend(&gpio_suspend);
+	powerkey_device = input_allocate_device();
+	input_set_capability(powerkey_device, EV_KEY, KEY_POWER);
+	powerkey_device->name = "flip_powerkey";
+	powerkey_device->phys = "flip_powerkey/input0";
+	if(input_register_device(powerkey_device))
+		pr_info("%s: failed to register flip_powerkey\n", __func__);
+
+	return ret;
 }
 
 static void __exit gpio_keys_exit(void)

@@ -315,6 +315,7 @@ header-y += pktcdvd.h
 header-y += pmu.h
 header-y += poll.h
 header-y += posix_types.h
+header-y += powersuspend.h
 header-y += ppdev.h
 header-y += ppp-comp.h
 header-y += ppp-ioctl.h
