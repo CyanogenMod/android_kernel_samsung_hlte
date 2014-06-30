@@ -89,7 +89,7 @@ ENTRY(cpu_v7_switch_mm)
 	mcr	p15, 0, r1, c13, c0, 1		@ set context ID
 	isb
 #endif
-	mov	pc, lr
+	bx	lr
 ENDPROC(cpu_v7_switch_mm)
 
 #ifdef CONFIG_TIMA_RKP_L2_GROUP
@@ -137,7 +137,7 @@ ENTRY(cpu_v7_timal2group_set_pte_commit)
 	dsb
 	isb
 	//bl v7_inval_kern_dcache_area
-	mov	pc, lr
+	bx	lr
 ENDPROC(cpu_v7_timal2group_set_pte_commit)
 
 /*  
@@ -221,7 +221,7 @@ ENTRY(cpu_v7_timal2group_set_pte_ext)
 	mov	r0, r5
 	pop	{r5}
 	pop	{r4}
-	mov	pc, lr
+	bx	lr
 ENDPROC(cpu_v7_timal2group_set_pte_ext)
 #endif  /* CONFIG_TIMA_RKP_L2_GROUP */
 
@@ -240,7 +240,7 @@ ENTRY(cpu_v7_tima_iommu_opt)
 	smc     #1
 	pop	{r0}
 	pop     {r0-r3, r11}
-	mov	pc, lr
+	bx	lr
 ENDPROC(cpu_v7_tima_iommu_opt)
 #endif
 
@@ -350,7 +350,7 @@ ENTRY(cpu_v7_tima_set_pte_ext)
 4:
 
 #endif
-	mov	pc, lr
+	bx	lr
 ENDPROC(cpu_v7_tima_set_pte_ext)
 #endif
 
@@ -387,10 +387,10 @@ ENTRY(cpu_v7_set_pte_ext)
  ARM(	str	r3, [r0, #2048]! )
  THUMB(	add	r0, r0, #2048 )
  THUMB(	str	r3, [r0] )
-	ALT_SMP(mov	pc,lr)
+	ALT_SMP(bx	lr)
 	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
 #endif
-	mov	pc, lr
+	bx	lr
 ENDPROC(cpu_v7_set_pte_ext)
 
 	/*

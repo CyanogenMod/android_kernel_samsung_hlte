@@ -40,7 +40,7 @@ sum	.req	r3
 		adcs	sum, sum, ip, put_byte_1	@ update checksum
 		strb	ip, [dst], #1
 		tst	dst, #2
-		moveq	pc, lr			@ dst is now 32bit aligned
+		reteq	lr			@ dst is now 32bit aligned
 
 .Ldst_16bit:	load2b	r8, ip
 		sub	len, len, #2
@@ -48,7 +48,7 @@ sum	.req	r3
 		strb	r8, [dst], #1
 		adcs	sum, sum, ip, put_byte_1
 		strb	ip, [dst], #1
-		mov	pc, lr			@ dst is now 32bit aligned
+		ret	lr			@ dst is now 32bit aligned
 
 		/*
 		 * Handle 0 to 7 bytes, with any alignment of source and
