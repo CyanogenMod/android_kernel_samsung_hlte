@@ -5714,9 +5714,12 @@ int l2cap_destroy_cfm(struct hci_chan *chan, u8 reason)
 }
 
 static int l2cap_sig_amp(struct l2cap_conn *conn, struct l2cap_cmd_hdr *cmd,
-			u8 *data, struct sk_buff *skb)
+			u16 cmd_len, u8 *data, struct sk_buff *skb)
 {
 	struct l2cap_amp_signal_work *amp_work;
+
+	if (cmd_len < sizeof(struct l2cap_conn_req))
+		return -EPROTO;
 
 	amp_work = kzalloc(sizeof(*amp_work), GFP_ATOMIC);
 	if (!amp_work)
@@ -5871,7 +5874,7 @@ static inline int l2cap_bredr_sig_cmd(struct l2cap_conn *conn,
 	case L2CAP_MOVE_CHAN_RSP:
 	case L2CAP_MOVE_CHAN_CFM:
 	case L2CAP_MOVE_CHAN_CFM_RSP:
-		err = l2cap_sig_amp(conn, cmd, data, skb);
+		err = l2cap_sig_amp(conn, cmd, cmd_len, data, skb);
 		break;
 	default:
 		BT_ERR("Unknown BR/EDR signaling command 0x%2.2x", cmd->code);
