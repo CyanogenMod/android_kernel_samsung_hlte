@@ -38,6 +38,9 @@
 #define SYNAPTICS_PM_GPIO_STATE_WAKE	0
 #define SYNAPTICS_PM_GPIO_STATE_SLEEP	1
 
+#undef dev_info
+#define dev_info(dev, fmt, arg...)
+
 struct qpnp_pin_cfg synaptics_int_set[] = {
 	{
 		.mode = 0,
