@@ -50,7 +50,7 @@ static void ssp_sensorhub_log(const char *func_name,
 			strlcat(log_str, "..., ", log_size);
 	}
 
-	pr_info("[SSP]: %s - %s (%d)", func_name, log_str, length);
+	//pr_info("[SSP]: %s - %s (%d)", func_name, log_str, length);
 	kfree(log_str);
 }
 
