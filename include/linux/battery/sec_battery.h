@@ -161,6 +161,8 @@ struct sec_battery_info {
 	int stability_test;
 	int eng_not_full_status;
 #endif
+
+	bool ps_changed;
 };
 
 ssize_t sec_bat_show_attrs(struct device *dev,
