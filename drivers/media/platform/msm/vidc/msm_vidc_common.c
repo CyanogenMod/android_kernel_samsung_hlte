@@ -2950,7 +2950,7 @@ int msm_comm_try_set_prop(struct msm_vidc_inst *inst,
 
 	mutex_lock(&inst->sync_lock);
 	if (inst->state < MSM_VIDC_OPEN_DONE || inst->state >= MSM_VIDC_CLOSE) {
-		dprintk(VIDC_ERR, "Not in proper state to set property\n");
+		dprintk(VIDC_ERR, "skip set property\n");
 		rc = -EAGAIN;
 		goto exit;
 	}

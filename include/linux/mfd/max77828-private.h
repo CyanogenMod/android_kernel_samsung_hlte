@@ -399,6 +399,7 @@ enum cable_type_muic {
 #if defined(CONFIG_MUIC_DET_JACK)
 	CABLE_TYPE_EARJACK_MUIC,		/* 22 */
 #endif
+	CABLE_TYPE_CHARGING_CABLE_MUIC,
 	CABLE_TYPE_UNKNOWN_MUIC			/* 23 */
 };
 
