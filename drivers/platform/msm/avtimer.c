@@ -313,7 +313,7 @@ static const struct file_operations avtimer_fops = {
 
 static int dev_avtimer_probe(struct platform_device *pdev)
 {
-	int result = 0;
+	int result;
 	dev_t dev = MKDEV(major, 0);
 	struct device *device_handle;
 	struct resource *reg_lsb = NULL, *reg_msb = NULL;
