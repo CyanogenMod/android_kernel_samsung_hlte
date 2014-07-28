@@ -1188,7 +1188,7 @@ static int mdss_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 	}
 
 	if (is_mdss_iommu_attached()) {
-		int ret = msm_iommu_map_contig_buffer(tp->dmap,
+		ret = msm_iommu_map_contig_buffer(tp->dmap,
 					mdss_get_iommu_domain(domain), 0,
 					size, SZ_4K, 0, &(addr));
 		if (IS_ERR_VALUE(ret)) {
@@ -1425,7 +1425,7 @@ void mdss_mdp_clk_ctrl(int enable, int isr);
 void mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp)
 {
 	struct dcs_cmd_req *req;
-	int ret = -EINVAL;
+	int rc = 0;
 
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) || defined (CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)\
 	|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL)
@@ -1451,6 +1451,7 @@ void mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp)
 	 * also, axi bus bandwidth need since dsi controller will
 	 * fetch dcs commands from axi bus
 	 */
+	mdss_bus_scale_set_quota(MDSS_HW_DSI0, SZ_1M, SZ_1M);
 	mdss_bus_bandwidth_ctrl(1);
 
 #if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
@@ -1460,16 +1461,22 @@ void mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp)
 	pr_debug("%s:  from_mdp=%d pid=%d\n", __func__, from_mdp, current->pid);
 	mdss_dsi_clk_ctrl(ctrl, 1);
 
+	rc = mdss_iommu_ctrl(1);
+	if (IS_ERR_VALUE(rc)) {
+		pr_err("IOMMU attach failed\n");
+		mutex_unlock(&ctrl->cmd_mutex);
+		return;
+	}
 	if (req->flags & CMD_REQ_RX)
 		mdss_dsi_cmdlist_rx(ctrl, req);
 	else if (req->flags & CMD_REQ_SINGLE_TX)
 		mdss_dsi_cmds_single_tx(ctrl,req->cmds,req->cmds_cnt);
 	else
-		ret = mdss_dsi_cmdlist_tx(ctrl, req);
+		mdss_dsi_cmdlist_tx(ctrl, req);
 
+	mdss_iommu_ctrl(0);
 	mdss_dsi_clk_ctrl(ctrl, 0);
-	mdss_bus_bandwidth_ctrl(0);
-
+	mdss_bus_scale_set_quota(MDSS_HW_DSI0, 0, 0);
 need_lock:
 
 	if (from_mdp) /* from pipe_commit */

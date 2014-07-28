@@ -327,7 +327,7 @@ static int mdss_mdp_bus_scale_register(struct mdss_data_type *mdata)
 		pr_debug("register bus_hdl=%x\n", mdata->bus_hdl);
 	}
 
-	return mdss_mdp_bus_scale_set_quota(AB_QUOTA, IB_QUOTA);
+	return mdss_bus_scale_set_quota(MDSS_HW_MDP, AB_QUOTA, IB_QUOTA);
 }
 
 static void mdss_mdp_bus_scale_unregister(struct mdss_data_type *mdata)
@@ -395,6 +395,29 @@ int mdss_mdp_bus_scale_set_quota(u64 ab_quota, u64 ib_quota)
 
 	return msm_bus_scale_client_update_request(mdss_res->bus_hdl,
 		new_uc_idx);
+}
+
+int mdss_bus_scale_set_quota(int client, u64 ab_quota, u64 ib_quota)
+{
+	int rc = 0;
+	int i;
+	u64 total_ab = 0;
+	u64 total_ib = 0;
+
+	mutex_lock(&bus_bw_lock);
+
+	mdss_res->ab[client] = ab_quota;
+	mdss_res->ib[client] = ib_quota;
+	for (i = 0; i < MDSS_MAX_HW_BLK; i++) {
+		total_ab += mdss_res->ab[i];
+		total_ib = max(total_ib, mdss_res->ib[i]);
+	}
+
+	rc = mdss_mdp_bus_scale_set_quota(total_ab, total_ib);
+
+	mutex_unlock(&bus_bw_lock);
+
+	return rc;
 }
 
 static inline u32 mdss_mdp_irq_mask(u32 intr_type, u32 intf_num)
@@ -630,6 +653,37 @@ unsigned long mdss_mdp_get_clk_rate(u32 clk_idx)
 	return clk_rate;
 }
 
+int mdss_iommu_ctrl(int enable)
+{
+	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
+	int rc = 0;
+
+	mutex_lock(&mdp_iommu_lock);
+	pr_debug("%pS: enable %d mdata->iommu_ref_cnt %d\n",
+		__builtin_return_address(0), enable, mdata->iommu_ref_cnt);
+
+	if (enable) {
+
+		if (mdata->iommu_ref_cnt == 0)
+			rc = mdss_iommu_attach(mdata);
+		mdata->iommu_ref_cnt++;
+	} else {
+		if (mdata->iommu_ref_cnt) {
+			mdata->iommu_ref_cnt--;
+			if (mdata->iommu_ref_cnt == 0)
+				rc = mdss_iommu_dettach(mdata);
+		} else {
+			pr_err("unbalanced iommu ref\n");
+		}
+	}
+	mutex_unlock(&mdp_iommu_lock);
+
+	if (IS_ERR_VALUE(rc))
+		return rc;
+	else
+		return mdata->iommu_ref_cnt;
+}
+
 /**
  * mdss_bus_bandwidth_ctrl() -- place bus bandwidth request
  * @enable:	value of enable or disable
@@ -637,7 +691,7 @@ unsigned long mdss_mdp_get_clk_rate(u32 clk_idx)
  * Function place bus bandwidth request to allocate saved bandwidth
  * if enabled or free bus bandwidth allocation if disabled.
  * Bus bandwidth is required by mdp.For dsi, it only requires to send
- * dcs coammnd.
+ * dcs coammnd. It returns error if bandwidth request fails.
  */
 void mdss_bus_bandwidth_ctrl(int enable)
 {
@@ -667,14 +721,11 @@ void mdss_bus_bandwidth_ctrl(int enable)
 		if (!enable) {
 			msm_bus_scale_client_update_request(
 				mdata->bus_hdl, 0);
-			mdss_iommu_dettach(mdata);
 			pm_runtime_put(&mdata->pdev->dev);
 		} else {
 			pm_runtime_get_sync(&mdata->pdev->dev);
 			msm_bus_scale_client_update_request(
 				mdata->bus_hdl, mdata->curr_bw_uc_idx);
-			if (!mdata->handoff_pending)
-				mdss_iommu_attach(mdata);
 		}
 	}
 
@@ -832,14 +883,12 @@ int mdss_iommu_attach(struct mdss_data_type *mdata)
 {
 	struct iommu_domain *domain;
 	struct mdss_iommu_map_type *iomap;
-	int i;
+	int i, rc = 0;
 
 	xlog(__func__, mdata->iommu_attached, 0, 0, 0, 0, 0); 
-	mutex_lock(&mdp_iommu_lock);
 	if (mdata->iommu_attached) {
 		pr_debug("mdp iommu already attached\n");
-		mutex_unlock(&mdp_iommu_lock);
-		return 0;
+		goto end;
 	}
 
 	for (i = 0; i < MDSS_IOMMU_MAX_DOMAIN; i++) {
@@ -851,13 +900,21 @@ int mdss_iommu_attach(struct mdss_data_type *mdata)
 				iomap->client_name, iomap->ctx_name);
 			continue;
 		}
-		iommu_attach_device(domain, iomap->ctx);
+
+		rc = iommu_attach_device(domain, iomap->ctx);
+		if (rc) {
+			WARN(1, "mdp::iommu device attach failed rc:%d\n", rc);
+			for (i--; i >= 0; i--) {
+				iomap = mdata->iommu_map + i;
+				iommu_detach_device(domain, iomap->ctx);
+			}
+			goto end;
+		}
 	}
 
 	mdata->iommu_attached = true;
-	mutex_unlock(&mdp_iommu_lock);
-
-	return 0;
+end:
+	return rc;
 }
 
 int mdss_iommu_dettach(struct mdss_data_type *mdata)
@@ -867,10 +924,8 @@ int mdss_iommu_dettach(struct mdss_data_type *mdata)
 	int i;
 
 	xlog(__func__, mdata->iommu_attached, 0, 0, 0, 0, 0); 
-	mutex_lock(&mdp_iommu_lock);
 	if (!mdata->iommu_attached) {
 		pr_debug("mdp iommu already dettached\n");
-		mutex_unlock(&mdp_iommu_lock);
 		return 0;
 	}
 
@@ -887,7 +942,6 @@ int mdss_iommu_dettach(struct mdss_data_type *mdata)
 	}
 
 	mdata->iommu_attached = false;
-	mutex_unlock(&mdp_iommu_lock);
 
 	return 0;
 }
@@ -2549,8 +2603,6 @@ static void mdss_mdp_footswitch_ctrl(struct mdss_data_type *mdata, int on)
 		mdata->fs_ena = true;
 	} else {
 		pr_debug("Disable MDP FS\n");
-		if (is_mdss_iommu_attached()) 
-			mdss_iommu_dettach(mdata);
 		if (mdata->fs_ena) {
 			regulator_disable(mdata->fs);
 			mdss_mdp_cx_ctrl(mdata, false);

@@ -25,6 +25,13 @@
 
 #define TIMEOUT_MS 1000
 
+/*
+ * AVS bring up in the modem is optimitized for the new
+ * Sub System Restart design and 100 milliseconds timeout
+ * is sufficient to make sure the Q6 will be ready.
+ */
+#define Q6_READY_TIMEOUT_MS 100
+
 struct q6core_str {
 	struct apr_svc *core_handle_q;
 	wait_queue_head_t bus_bw_req_wait;
@@ -40,6 +47,11 @@ static int32_t aprv2_core_fn_q(struct apr_client_data *data, void *priv)
 	uint32_t *payload1;
 	uint32_t nseg;
 	int i, j;
+
+	if (data == NULL) {
+		pr_err("%s: data argument is null\n", __func__);
+		return -EINVAL;
+	}
 
 	pr_debug("core msg: payload len = %u, apr resp opcode = 0x%X\n",
 		data->payload_size, data->opcode);
@@ -232,7 +244,7 @@ bool q6core_is_adsp_ready(void)
 
 	rc = wait_event_timeout(q6core_lcl.bus_bw_req_wait,
 				(q6core_lcl.bus_bw_resp_received == 1),
-				msecs_to_jiffies(TIMEOUT_MS));
+				msecs_to_jiffies(Q6_READY_TIMEOUT_MS));
 	if (rc > 0 && q6core_lcl.bus_bw_resp_received) {
 		/* ensure to read updated param by callback thread */
 		rmb();
