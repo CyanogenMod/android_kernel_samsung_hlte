@@ -385,10 +385,20 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 		 * otherwise the counter becomes a doomsday timer for otherwise
 		 * working systems
 		 */
-		if (time_after(jiffies, desc->last_unhandled + HZ/10))
+		if (time_after(jiffies, desc->last_unhandled + HZ/10)) {
 			desc->irqs_unhandled = 1;
-		else
+		} else {
 			desc->irqs_unhandled++;
+			if (unlikely(desc->istate & IRQS_SUSPENDED)) {
+				/*
+				 * That shouldn't happen.  It means IRQs from
+				 * a device that is supposed to be suspended at
+				 * this point.  Decay faster.
+				 */
+				desc->irqs_unhandled += 999;
+				desc->irq_count += 999;
+			}
+		}
 		desc->last_unhandled = jiffies;
 	}
 
