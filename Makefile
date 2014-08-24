@@ -347,27 +347,10 @@ CHECK		= sparse
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
-
-MODFLAGS        = -DMODULE \
-                  -march=armv7-a \
-                  -mfpu=neon-vfpv4 \
-                  -mtune=cortex-a15 \
-                  -O3 \
-                  -fgcse-las
-
 CFLAGS_MODULE   = -munaligned-access -fno-pic -mfpu=neon-vfpv4
 AFLAGS_MODULE   =
-LDFLAGS_MODULE  =
-CFLAGS_KERNEL   = -march=armv7-a \
-                  -mfpu=neon-vfpv4 \
-                  -mtune=cortex-a15 \
-                  -O2 \
-                  -fgcse-las \
-                  -fpredictive-commoning \
-		  -Wno-error=implicit-function-declaration
-ifeq ($(ENABLE_GRAPHITE),true)
-CFLAGS_KERNEL	+= -fgraphite -floop-parallelize-all -ftree-loop-linear -floop-interchange -floop-strip-mine -floop-block
-endif
+LDFLAGS_MODULE  = --strip-debug
+CFLAGS_KERNEL   =
 AFLAGS_KERNEL	=
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
@@ -388,7 +371,10 @@ KBUILD_CFLAGS   := -w -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Wno-maybe-uninitialized \
 		   -Wno-sizeof-pointer-memaccess \
 		   -fno-delete-null-pointer-checks \
-		   -march=armv7-a -marm -mfpu=neon-vfpv4
+		   -marm -mcpu=cortex-a15 -mtune=cortex-a15 -mfpu=neon-vfpv4 \
+                   -mvectorize-with-neon-quad -fgcse-after-reload -fgcse-sm \
+                   -fgcse-las -ftree-loop-im -ftree-loop-ivcanon -fivopts \
+                   -ftree-vectorize -fmodulo-sched -ffast-math
 
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
