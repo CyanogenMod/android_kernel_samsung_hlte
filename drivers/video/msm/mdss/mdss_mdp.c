@@ -58,6 +58,8 @@
 #define CREATE_TRACE_POINTS
 #include "mdss_mdp_trace.h"
 
+#define AUTOSUSPEND_TIMEOUT_MS	200
+
 struct mdss_data_type *mdss_res;
 static int mdp_clk_cnt;
 
@@ -727,7 +729,8 @@ void mdss_bus_bandwidth_ctrl(int enable)
 		if (!enable) {
 			msm_bus_scale_client_update_request(
 				mdata->bus_hdl, 0);
-			pm_runtime_put(&mdata->pdev->dev);
+			pm_runtime_mark_last_busy(&mdata->pdev->dev);
+			pm_runtime_put_autosuspend(&mdata->pdev->dev);
 		} else {
 			pm_runtime_get_sync(&mdata->pdev->dev);
 			msm_bus_scale_client_update_request(
@@ -778,8 +781,10 @@ void mdss_mdp_clk_ctrl(int enable, int isr)
 
 		mdss_bus_bandwidth_ctrl(enable);
 
-		if (!enable)
-			pm_runtime_put(&mdata->pdev->dev);
+		if (!enable) {
+			pm_runtime_mark_last_busy(&mdata->pdev->dev);
+			pm_runtime_put_autosuspend(&mdata->pdev->dev);
+		}
 	}
 
 	mutex_unlock(&mdp_clk_lock);
@@ -1349,6 +1354,8 @@ static int mdss_mdp_probe(struct platform_device *pdev)
 		goto probe_done;
 	}
 
+	pm_runtime_set_autosuspend_delay(&pdev->dev, AUTOSUSPEND_TIMEOUT_MS);
+	pm_runtime_use_autosuspend(&pdev->dev);
 	pm_runtime_set_suspended(&pdev->dev);
 	pm_runtime_enable(&pdev->dev);
 	if (!pm_runtime_enabled(&pdev->dev))
