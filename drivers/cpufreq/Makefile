@@ -11,16 +11,10 @@ obj-$(CONFIG_CPU_FREQ_GOV_PERFORMANCE)	+= cpufreq_performance.o
 obj-$(CONFIG_CPU_FREQ_GOV_POWERSAVE)	+= cpufreq_powersave.o
 obj-$(CONFIG_CPU_FREQ_GOV_USERSPACE)	+= cpufreq_userspace.o
 obj-$(CONFIG_CPU_FREQ_GOV_ONDEMAND)	+= cpufreq_ondemand.o
-obj-$(CONFIG_CPU_FREQ_GOV_YANKDEMAND)	+= cpufreq_yankdemand.o
 obj-$(CONFIG_CPU_FREQ_GOV_CONSERVATIVE)	+= cpufreq_conservative.o
 obj-$(CONFIG_CPU_FREQ_GOV_INTERACTIVE)	+= cpufreq_interactive.o
 obj-$(CONFIG_CPU_FREQ_GOV_INTELLIDEMAND)+= cpufreq_intellidemand.o
 obj-$(CONFIG_CPU_FREQ_GOV_INTELLIACTIVE)+= cpufreq_intelliactive.o
-obj-$(CONFIG_CPU_FREQ_GOV_NIGHTMARE)	+= cpufreq_nightmare.o
-obj-$(CONFIG_CPU_FREQ_GOV_PEGASUSQ)	+= cpufreq_pegasusq.o
-obj-$(CONFIG_CPU_FREQ_GOV_HYPER)	+= cpufreq_HYPER.o
-obj-$(CONFIG_CPU_FREQ_GOV_ABYSSPLUGV2)	+= cpufreq_abyssplugv2.o
-obj-$(CONFIG_CPU_FREQ_GOV_ONDEMANDPLUS)	+= cpufreq_ondemandplus.o
 obj-$(CONFIG_CPU_FREQ_GOV_YANKACTIVE)	+= cpufreq_yankactive.o
 
 # CPUfreq cross-arch helpers
