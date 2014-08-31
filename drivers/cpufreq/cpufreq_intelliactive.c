@@ -32,7 +32,6 @@
 #include <linux/slab.h>
 #include <linux/kernel_stat.h>
 #include <asm/cputime.h>
-#include <linux/input.h>
 
 static int active_count;
 
@@ -136,12 +135,6 @@ static unsigned int sync_freq = 729600;
 static unsigned int up_threshold_any_cpu_freq = 960000;
 
 static int two_phase_freq_array[NR_CPUS] = {[0 ... NR_CPUS-1] = 1728000} ;
-
-/*
- * Duration in usec to be used with touchboost(interactive_input_event).
- * Default is 500000 usec(500 msec).
- */
-#define TOUCHBOOST_DURATION 500000
 
 static int cpufreq_governor_intelliactive(struct cpufreq_policy *policy,
 		unsigned int event);
@@ -1272,79 +1265,6 @@ static struct attribute *interactive_attributes[] = {
 	NULL,
 };
 
-static void interactive_input_event(struct input_handle *handle,
-		unsigned int type,
-		unsigned int code, int value)
-{
-	if (type == EV_SYN && code == SYN_REPORT) {
-		boostpulse_endtime = ktime_to_us(ktime_get()) + TOUCHBOOST_DURATION;
-		cpufreq_interactive_boost();
-	}
-}
-
-static int interactive_input_connect(struct input_handler *handler,
-		struct input_dev *dev, const struct input_device_id *id)
-{
-	struct input_handle *handle;
-	int error;
-
-	handle = kzalloc(sizeof(struct input_handle), GFP_KERNEL);
-	if (!handle)
-		return -ENOMEM;
-
-	handle->dev = dev;
-	handle->handler = handler;
-	handle->name = "cpufreq";
-
-	error = input_register_handle(handle);
-	if (error)
-		goto err2;
-
-	error = input_open_device(handle);
-	if (error)
-		goto err1;
-
-	return 0;
-err1:
-	input_unregister_handle(handle);
-err2:
-	kfree(handle);
-	return error;
-}
-
-static void interactive_input_disconnect(struct input_handle *handle)
-{
-	input_close_device(handle);
-	input_unregister_handle(handle);
-	kfree(handle);
-}
-
-static const struct input_device_id interactive_ids[] = {
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
-			 INPUT_DEVICE_ID_MATCH_ABSBIT,
-		.evbit = { BIT_MASK(EV_ABS) },
-		.absbit = { [BIT_WORD(ABS_MT_POSITION_X)] =
-			    BIT_MASK(ABS_MT_POSITION_X) |
-			    BIT_MASK(ABS_MT_POSITION_Y) },
-	}, /* multi-touch touchscreen */
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_KEYBIT |
-			 INPUT_DEVICE_ID_MATCH_ABSBIT,
-		.keybit = { [BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH) },
-		.absbit = { [BIT_WORD(ABS_X)] =
-			    BIT_MASK(ABS_X) | BIT_MASK(ABS_Y) },
-	}, /* touchpad */
-};
-
-static struct input_handler interactive_input_handler = {
-	.event		= interactive_input_event,
-	.connect	= interactive_input_connect,
-	.disconnect	= interactive_input_disconnect,
-	.name		= "intelliactive",
-	.id_table	= interactive_ids,
-};
-
 static struct attribute_group interactive_attr_group = {
 	.attrs = interactive_attributes,
 	.name = "intelliactive",
@@ -1419,10 +1339,6 @@ static int cpufreq_governor_intelliactive(struct cpufreq_policy *policy,
 			return 0;
 		}
 
-		if (!policy->cpu)
-			rc = input_register_handler
-				(&interactive_input_handler);
-
 		rc = sysfs_create_group(cpufreq_global_kobject,
 				&interactive_attr_group);
 		if (rc) {
@@ -1449,8 +1365,6 @@ static int cpufreq_governor_intelliactive(struct cpufreq_policy *policy,
 		}
 
 		if (--active_count > 0) {
-			if (!policy->cpu)
-				input_unregister_handler(&interactive_input_handler);
 			mutex_unlock(&gov_lock);
 			return 0;
 		}
@@ -1532,8 +1446,6 @@ static int __init cpufreq_intelliactive_init(void)
 		spin_lock_init(&pcpu->load_lock);
 		spin_lock_init(&pcpu->target_freq_lock);
 		init_rwsem(&pcpu->enable_sem);
-		if (!i)
-			rc = input_register_handler(&interactive_input_handler);
 	}
 
 	spin_lock_init(&target_loads_lock);
@@ -1566,10 +1478,6 @@ static void __exit cpufreq_interactive_exit(void)
 	unsigned int cpu;
 
 	cpufreq_unregister_governor(&cpufreq_gov_intelliactive);
-	for_each_possible_cpu(cpu) {
-		if(!cpu)
-			input_unregister_handler(&interactive_input_handler);
-	}
 	kthread_stop(speedchange_task);
 	put_task_struct(speedchange_task);
 }
