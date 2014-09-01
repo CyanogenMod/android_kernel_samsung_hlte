@@ -21,6 +21,7 @@
  *                 Apply upstream patches from https://github.com/android/kernel_common (branch android-3.4)
  *                 Remove unnecessary tracer
  *                 Bring-up Touchboost from intelliactive (by faux123)
+ *                 Predefine some governor tunables
  *
  */
 
@@ -149,7 +150,7 @@ static u64 boostpulse_endtime;
 #define DEFAULT_TIMER_SLACK (4 * DEFAULT_TIMER_RATE)
 static int timer_slack_val = DEFAULT_TIMER_SLACK;
 
-static bool io_is_busy;
+static bool io_is_busy = 1;
 
 #ifdef CONFIG_MODE_AUTO_CHANGE
 struct cpufreq_loadinfo {
@@ -211,9 +212,9 @@ static unsigned int sampling_down_factor_set[MAX_PARAM_SET];
  * up_threshold_any_cpu_freq then do not let the frequency to drop below
  * sync_freq
  */
-static unsigned int up_threshold_any_cpu_load;
-static unsigned int sync_freq;
-static unsigned int up_threshold_any_cpu_freq;
+static unsigned int up_threshold_any_cpu_load = 95;
+static unsigned int sync_freq = 729600;
+static unsigned int up_threshold_any_cpu_freq = 960000;
 
 static int cpufreq_governor_arteractive(struct cpufreq_policy *policy,
 		unsigned int event);
