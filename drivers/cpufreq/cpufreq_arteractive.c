@@ -17,6 +17,7 @@
  *         Park Ju Hyung - bring-up from SM-G900F source drop (qkrwngud825@gmail.com)
  *
  * Version : 1.0 - Initial bring-up from SM-G900F_KK_Opensource_Update3.zip
+ *                 Whitespace fix-ups
  *
  */
 
@@ -198,7 +199,7 @@ static int cpufreq_governor_arteractive(struct cpufreq_policy *policy,
 		unsigned int event);
 
 #define DYN_DEFER (1)
-		
+
 #ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_ARTERACTIVE
 static
 #endif
@@ -236,15 +237,15 @@ static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
 static inline void timer_set_nondeferrable(struct timer_list *timer)
 {
        timer->base =
-               ((struct tvec_base *)((unsigned long)timer->base &
-                       ~TIMER_DEFERRABLE));
+	       ((struct tvec_base *)((unsigned long)timer->base &
+		       ~TIMER_DEFERRABLE));
 }
 
 static inline void timer_set_deferrable(struct timer_list *timer)
 {
        timer->base =
-               ((struct tvec_base *)((unsigned long)timer->base |
-                       TIMER_DEFERRABLE));
+	       ((struct tvec_base *)((unsigned long)timer->base |
+		       TIMER_DEFERRABLE));
 }
 #endif
 
@@ -274,12 +275,12 @@ static void cpufreq_interactive_timer_resched(
 	pcpu->cputime_speedadj = 0;
 	pcpu->cputime_speedadj_timestamp = pcpu->time_in_idle_timestamp;
 	expires = jiffies + usecs_to_jiffies(timer_rate);
-	
+
 #ifdef DYN_DEFER
        if (pcpu->target_freq > pcpu->policy->min)
-               timer_set_nondeferrable(&pcpu->cpu_timer);
+	       timer_set_nondeferrable(&pcpu->cpu_timer);
        else
-               timer_set_deferrable(&pcpu->cpu_timer);
+	       timer_set_deferrable(&pcpu->cpu_timer);
 #endif
 
 	mod_timer_pinned(&pcpu->cpu_timer, expires);
@@ -578,7 +579,7 @@ static void set_new_param_set(unsigned int index)
 
 	spin_lock_irqsave(&target_loads_lock, flags);
 	target_loads = target_loads_set[index];
-	ntarget_loads =	ntarget_loads_set[index];
+	ntarget_loads = ntarget_loads_set[index];
 	spin_unlock_irqrestore(&target_loads_lock, flags);
 
 	min_sample_time = min_sample_time_set[index];
@@ -1561,29 +1562,29 @@ static struct global_attr up_threshold_any_cpu_freq_attr =
 #ifdef CONFIG_MODE_AUTO_CHANGE
 #define index(obj_name, obj_attr)					\
 static ssize_t show_##obj_name(struct kobject *kobj,			\
-                              struct attribute *attr, char *buf)	\
+			      struct attribute *attr, char *buf)	\
 {									\
-        return sprintf(buf, "%u\n", obj_name);				\
+	return sprintf(buf, "%u\n", obj_name);				\
 }									\
 									\
 static ssize_t store_##obj_name(struct kobject *kobj,			\
-                               struct attribute *attr, const char *buf,	\
-                               size_t count)				\
+			       struct attribute *attr, const char *buf,	\
+			       size_t count)				\
 {									\
-        int ret;							\
-        long unsigned int val;						\
+	int ret;							\
+	long unsigned int val;						\
 									\
-        ret = strict_strtoul(buf, 0, &val);				\
-        if (ret < 0)							\
-                return ret;						\
+	ret = strict_strtoul(buf, 0, &val);				\
+	if (ret < 0)							\
+		return ret;						\
 									\
 	val &= MULTI_MODE | SINGLE_MODE | NO_MODE;			\
-        obj_name = val;							\
-        return count;							\
+	obj_name = val;							\
+	return count;							\
 }									\
 									\
 static struct global_attr obj_attr = __ATTR(obj_name, 0644,		\
-                show_##obj_name, store_##obj_name);			\
+		show_##obj_name, store_##obj_name);			\
 
 index(mode, mode_attr);
 index(enforced_mode, enforced_mode_attr);
@@ -1591,28 +1592,28 @@ index(param_index, param_index_attr);
 
 #define load(obj_name, obj_attr)					\
 static ssize_t show_##obj_name(struct kobject *kobj,			\
-                              struct attribute *attr, char *buf)	\
+			      struct attribute *attr, char *buf)	\
 {									\
-        return sprintf(buf, "%u\n", obj_name);				\
+	return sprintf(buf, "%u\n", obj_name);				\
 }									\
 									\
 static ssize_t store_##obj_name(struct kobject *kobj,			\
-                               struct attribute *attr, const char *buf,	\
-                               size_t count)				\
+			       struct attribute *attr, const char *buf,	\
+			       size_t count)				\
 {									\
-        int ret;							\
-        long unsigned int val;						\
+	int ret;							\
+	long unsigned int val;						\
 									\
-        ret = strict_strtoul(buf, 0, &val);				\
-        if (ret < 0)							\
-                return ret;						\
+	ret = strict_strtoul(buf, 0, &val);				\
+	if (ret < 0)							\
+		return ret;						\
 									\
-        obj_name = val;							\
-        return count;							\
+	obj_name = val;							\
+	return count;							\
 }									\
 									\
 static struct global_attr obj_attr = __ATTR(obj_name, 0644,		\
-                show_##obj_name, store_##obj_name);			\
+		show_##obj_name, store_##obj_name);			\
 
 load(multi_enter_load, multi_enter_load_attr);
 load(multi_exit_load, multi_exit_load_attr);
@@ -1621,28 +1622,28 @@ load(single_exit_load, single_exit_load_attr);
 
 #define time(obj_name, obj_attr)					\
 static ssize_t show_##obj_name(struct kobject *kobj,			\
-                              struct attribute *attr, char *buf)	\
+			      struct attribute *attr, char *buf)	\
 {									\
-        return sprintf(buf, "%lu\n", obj_name);				\
+	return sprintf(buf, "%lu\n", obj_name);				\
 }									\
 									\
 static ssize_t store_##obj_name(struct kobject *kobj,			\
-                               struct attribute *attr, const char *buf,	\
-                               size_t count)				\
+			       struct attribute *attr, const char *buf,	\
+			       size_t count)				\
 {									\
-        int ret;							\
-        unsigned long val;						\
+	int ret;							\
+	unsigned long val;						\
 									\
-        ret = strict_strtoul(buf, 0, &val);				\
-        if (ret < 0)							\
-                return ret;						\
+	ret = strict_strtoul(buf, 0, &val);				\
+	if (ret < 0)							\
+		return ret;						\
 									\
-        obj_name = val;							\
-        return count;							\
+	obj_name = val;							\
+	return count;							\
 }									\
 									\
 static struct global_attr obj_attr = __ATTR(obj_name, 0644,		\
-                show_##obj_name, store_##obj_name);			\
+		show_##obj_name, store_##obj_name);			\
 
 time(multi_enter_time, multi_enter_time_attr);
 time(multi_exit_time, multi_exit_time_attr);
@@ -1751,7 +1752,7 @@ static int cpufreq_governor_arteractive(struct cpufreq_policy *policy,
 		if (!hispeed_freq)
 			hispeed_freq = policy->max;
 #ifdef CONFIG_MODE_AUTO_CHANGE
-	        for (j=0 ; j<MAX_PARAM_SET ; j++)
+		for (j=0 ; j<MAX_PARAM_SET ; j++)
 			if (!hispeed_freq_set[j])
 				hispeed_freq_set[j] = policy->max;
 #endif
