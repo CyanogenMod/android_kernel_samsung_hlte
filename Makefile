@@ -245,8 +245,8 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 
 HOSTCC       = gcc
 HOSTCXX      = g++
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O3 -fomit-frame-pointer -fgcse-las
-HOSTCXXFLAGS = -O3  -fgcse-las
+HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer
+HOSTCXXFLAGS = -O2
 
 # Decide whether to build built-in, modular, or both.
 # Normally, just do built-in.
@@ -347,7 +347,7 @@ CHECK		= sparse
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
-CFLAGS_MODULE   = -munaligned-access -fno-pic -mfpu=neon-vfpv4
+CFLAGS_MODULE   = -munaligned-access -fno-pic
 AFLAGS_MODULE   =
 LDFLAGS_MODULE  = --strip-debug
 CFLAGS_KERNEL   =
@@ -364,17 +364,17 @@ LINUXINCLUDE    := -I$(srctree)/arch/$(hdr-arch)/include \
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 
-KBUILD_CFLAGS   := -w -Wundef -Wstrict-prototypes -Wno-trigraphs \
+KBUILD_CFLAGS   := -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
 		   -Wno-maybe-uninitialized \
-		   -Wno-sizeof-pointer-memaccess \
-		   -fno-delete-null-pointer-checks \
-		   -marm -mcpu=cortex-a15 -mtune=cortex-a15 -mfpu=neon-vfpv4 \
-                   -mvectorize-with-neon-quad -fgcse-after-reload -fgcse-sm \
-                   -fgcse-las -ftree-loop-im -ftree-loop-ivcanon -fivopts \
-                   -ftree-vectorize -fmodulo-sched -ffast-math
+		   -fno-delete-null-pointer-checks
+
+# arter97's optimizations
+KBUILD_CFLAGS	+= -s -pipe -Ofast -mcpu=cortex-a15 -mtune=cortex-a15 -mfloat-abi=hard -mfpu=vfpv4 -fno-tree-vectorize -fmodulo-sched -fmodulo-sched-allow-regmoves -fno-inline-functions -funroll-loops
+# -Wno-unused
+KBUILD_CFLAGS	+= -Wno-unused
 
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
