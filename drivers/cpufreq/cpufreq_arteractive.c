@@ -48,7 +48,7 @@
  *    Setting this to 1 will activate Touchboost and use maximum frequency on screen touch input events.
  * Please set this to 0 if the source-tree has another Touchboost(e.g. TSP_BOOSTER) implemented.
  */
-#define TOUCHBOOST 1
+#define TOUCHBOOST 0
 
 /*
  * Duration in usec to be used with Touchboost(interactive_input_event).
