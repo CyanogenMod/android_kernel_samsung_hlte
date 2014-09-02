@@ -237,14 +237,14 @@ static inline void timer_set_nondeferrable(struct timer_list *timer)
 {
        timer->base =
                ((struct tvec_base *)((unsigned long)timer->base &
-                       ~TBASE_DEFERRABLE_FLAG));
+                       ~TIMER_DEFERRABLE));
 }
 
 static inline void timer_set_deferrable(struct timer_list *timer)
 {
        timer->base =
                ((struct tvec_base *)((unsigned long)timer->base |
-                       TBASE_DEFERRABLE_FLAG));
+                       TIMER_DEFERRABLE));
 }
 #endif
 
