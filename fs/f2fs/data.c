@@ -1544,54 +1544,32 @@ static int f2fs_write_end(struct file *file,
 	return copied;
 }
 
-static ssize_t check_direct_IO(struct inode *inode, int rw,
-		const struct iovec *iov, loff_t offset, unsigned long nr_segs)
+static int check_direct_IO(struct inode *inode, int rw,
+		struct iov_iter *iter, loff_t offset)
 {
 	unsigned blocksize_mask = inode->i_sb->s_blocksize - 1;
-	int seg, i;
-	size_t size;
-	unsigned long addr;
-	ssize_t retval = -EINVAL;
-	loff_t end = offset;
+	size_t count = iov_iter_count(iter);
+	loff_t final_size = offset + count;
+
+	if (rw == READ)
+		return 0;
 
 	if (offset & blocksize_mask)
 		return -EINVAL;
 
-	/* Check the memory alignment.  Blocks cannot straddle pages */
-	for (seg = 0; seg < nr_segs; seg++) {
-		addr = (unsigned long)iov[seg].iov_base;
-		size = iov[seg].iov_len;
-		end += size;
-		if ((addr & blocksize_mask) || (size & blocksize_mask))
-			goto out;
+	if (final_size & blocksize_mask)
+		return -EINVAL;
 
-		/* If this is a write we don't need to check anymore */
-		if (rw & WRITE)
-			continue;
-
-		/*
-		 * Check to make sure we don't have duplicate iov_base's in this
-		 * iovec, if so return EINVAL, otherwise we'll get csum errors
-		 * when reading back.
-		 */
-		for (i = seg + 1; i < nr_segs; i++) {
-			if (iov[seg].iov_base == iov[i].iov_base)
-				goto out;
-		}
-	}
-	retval = 0;
-out:
-	return retval;
+	return 0;
 }
 
 static ssize_t f2fs_direct_IO(int rw, struct kiocb *iocb,
-				const struct iovec *iov, loff_t offset,
-				unsigned long nr_segs)
+				struct iov_iter *iter, loff_t offset)
 {
 	struct file *file = iocb->ki_filp;
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
-	size_t count = iov_length(iov, nr_segs);
+	size_t count = iov_iter_count(iter);
 	int err;
 
 	/* we don't need to use inline_data strictly */
@@ -1604,9 +1582,8 @@ static ssize_t f2fs_direct_IO(int rw, struct kiocb *iocb,
 	if (f2fs_encrypted_inode(inode) && S_ISREG(inode->i_mode))
 		return 0;
 
-	err = check_direct_IO(inode, rw, iov, offset, nr_segs);
-	if (err)
-		return err;
+	if (check_direct_IO(inode, rw, iter, offset))
+		return 0;
 
 	trace_f2fs_direct_IO_enter(inode, offset, count, rw);
 
@@ -1618,8 +1595,7 @@ static ssize_t f2fs_direct_IO(int rw, struct kiocb *iocb,
 		}
 	}
 
-	err = blockdev_direct_IO(rw, iocb, inode, iov, offset, nr_segs,
-							get_data_block_dio);
+	err = blockdev_direct_IO(rw, iocb, inode, iter, offset, get_data_block_dio);
 out:
 	if (err < 0 && (rw & WRITE))
 		f2fs_write_failed(mapping, offset + count);
