@@ -1119,10 +1119,11 @@ static int f2fs_write_end(struct file *file,
 }
 
 static int check_direct_IO(struct inode *inode, int rw,
-		const struct iovec *iov, loff_t offset, unsigned long nr_segs)
+		struct iov_iter *iter, loff_t offset)
 {
 	unsigned blocksize_mask = inode->i_sb->s_blocksize - 1;
-	int i;
+	size_t count = iov_iter_count(iter);
+	loff_t final_size = offset + count;
 
 	if (rw == READ)
 		return 0;
@@ -1130,21 +1131,19 @@ static int check_direct_IO(struct inode *inode, int rw,
 	if (offset & blocksize_mask)
 		return -EINVAL;
 
-	for (i = 0; i < nr_segs; i++)
-		if (iov[i].iov_len & blocksize_mask)
-			return -EINVAL;
+	if (final_size & blocksize_mask)
+		return -EINVAL;
 
 	return 0;
 }
 
 static ssize_t f2fs_direct_IO(int rw, struct kiocb *iocb,
-				const struct iovec *iov, loff_t offset,
-				unsigned long nr_segs)
+				struct iov_iter *iter, loff_t offset)
 {
 	struct file *file = iocb->ki_filp;
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
-	size_t count = iov_length(iov, nr_segs);
+	size_t count = iov_iter_count(iter);
 	int err;
 
 	/* we don't need to use inline_data strictly */
@@ -1154,7 +1153,7 @@ static ssize_t f2fs_direct_IO(int rw, struct kiocb *iocb,
 			return err;
 	}
 
-	if (check_direct_IO(inode, rw, iov, offset, nr_segs))
+	if (check_direct_IO(inode, rw, iter, offset))
 		return 0;
 
 	trace_f2fs_direct_IO_enter(inode, offset, count, rw);
@@ -1162,8 +1161,7 @@ static ssize_t f2fs_direct_IO(int rw, struct kiocb *iocb,
 	if (rw & WRITE)
 		__allocate_data_blocks(inode, offset, count);
 
-	err = blockdev_direct_IO(rw, iocb, inode, iov, offset, nr_segs,
-							get_data_block);
+	err = blockdev_direct_IO(rw, iocb, inode, iter, offset, get_data_block);
 	if (err < 0 && (rw & WRITE))
 		f2fs_write_failed(mapping, offset + count);
 
