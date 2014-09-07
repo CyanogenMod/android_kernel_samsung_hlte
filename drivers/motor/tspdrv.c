@@ -121,20 +121,30 @@ static int vibrator_work;
 
 struct vibrator_platform_data vibrator_drvdata;
 
+/*
+ * msm8974_sec tspdrv vibration strength control
+ * (/sys/vibrator/pwm_val)
+ *
+ * integer strength range: 0 ~ 126
+ * sysfs   pwm_val  range: 0 ~ 100
+ *
+ * Author : Park Ju Hyung <qkrwngud825@gmail.com>
+ */
+static unsigned long pwm_val = 100; /* strength in percent */
+static int8_t strength = 126;
+
 static int set_vibetonz(int timeout)
 {
-	int8_t strength;
 	if (!timeout) {
 		if (vibrator_drvdata.vib_model == HAPTIC_PWM) {
-			strength = 0;
-			ImmVibeSPI_ForceOut_SetSamples(0, 8, 1, &strength);
+			int8_t zero = 0;
+			ImmVibeSPI_ForceOut_SetSamples(0, 8, 1, &zero);
 		} else { /* HAPTIC_MOTOR */
 			ImmVibeSPI_ForceOut_AmpDisable(0);
 		}
 	} else {
 		DbgOut((KERN_INFO "tspdrv: ENABLE\n"));
 		if (vibrator_drvdata.vib_model == HAPTIC_PWM) {
-			strength = 126;
 			/* 90% duty cycle */
 			ImmVibeSPI_ForceOut_SetSamples(0, 8, 1, &strength);
 		} else { /* HAPTIC_MOTOR */
@@ -144,6 +154,60 @@ static int set_vibetonz(int timeout)
 	}
 
 	vibrator_value = timeout;
+	return 0;
+}
+
+static ssize_t pwm_val_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int count;
+
+	pwm_val = (strength * 100) / 126;
+
+	count = sprintf(buf, "%lu\n", pwm_val);
+	pr_debug("[VIB] pwm_val: %lu\n", pwm_val);
+
+	return count;
+}
+
+ssize_t pwm_val_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t size)
+{
+	if (kstrtoul(buf, 0, &pwm_val))
+		pr_err("[VIB] %s: error on storing pwm_val\n", __func__);
+
+	if ((pwm_val > 100) || (pwm_val < 0)) {
+		pr_info("[VIB] %s: pwm_val %lu is out of [0, 100] range\n", __func__, pwm_val);
+		return -EINVAL;
+	} else {
+		pr_info("[VIB] %s: pwm_val=%lu\n", __func__, pwm_val);
+	}
+
+	strength = (pwm_val * 126) / 100;
+
+	pr_info("[VIB] %s: strength=%d\n", __func__, strength);
+
+	return size;
+}
+static DEVICE_ATTR(pwm_val, S_IRUGO | S_IWUSR,
+		pwm_val_show, pwm_val_store);
+
+static int create_vibrator_sysfs(void)
+{
+	int ret;
+	struct kobject *vibrator_kobj;
+	vibrator_kobj = kobject_create_and_add("vibrator", NULL);
+	if (unlikely(!vibrator_kobj))
+		return -ENOMEM;
+
+	ret = sysfs_create_file(vibrator_kobj,
+		&dev_attr_pwm_val.attr);
+	if (unlikely(ret < 0)) {
+		pr_err("[VIB] sysfs_create_file failed: %d\n", ret);
+		return ret;
+	}
+
 	return 0;
 }
 
@@ -554,6 +618,7 @@ static __devinit int tspdrv_probe(struct platform_device *pdev)
 		return ret;
 	}
 #endif
+	create_vibrator_sysfs();
 
 	DbgRecorderInit(());
 
