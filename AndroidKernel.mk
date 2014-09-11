@@ -20,6 +20,7 @@ USE_MODULE ?= $(shell $(PERL) -e '$$of = "n"; while (<>) { if (/CONFIG_MODULES=y
 DTS_NAMES ?= $(shell $(PERL) -e 'while (<>) {$$a = $$1 if /CONFIG_ARCH_((?:MSM|QSD|MPQ)[a-zA-Z0-9]+)=y/; $$r = $$1 if /CONFIG_MSM_SOC_REV_(?!NONE)(\w+)=y/; $$arch = $$arch.lc("$$a$$r ") if /CONFIG_ARCH_((?:MSM|QSD|MPQ)[a-zA-Z0-9]+)=y/} print $$arch;' $(KERNEL_CONFIG))
 KERNEL_USE_OF ?= $(shell $(PERL) -e '$$of = "n"; while (<>) { if (/CONFIG_USE_OF=y/) { $$of = "y"; break; } } print $$of;' kernel/arch/arm/configs/$(KERNEL_DEFCONFIG))
 LOCALE_KOR ?= $(shell $(PERL) -e '$$of = "n"; while (<>) { if (/CONFIG_SEC_LOCALE_KOR=y/) { $$of = "y"; break; } } print $$of;' $(KERNEL_CONFIG))
+LOCALE_JPN ?= $(shell $(PERL) -e '$$of = "n"; while (<>) { if (/CONFIG_SEC_LOCALE_JPN=y/) { $$of = "y"; break; } } print $$of;' $(KERNEL_CONFIG))
 K_PROJECT ?= $(shell $(PERL) -e '$$of = "n"; while (<>) { if (/CONFIG_SEC_K_PROJECT=y/) { $$of = "y"; break; } } print $$of;' $(KERNEL_CONFIG))
 H_PROJECT ?= $(shell $(PERL) -e '$$of = "n"; while (<>) { if (/CONFIG_SEC_H_PROJECT=y/) { $$of = "y"; break; } } print $$of;' $(KERNEL_CONFIG))
 F_PROJECT ?= $(shell $(PERL) -e '$$of = "n"; while (<>) { if (/CONFIG_SEC_F_PROJECT=y/) { $$of = "y"; break; } } print $$of;' $(KERNEL_CONFIG))
@@ -74,10 +75,14 @@ $(info printing $(DTS_NAMES))
 $(info printing $(DTS_FILES))
 
 ifeq "$(H_PROJECT)" "y"
-	ifeq "$(LOCALE_KOR)" "y"
-		DTS_FILES = $(wildcard $(TOP)/kernel/arch/arm/boot/dts/msm8974/$(DTS_NAME)-sec-hltekor*.dts)
+	ifeq "$(LOCALE_JPN)" "y"
+		DTS_FILES = $(wildcard $(TOP)/kernel/arch/arm/boot/dts/msm8974/$(DTS_NAME)-sec-hltejpn*.dts)
 	else
-		DTS_FILES = $(wildcard $(TOP)/kernel/arch/arm/boot/dts/msm8974/$(DTS_NAME)-sec-hlte-*.dts)
+		ifeq "$(LOCALE_KOR)" "y"
+			DTS_FILES = $(wildcard $(TOP)/kernel/arch/arm/boot/dts/msm8974/$(DTS_NAME)-sec-hltekor*.dts)
+		else
+			DTS_FILES = $(wildcard $(TOP)/kernel/arch/arm/boot/dts/msm8974/$(DTS_NAME)-sec-hlte-*.dts)
+		endif
 	endif
 endif
 ifeq "$(F_PROJECT)" "y"
