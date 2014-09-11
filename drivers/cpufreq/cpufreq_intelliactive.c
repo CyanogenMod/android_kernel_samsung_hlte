@@ -371,9 +371,6 @@ static u64 update_load(int cpu)
 	unsigned int delta_idle;
 	unsigned int delta_time;
 	u64 active_time;
-#ifdef CONFIG_SEC_PM
-	unsigned int cur_load = 0;
-#endif
 
 	now_idle = get_cpu_idle_time(cpu, &now);
 	delta_idle = (unsigned int)(now_idle - pcpu->time_in_idle);
@@ -388,13 +385,6 @@ static u64 update_load(int cpu)
 
 	pcpu->time_in_idle = now_idle;
 	pcpu->time_in_idle_timestamp = now;
-
-#ifdef CONFIG_SEC_PM
-	cur_load = (unsigned int)(active_time * 100) / delta_time;
-	pcpu->policy->load_at_max = (cur_load * pcpu->policy->cur) /
-		pcpu->policy->cpuinfo.max_freq;
-#endif
-
 	return now;
 }
 
@@ -443,10 +433,6 @@ static void cpufreq_interactive_timer(unsigned long data)
 	pcpu->prev_load = cpu_load;
 	boosted = boost_val || now < boostpulse_endtime;
 
-#ifdef CONFIG_SEC_PM
-	pcpu->policy->util = cpu_load;
-#endif
-
 	if (counter < 5) {
 		counter++;
 		if (counter > 2) {
@@ -487,7 +473,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 					continue;
 
 				max_load = max(max_load, picpu->prev_load);
-				max_freq = max(max_freq, picpu->policy->cur);
+				max_freq = max(max_freq, picpu->target_freq);
 			}
 
 			if (max_freq > up_threshold_any_cpu_freq &&
