@@ -1196,7 +1196,6 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 		atomic_set(&mfd->kickoff_pending, 0);
 		wake_up_all(&mfd->kickoff_wait_q);
 	}
-	mutex_unlock(&mfd->lock);
 
 	if (IS_ERR_VALUE(ret))
 		goto commit_fail;
