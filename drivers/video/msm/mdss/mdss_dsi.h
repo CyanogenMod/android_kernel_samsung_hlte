@@ -329,6 +329,13 @@ struct mdss_dsi_ctrl_pdata {
 };
 
 extern unsigned int gv_manufacture_id;
+
+struct dsi_status_data {
+	struct notifier_block fb_notifier;
+	struct delayed_work check_status;
+	struct msm_fb_data_type *mfd;
+};
+
 int dsi_panel_device_register(struct device_node *pan_node,
 				struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 
@@ -393,5 +400,8 @@ void mdss_dsi_dump_power_clk(struct mdss_panel_data *pdata, int flag);
 /*for mondrian*/
 void pwm_backlight_enable(void);
 void pwm_backlight_disable(void);
+
+int mdss_dsi_register_recovery_handler(struct mdss_dsi_ctrl_pdata *ctrl,
+		struct mdss_panel_recovery *recovery);
 
 #endif /* MDSS_DSI_H */

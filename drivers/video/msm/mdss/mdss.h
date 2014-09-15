@@ -126,6 +126,7 @@ struct mdss_data_type {
 	u32 has_bwc;
 	u32 has_decimation;
 	u8 has_wfd_blk;
+	u32 has_no_lut_read;
 	u8 has_wb_ad;
 
 	u32 rotator_ot_limit;
@@ -157,6 +158,7 @@ struct mdss_data_type {
 
 	struct mdss_fudge_factor ab_factor;
 	struct mdss_fudge_factor ib_factor;
+	struct mdss_fudge_factor ib_factor_overlap;
 	struct mdss_fudge_factor clk_factor;
 
 	struct mdss_hw_settings *hw_settings;

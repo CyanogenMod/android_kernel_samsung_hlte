@@ -215,8 +215,8 @@ int mdss_mdp_smp_reserve(struct mdss_mdp_pipe *pipe)
 	u32 num_blks = 0, reserved = 0;
 	struct mdss_mdp_plane_sizes ps;
 	int i;
-	int rc = 0, rot_mode = 0;
-	u32 nlines, format;
+	int rc = 0, rot_mode = 0, wb_mixer = 0;
+	u32 nlines, format, seg_w;
 	u16 width;
 
 	width = pipe->src.w >> pipe->horz_deci;
@@ -228,19 +228,17 @@ int mdss_mdp_smp_reserve(struct mdss_mdp_pipe *pipe)
 			return rc;
 		/*
 		 * Override fetch strides with SMP buffer size for both the
-		 * planes
+		 * planes. BWC line buffer needs to be divided into 16
+		 * segments and every segment is aligned to format
+		 * specific RAU size
 		 */
+		seg_w = DIV_ROUND_UP(pipe->src.w, 16);
 		if (pipe->src_fmt->fetch_planes == MDSS_MDP_PLANE_INTERLEAVED) {
-			/*
-			 * BWC line buffer needs to be divided into 16
-			 * segments and every segment is aligned to format
-			 * specific RAU size
-			 */
-			ps.ystride[0] = ALIGN(pipe->src.w / 16 , 32) * 16 *
-				ps.rau_h[0] * pipe->src_fmt->bpp;
+			ps.ystride[0] = ALIGN(seg_w, 32) * 16 * ps.rau_h[0] *
+					pipe->src_fmt->bpp;
 			ps.ystride[1] = 0;
 		} else {
-			u32 bwc_width = ALIGN(pipe->src.w / 16, 64) * 16;
+			u32 bwc_width = ALIGN(seg_w, 64) * 16;
 			ps.ystride[0] = bwc_width * ps.rau_h[0];
 			ps.ystride[1] = bwc_width * ps.rau_h[1];
 			/*
@@ -301,6 +299,9 @@ int mdss_mdp_smp_reserve(struct mdss_mdp_pipe *pipe)
 	else
 		nlines = pipe->bwc_mode ? 1 : 2;
 
+	if (pipe->mixer->type == MDSS_MDP_MIXER_TYPE_WRITEBACK)
+		wb_mixer = 1;
+
 	mutex_lock(&mdss_mdp_smp_lock);
 	for (i = (MAX_PLANES - 1); i >= ps.num_planes; i--) {
 		if (bitmap_weight(pipe->smp_map[i].allocated, SMP_MB_CNT)) {
@@ -312,7 +313,7 @@ int mdss_mdp_smp_reserve(struct mdss_mdp_pipe *pipe)
 	}
 
 	for (i = 0; i < ps.num_planes; i++) {
-		if (rot_mode) {
+		if (rot_mode || wb_mixer) {
 			num_blks = 1;
 		} else {
 			num_blks = DIV_ROUND_UP(ps.ystride[i] * nlines,

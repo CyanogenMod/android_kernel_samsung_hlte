@@ -2,11 +2,11 @@ ifeq ($(TARGET_BUILD_VARIANT),user)
 EXTRA_CFLAGS += -DDLOG_USER_VARIANT
 endif
 obj-$(CONFIG_SAMSUNG_DEBUG_DISPLAY) += dlog.o
-mdss-mdp3-objs = mdp3.o mdp3_dma.o mdp3_ctrl.o
+mdss-mdp3-objs = mdp3.o mdp3_dma.o mdp3_ctrl.o dsi_status_v2.o
 mdss-mdp3-objs += mdp3_ppp.o mdp3_ppp_hwio.o mdp3_ppp_data.o
 obj-$(CONFIG_FB_MSM_MDSS_MDP3) += mdss-mdp3.o
 
-mdss-mdp-objs := mdss_mdp.o mdss_mdp_ctl.o mdss_mdp_pipe.o mdss_mdp_util.o
+mdss-mdp-objs := mdss_mdp.o mdss_mdp_ctl.o mdss_mdp_pipe.o mdss_mdp_util.o dsi_status_6g.o
 mdss-mdp-objs += mdss_mdp_pp.o
 mdss-mdp-objs += mdss_mdp_intf_video.o
 mdss-mdp-objs += mdss_mdp_intf_cmd.o
@@ -18,7 +18,7 @@ mdss-mdp-objs += mdss_mdp_wb.o
 obj-$(CONFIG_FB_MSM_MDSS) += mdss-mdp.o
 
 ifeq ($(CONFIG_FB_MSM_MDSS),y)
-obj-$(CONFIG_DEBUG_FS) += mdss_debug.o
+obj-$(CONFIG_DEBUG_FS) += mdss_debug.o mdss_debug_xlog.o
 endif
 
 ifeq ($(CONFIG_FB_MSM_MDSS_DSI_DBG),y)
@@ -91,11 +91,7 @@ obj-$(CONFIG_FB_MSM_QPIC_ILI_QVGA_PANEL) += qpic_panel_ili_qvga.o
 
 obj-$(CONFIG_FB_MSM_MDSS) += mdss_fb.o
 
-ifeq ($(CONFIG_FB_MSM_MDSS_MDP3),y)
-obj-$(CONFIG_FB_MSM_MDSS_DSI_CTRL_STATUS) += dsi_status_v2.o
-else
 obj-$(CONFIG_FB_MSM_MDSS_DSI_CTRL_STATUS) += mdss_dsi_status.o
-endif
 
 obj-$(CONFIG_FB_MSM_EDP_SAMSUNG) += edp-eeprom.o edp-backlight.o
 ifeq ($(CONFIG_FB_MSM_EDP_SAMSUNG),y)

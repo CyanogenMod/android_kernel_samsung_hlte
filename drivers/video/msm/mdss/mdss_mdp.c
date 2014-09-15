@@ -72,6 +72,7 @@ struct msm_mdp_interface mdp5 = {
 	.fb_mem_get_iommu_domain = mdss_fb_mem_get_iommu_domain,
 	.panel_register_done = mdss_panel_register_done,
 	.fb_stride = mdss_mdp_fb_stride,
+	.check_dsi_status = mdss_check_dsi_ctrl_status,
 };
 
 #define DEFAULT_TOTAL_RGB_PIPES 3
@@ -754,10 +755,7 @@ void mdss_mdp_clk_ctrl(int enable, int isr)
 		}
 	}
 
-#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
-	xlog(__func__, mdp_clk_cnt, changed, enable, 0, 0, 0);
-#endif
-
+	MDSS_XLOG(mdp_clk_cnt, changed, enable, current->pid);
 	pr_debug("%s: clk_cnt=%d changed=%d enable=%d\n",
 			__func__, mdp_clk_cnt, changed, enable);
 
@@ -885,7 +883,8 @@ int mdss_iommu_attach(struct mdss_data_type *mdata)
 	struct mdss_iommu_map_type *iomap;
 	int i, rc = 0;
 
-	xlog(__func__, mdata->iommu_attached, 0, 0, 0, 0, 0); 
+	MDSS_XLOG(mdata->iommu_attached);
+
 	if (mdata->iommu_attached) {
 		pr_debug("mdp iommu already attached\n");
 		goto end;
@@ -923,7 +922,8 @@ int mdss_iommu_dettach(struct mdss_data_type *mdata)
 	struct mdss_iommu_map_type *iomap;
 	int i;
 
-	xlog(__func__, mdata->iommu_attached, 0, 0, 0, 0, 0); 
+	MDSS_XLOG(mdata->iommu_attached);
+
 	if (!mdata->iommu_attached) {
 		pr_debug("mdp iommu already dettached\n");
 		return 0;
@@ -1065,7 +1065,7 @@ static int mdss_mdp_debug_init(struct mdss_data_type *mdata)
 	if (rc)
 		return rc;
 
-	mdss_debug_register_base(NULL, mdata->mdp_base, mdata->mdp_reg_size);
+	mdss_debug_register_base("mdp", mdata->mdp_base, mdata->mdp_reg_size);
 
 	return 0;
 }
@@ -1112,8 +1112,9 @@ int mdss_hw_init(struct mdss_data_type *mdata)
 		writel_relaxed(1, offset + 16);
 	}
 
-	mdata->nmax_concurrent_ad_hw = (mdata->mdp_rev <= MDSS_MDP_HW_REV_102) ?
-									1 : 2;
+	mdata->nmax_concurrent_ad_hw =
+		(mdata->mdp_rev < MDSS_MDP_HW_REV_103) ? 1 : 2;
+
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 	pr_debug("MDP hw init done\n");
 
@@ -1155,6 +1156,14 @@ static u32 mdss_mdp_res_init(struct mdss_data_type *mdata)
 	return rc;
 }
 
+/**
+ * mdss_mdp_footswitch_ctrl_splash() - clocks handoff for cont. splash screen
+ * @on: 1 to start handoff, 0 to complete the handoff after first frame update
+ *
+ * MDSS Clocks and GDSC are already on during continous splash screen, but
+ * increasing ref count will keep clocks from being turned off until handoff
+ * has properly happend after frame update.
+ */
 void mdss_mdp_footswitch_ctrl_splash(int on)
 {
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
@@ -1163,9 +1172,11 @@ void mdss_mdp_footswitch_ctrl_splash(int on)
 			pr_debug("Enable MDP FS for splash.\n");
 			mdata->handoff_pending = true;
 			regulator_enable(mdata->fs);
+			mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 			mdss_hw_init(mdata);
 		} else {
 			pr_debug("Disable MDP FS for splash.\n");
+			mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 			regulator_disable(mdata->fs);
 			mdata->handoff_pending = false;
 		}
@@ -2321,6 +2332,8 @@ static int mdss_mdp_parse_dt_misc(struct platform_device *pdev)
 		"qcom,mdss-has-decimation");
 	mdata->has_wfd_blk = of_property_read_bool(pdev->dev.of_node,
 		"qcom,mdss-has-wfd-blk");
+	mdata->has_no_lut_read = of_property_read_bool(pdev->dev.of_node,
+		"qcom,mdss-no-lut-read");
 	prop = of_find_property(pdev->dev.of_node, "batfet-supply", NULL);
 	mdata->batfet_required = prop ? true : false;
 	rc = of_property_read_u32(pdev->dev.of_node,
@@ -2346,6 +2359,17 @@ static int mdss_mdp_parse_dt_misc(struct platform_device *pdev)
 	mdata->ib_factor.denom = 5;
 	mdss_mdp_parse_dt_fudge_factors(pdev, "qcom,mdss-ib-factor",
 		&mdata->ib_factor);
+
+	/*
+	 * Set overlap ib value equal to ib by default. This value can
+	 * be tuned in device tree to be different from ib.
+	 * This factor apply when the max bandwidth per pipe
+	 * is the overlap BW.
+	 */
+	mdata->ib_factor_overlap.numer = mdata->ib_factor.numer;
+	mdata->ib_factor_overlap.denom = mdata->ib_factor.denom;
+	mdss_mdp_parse_dt_fudge_factors(pdev, "qcom,mdss-ib-factor-overlap",
+		&mdata->ib_factor_overlap);
 
 	mdata->clk_factor.numer = 1;
 	mdata->clk_factor.denom = 1;
