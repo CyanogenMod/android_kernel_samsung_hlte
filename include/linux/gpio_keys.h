@@ -31,7 +31,6 @@ struct gpio_keys_platform_data {
 #ifdef CONFIG_SENSORS_HALL
 	int gpio_flip_cover;
 #endif
-	bool debounce_set;
 };
 
 #endif
