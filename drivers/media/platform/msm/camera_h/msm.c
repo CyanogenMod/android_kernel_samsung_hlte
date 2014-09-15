@@ -704,7 +704,6 @@ int msm_post_event(struct v4l2_event *event, int timeout)
 	struct msm_command *cmd;
 	int session_id, stream_id;
 	unsigned long flags = 0;
-	int wait_count = 0;
 
 	session_id = event_data->session_id;
 	stream_id = event_data->stream_id;
@@ -744,18 +743,15 @@ int msm_post_event(struct v4l2_event *event, int timeout)
 		return rc;
 	}
 
-	wait_count = 2000;
 	do { //Apply QC patch for msm_post_event failure
-		/* should wait on session based condition */
-		rc = wait_event_interruptible_timeout(cmd_ack->wait,
+	/* should wait on session based condition */
+	rc = wait_event_interruptible_timeout(cmd_ack->wait,
 		!list_empty_careful(&cmd_ack->command_q.list),
 		msecs_to_jiffies(timeout));
-		wait_count--;
 		if(rc != -ERESTARTSYS)
 			break;
-		pr_err("%s:%d retry wait_event_interruptible_timeout ERESTARTSYS, remain_count : %d\n", __func__, __LINE__, wait_count);
-		usleep(1000); /* wait for 2ms */
-	} while(wait_count > 0);
+		pr_err("%s:%d retry wait_event_interruptible_timeout ERESTARTSYS\n", __func__, __LINE__);
+	} while(1);
 
 	if (list_empty_careful(&cmd_ack->command_q.list)) {
 		pr_err("%s:%d failed (rc = %d)\n", __func__, __LINE__, rc);

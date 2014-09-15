@@ -2053,7 +2053,7 @@ config ARM_FLUSH_CONSOLE_ON_RESTART
 
 config CP_ACCESS
 	tristate "CP register access tool"
-	default n
+	default m
 	help
 	  Provide support for Coprocessor register access using /sys
 	  interface. Read and write to CP registers from userspace
