@@ -17,7 +17,6 @@
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/init.h>
-#include <linux/delay.h>
 
 #include <asm/cacheflush.h>
 
@@ -270,7 +269,6 @@ static int scm_call_common(u32 svc_id, u32 cmd_id, const void *cmd_buf,
 	mutex_lock(&scm_lock);
 	ret = __scm_call(scm_buf);
 	mutex_unlock(&scm_lock);
-
 	if (ret)
 		return ret;
 
@@ -337,15 +335,14 @@ int scm_call_noalloc(u32 svc_id, u32 cmd_id, const void *cmd_buf,
  * response buffers is taken care of by scm_call; however, callers are
  * responsible for any other cached buffers passed over to the secure world.
  */
-
-#define SCM_EBUSY_WAIT_MS	30
-#define SCM_EBUSY_MAX_RETRY	400
-
 int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
 		void *resp_buf, size_t resp_len)
 {
 	struct scm_command *cmd;
-	int ret, retry_count = 0;
+	int ret;
+	int retry_started = 0;
+	unsigned int retry_cnt = 0;
+	unsigned long retry_till = jiffies + msecs_to_jiffies(15 * 1000);
 	size_t len = SCM_BUF_LEN(cmd_len, resp_len);
 
 	if (cmd_len > len || resp_len > len)
@@ -355,18 +352,25 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
 	if (!cmd)
 		return -ENOMEM;
 
-	do {
-		memset(cmd, 0x0, PAGE_ALIGN(len));
-		ret = scm_call_common(svc_id, cmd_id, cmd_buf, cmd_len, resp_buf,
+_retry:
+	retry_cnt++;
+	ret = scm_call_common(svc_id, cmd_id, cmd_buf, cmd_len, resp_buf,
 				resp_len, cmd, len);
 
-		if (ret == -EBUSY)
-			msleep(SCM_EBUSY_WAIT_MS);
+	if (ret == -EBUSY) {
+		if (retry_started == 0) {
+			pr_err("scm_call_common : busy => retry start\n");
+			retry_started = 1;
+		}
 
-	} while (ret == -EBUSY && (retry_count++ < SCM_EBUSY_MAX_RETRY));
+		if (time_after(jiffies, retry_till))
+			panic("scm_call_common : met deadline, retry_cnt = %u\n", retry_cnt);
 
-	if (ret == -EBUSY)
-		panic("scm_call timeout with SCM_EBUSY, retry_count = %d, delay = %d ms", retry_count, SCM_EBUSY_WAIT_MS);
+		goto _retry;
+	}
+
+	if (retry_started)
+		pr_err("scm_call_common : busy => retry ends (cnt = %u)\n", retry_cnt);
 
 	kfree(cmd);
 	return ret;
