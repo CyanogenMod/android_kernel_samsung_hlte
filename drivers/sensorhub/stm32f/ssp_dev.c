@@ -663,7 +663,6 @@ static int ssp_resume(struct device *dev)
 		pr_err("[SSP]: %s MSG2SSP_AP_STATUS_RESUME failed\n",
 			__func__);
 	data->uLastResumeState = MSG2SSP_AP_STATUS_RESUME;
-	toggle_mcu_reset(data);
 
 	return 0;
 }
