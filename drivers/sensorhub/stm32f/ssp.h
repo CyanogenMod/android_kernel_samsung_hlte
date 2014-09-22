@@ -680,6 +680,7 @@ void report_temp_humidity_data(struct ssp_data *, struct sensor_value *);
 void report_bulk_comp_data(struct ssp_data *data);
 unsigned int get_module_rev(struct ssp_data *data);
 void reset_mcu(struct ssp_data *);
+void reset_mcu_quick(struct ssp_data *);
 void convert_acc_data(s16 *);
 int sensors_register(struct device *, void *,
 	struct device_attribute*[], char *);
