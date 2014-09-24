@@ -38,12 +38,20 @@
 #define SENSORHUB_IOCTL_MAGIC		'S'
 #define IOCTL_READ_BIG_CONTEXT_DATA	_IOR(SENSORHUB_IOCTL_MAGIC, 3, char *)
 
+#define DEBUG_SENSORHUB	0
+
+#if DEBUG_SENSORHUB
 #define sensorhub_info(str, args...) \
 	pr_info("[SSP]: %s - " str, __func__, ##args)
 #define sensorhub_debug(str, args...) \
 	pr_debug("[SSP]: %s - " str, __func__, ##args)
 #define sensorhub_err(str, args...) \
 	pr_err("[SSP]: %s - " str, __func__, ##args)
+#else
+#define sensorhub_info(str, args...)
+#define sensorhub_debug(str, args...)
+#define sensorhub_err(str, args...)
+#endif
 
 
 struct sensorhub_event {
