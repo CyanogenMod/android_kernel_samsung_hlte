@@ -240,7 +240,7 @@ void reset_mcu_quick(struct ssp_data *data)
 
 	clean_pending_list(data);
 	toggle_mcu_reset(data);
-	msleep(250);
+	msleep(50);
 	ssp_enable(data, true);
 
 	if (initialize_mcu(data) < 0)
