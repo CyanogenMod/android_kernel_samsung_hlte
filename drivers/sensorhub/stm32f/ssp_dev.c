@@ -24,10 +24,6 @@ static void ssp_early_suspend(struct early_suspend *handler);
 static void ssp_late_resume(struct early_suspend *handler);
 #endif
 
-static void reset_mcu_quick_work(struct work_struct *work);
-static DECLARE_WORK(reset_mcu_quick_workqueue, reset_mcu_quick_work);
-struct workqueue_struct *reset_mcu_quick_queue;
-
 void ssp_enable(struct ssp_data *data, bool enable)
 {
 	pr_info("[SSP] %s, enable = %d, old enable = %d\n",
@@ -499,8 +495,6 @@ static int ssp_probe(struct spi_device *spi_dev)
 
 	pr_info("[SSP]: %s - probe success!\n", __func__);
 
-	reset_mcu_quick_queue = create_singlethread_workqueue("reset_mcu_quick_workqueue");
-
 	enable_debug_timer(data);
 
 	iRet = 0;
@@ -656,15 +650,13 @@ static int ssp_suspend(struct device *dev)
 	return 0;
 }
 
-static struct ssp_data *shared_data = NULL;
 static int ssp_resume(struct device *dev)
 {
 	struct spi_device *spi_dev = to_spi_device(dev);
 	struct ssp_data *data = spi_get_drvdata(spi_dev);
 	enable_irq(data->iIrq);
 	func_dbg();
-	shared_data = data;
-	queue_work(reset_mcu_quick_queue, &reset_mcu_quick_workqueue);
+	reset_mcu_quick(data);
 	enable_debug_timer(data);
 
 	if (SUCCESS != ssp_send_cmd(data, MSG2SSP_AP_STATUS_RESUME, 0))
@@ -680,12 +672,6 @@ static const struct dev_pm_ops ssp_pm_ops = {
 	.resume = ssp_resume
 };
 #endif /* CONFIG_HAS_EARLYSUSPEND */
-
-static void reset_mcu_quick_work(struct work_struct *work)
-{
-	reset_mcu_quick(shared_data);
-	return 0;
-}
 
 static const struct spi_device_id ssp_id[] = {
 	{"ssp", 0},
