@@ -716,7 +716,7 @@ static ssize_t barcode_ver_check_show(struct device *dev,
 	barcode_emul_read(data->client, FW_VER_ADDR, 1, &fw_ver);
 	fw_ver = (fw_ver >> 5) & 0x7;
 
-	return snprintf(buf, sizeof(buf), "%d\n", fw_ver+14);
+	return snprintf(buf, sizeof(*buf), "%d\n", fw_ver+14);
 }
 
 static DEVICE_ATTR(barcode_ver_check, 0664, barcode_ver_check_show, NULL);
@@ -729,7 +729,7 @@ static ssize_t barcode_led_status_show(struct device *dev,
 	u8 status;
 	barcode_emul_read(data->client, BEAM_STATUS_ADDR, 1, &status);
 	status = status & 0x1;
-	return snprintf(buf, sizeof(buf), "%d\n", status);
+	return snprintf(buf, sizeof(*buf), "%d\n", status);
 }
 static DEVICE_ATTR(barcode_led_status, 0664, barcode_led_status_show, NULL);
 
