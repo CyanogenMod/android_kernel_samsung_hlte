@@ -659,163 +659,19 @@ static void flip_cover_work(struct work_struct *work)
 	}
 }
 #else // CONFIG_SEC_FACTORY
-
-// Yank555.lu : Implement flip cover support for AOSP (arter97/Yank555.lu)
-
-//#define FLIP_COVER_DEBUG // Yank555.lu : Add debugging prints in dmesg
-
-#define	FLIP_COVER_CLOSED	0
-#define	FLIP_COVER_OPENED	1
-
-static struct input_dev *powerkey_device;
-
-#ifdef CONFIG_POWERSUSPEND
-
-static bool wait_for_suspend_resume = false;
-
-static void gpio_keys_power_suspend(struct power_suspend *handler)
-{
-	#ifdef FLIP_COVER_DEBUG
-	pr_info("[FLIPCOVER] suspend notification received.\n");
-	#endif
-	suspended = true;
-	wait_for_suspend_resume = false; // suspend/resume event received
-	return;
-}
-
-static void gpio_keys_power_resume(struct power_suspend *handler)
-{
-	#ifdef FLIP_COVER_DEBUG
-	pr_info("[FLIPCOVER] resume notification received.\n");
-	#endif
-	suspended = false;
-	wait_for_suspend_resume = false; // suspend/resume event received
-	return;
-}
-
-static struct power_suspend gpio_suspend = {
-	.suspend = gpio_keys_power_suspend,
-	.resume = gpio_keys_power_resume,
-};
-#endif // CONFIG_POWERSUSPEND
-
-static void press_powerkey(void) {
-
-#ifdef CONFIG_POWERSUSPEND
-	// Yank555.lu : Power will now be pressed, trigger a pause until we receive confirmation from powersuspend
-	wait_for_suspend_resume = true;
-#endif // CONFIG_POWERSUSPEND
-
-	// Press power key
-	#ifdef FLIP_COVER_DEBUG
-	pr_info("[FLIPCOVER] power button pressed.\n");
-	#endif
-	input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
-	input_event(powerkey_device, EV_SYN, 0, 0);
-	msleep(50);
-
-	// Release power key
-	#ifdef FLIP_COVER_DEBUG
-	pr_info("[FLIPCOVER] power button released.\n");
-	#endif
-	input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
-	input_event(powerkey_device, EV_SYN, 0, 0);
-	msleep(50);
-
-};
-
 static void flip_cover_work(struct work_struct *work)
 {
 	struct gpio_keys_drvdata *ddata =
 		container_of(work, struct gpio_keys_drvdata,
 				flip_cover_dwork.work);
 
-#ifdef CONFIG_POWERSUSPEND
-	int i;
-#endif // CONFIG_POWERSUSPEND
-
-	#ifdef FLIP_COVER_DEBUG
-	pr_info("[FLIPCOVER] initiating work ...\n");
-	#endif
-
-#ifdef CONFIG_POWERSUSPEND
-
-	// Yank555.lu : Use powersuspend to confirm screen is really on/off
-
 	ddata->flip_cover = gpio_get_value(ddata->gpio_flip_cover);
-
-	#ifdef FLIP_COVER_DEBUG
-	pr_info("[FLIPCOVER] flip cover position = %s / suspended = %s\n",
-		ddata->flip_cover == FLIP_COVER_CLOSED ? "closed" : "open",
-		suspended == true ? "true" : "false");
-	#endif
-
-	if (ddata->flip_cover == FLIP_COVER_CLOSED && suspended == false) {
-
-		#ifdef FLIP_COVER_DEBUG
-		pr_info("[FLIPCOVER] flip cover closed, screen on : turning screen off ...\n");
-		#endif
-		press_powerkey();
-
-	} else if (ddata->flip_cover == FLIP_COVER_OPENED && suspended == true) {
-
-		#ifdef FLIP_COVER_DEBUG
-		pr_info("[FLIPCOVER] flip cover opened, screen off : turning screen on ...\n");
-		#endif
-		press_powerkey();
-
-	} else {
-		#ifdef FLIP_COVER_DEBUG
-		pr_info("[FLIPCOVER] flip cover position and screen on/off in sync : waiting 100 miliseconds...\n");
-		#endif
-		msleep(100); // Yank555.lu : sleep as if we had pressed power
-	}
-
-	#ifdef FLIP_COVER_DEBUG
-	pr_info("[FLIPCOVER] Waiting up to 1.5 seconds for suspend/resume confirmation (if necessary) ...\n");
-	#endif
-
-	// Yank555.lu : Wait up to 1.5 seconds to receive the suspend/resume notification confirmation
-	for (i = 0; wait_for_suspend_resume == true && i < 150; i++)
-		msleep(10);
-
-	#ifdef FLIP_COVER_DEBUG
-	pr_info("[FLIPCOVER] waited %d miliseconds ...\n", i * 10);
-	#endif
-
-	// Yank555.lu : Reread current flip cover position for debugging purposes
-	#ifdef FLIP_COVER_DEBUG
-	pr_info("[FLIPCOVER] flip cover old position = %s / reread position = %s / suspended = %s\n",
-		ddata->flip_cover == FLIP_COVER_CLOSED ? "closed" : "open",
-		gpio_get_value(ddata->gpio_flip_cover) == FLIP_COVER_CLOSED ? "closed" : "open",
-		suspended == true ? "true" : "false");
-	#endif
-
-#else // CONFIG_POWERSUSPEND
-
-	// Yank555.lu : without powersuspend, just toggle power...
-
-	ddata->flip_cover = gpio_get_value(ddata->gpio_flip_cover);
-
-	#ifdef FLIP_COVER_DEBUG
-	pr_info("[FLIPCOVER] flip cover position changed (now = %s), toggling power ...\n",
-		ddata->flip_cover == FLIP_COVER_CLOSED ? "closed" : "open");
-	#endif
-	press_powerkey();
-
-#endif // CONFIG_POWERSUSPEND
-
 	printk(KERN_DEBUG "[keys] %s : %d\n",
 		__func__, ddata->flip_cover);
 
 	input_report_switch(ddata->input,
 		SW_LID, !ddata->flip_cover);
 	input_sync(ddata->input);
-
-	#ifdef FLIP_COVER_DEBUG
-	pr_info("[FLIPCOVER] work finished.\n");
-	#endif
-
 }
 #endif // CONFIG_SEC_FACTORY
 
@@ -1365,27 +1221,9 @@ static void set_boost_off(struct work_struct *work)
 
 static int __init gpio_keys_init(void)
 {
-	int ret = platform_driver_register(&gpio_keys_device_driver);
-
-#ifdef CONFIG_SENSORS_HALL
-#ifndef CONFIG_SEC_FACTORY
-	// Yank555.lu : registor device to press power key
-	powerkey_device = input_allocate_device();
-#ifdef CONFIG_POWERSUSPEND
-	// Yank555.lu : register to powersuspend
-	register_power_suspend(&gpio_suspend);
-#endif // CONFIG_POWERSUSPEND
-#endif // CONFIG_SEC_FACTORY
-#endif // CONFIG_SENSORS_HALL
-	input_set_capability(powerkey_device, EV_KEY, KEY_POWER);
-	powerkey_device->name = "flip_powerkey";
-	powerkey_device->phys = "flip_powerkey/input0";
-	if(input_register_device(powerkey_device))
-		pr_info("%s: failed to register flip_powerkey\n", __func__);
-
 	INIT_DELAYED_WORK(&boost_off, set_boost_off);
 
-	return ret;
+	return platform_driver_register(&gpio_keys_device_driver);
 }
 
 static void __exit gpio_keys_exit(void)
