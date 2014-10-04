@@ -85,7 +85,6 @@ static DECLARE_WORK(sync_system_work, sync_system);
 struct wake_lock sync_wake_lock;
 
 static bool suspended = false;
-static bool flip_cover_suspended = false;
 static bool flip_cover_action = false;
 
 static void sync_system(struct work_struct *work)
@@ -489,14 +488,12 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 static void gpio_keys_early_suspend(struct power_suspend *handler)
 {
 	suspended = true;
-	flip_cover_suspended = true;
 	return;
 }
 
 static void gpio_keys_late_resume(struct power_suspend *handler)
 {
 	suspended = false;
-	flip_cover_suspended = false;
 	return;
 }
 
@@ -740,9 +737,8 @@ static void flip_cover_work(struct work_struct *work)
 		SW_FLIP, ddata->flip_cover);
 	input_sync(ddata->input);
 
-	if (ddata->flip_cover == 0 && !flip_cover_action && !flip_cover_suspended) {
+	if (ddata->flip_cover == 0 && !flip_cover_action && !suspended) {
 		flip_cover_action = true;
-		flip_cover_suspended = true;
 		pr_info("%s: flip cover closed. Going to sleep ...\n", __func__);
 		input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
 		input_event(powerkey_device, EV_SYN, 0, 0);
@@ -752,9 +748,8 @@ static void flip_cover_work(struct work_struct *work)
 		input_event(powerkey_device, EV_SYN, 0, 0);
 		flip_cover_action = false;
 	}
-	if (ddata->flip_cover == 1 && !flip_cover_action && flip_cover_suspended) {
+	if (ddata->flip_cover == 1 && !flip_cover_action && suspended) {
 		flip_cover_action = true;
-		flip_cover_suspended = false;
 		pr_info("%s: flip cover opened. Waking up ...\n", __func__);
 		input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
 		input_event(powerkey_device, EV_SYN, 0, 0);
