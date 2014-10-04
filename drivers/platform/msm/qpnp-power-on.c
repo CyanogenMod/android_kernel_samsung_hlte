@@ -358,8 +358,6 @@ qpnp_get_cfg(struct qpnp_pon *pon, u32 pon_type)
 	return NULL;
 }
 
-extern void gpio_sync_worker(bool pwr);
-
 static int
 qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 {
@@ -408,7 +406,6 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 
 	if((cfg->key_code == 116) && (pon_rt_sts & pon_rt_bit)){
 		pon->powerkey_state = 1;
-		gpio_sync_worker(true);
 	}else if((cfg->key_code == 116) && !(pon_rt_sts & pon_rt_bit)){
 		pon->powerkey_state = 0;
 	}
