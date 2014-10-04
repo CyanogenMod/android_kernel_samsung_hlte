@@ -1382,7 +1382,7 @@ static int __init gpio_keys_init(void)
 	input_set_capability(powerkey_device, EV_KEY, KEY_POWER);
 	powerkey_device->name = "flip_powerkey";
 	powerkey_device->phys = "flip_powerkey/input0";
-	if(input_register_device(powerkey_device))
+	if(!input_register_device(powerkey_device))
 		pr_info("%s: failed to register flip_powerkey\n", __func__);
 
 	return ret;
