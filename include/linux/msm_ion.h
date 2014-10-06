@@ -406,6 +406,22 @@ struct ion_prefetch_data {
        unsigned long len;
 };
 
+#if defined(CONFIG_MACH_KLTE_JPN) || defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM)
+/* struct ion_buffer_data
+ *
+ * @handle:	handle for the buffer being queried
+ * @paddr:	The physical address of the buffer referenced by the handle
+ * @length:	The length of the buffer referenced by the handle
+ *
+ * Gets the physicial address of the given handle
+ */
+struct ion_buffer_data {
+	struct ion_handle *handle;
+	unsigned long paddr;
+	unsigned int length;
+};
+#endif
+
 #define ION_IOC_MSM_MAGIC 'M'
 
 /**
@@ -435,5 +451,17 @@ struct ion_prefetch_data {
 
 #define ION_IOC_DRAIN                  _IOWR(ION_IOC_MSM_MAGIC, 4, \
                                                struct ion_prefetch_data)
+
+#if defined(CONFIG_MACH_KLTE_JPN) || defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM)
+/**
+ * DOC: ION_IOC_GET_PHYS - get the physical address of the handle
+ *
+ * Gets the physicial address of the given handle
+ */
+#define ION_IOC_GET_PHYS	_IOWR(ION_IOC_MSM_MAGIC, 5, \
+									struct ion_buffer_data)
+
+
+#endif
 
 #endif

@@ -171,21 +171,12 @@ static char *msm_prim_auxpcm_gpio_name[][2] = {
 	{"PRIM_AUXPCM_DOUT",      "qcom,prim-auxpcm-gpio-dout"},
 };
 
-#ifdef CONFIG_PCM_ROUTE_VOICE_STUB
-static char *msm_sec_auxpcm_gpio_name[][2] = {
-	{"SEC_AUXPCM_CLK",       "qcom,sec-auxpcm-gpio-clk_duos"},
-	{"SEC_AUXPCM_SYNC",      "qcom,sec-auxpcm-gpio-sync_duos"},
-	{"SEC_AUXPCM_DIN",       "qcom,sec-auxpcm-gpio-din_duos"},
-	{"SEC_AUXPCM_DOUT",      "qcom,sec-auxpcm-gpio-dout_duos"},
-};
-#else
 static char *msm_sec_auxpcm_gpio_name[][2] = {
 	{"SEC_AUXPCM_CLK",       "qcom,sec-auxpcm-gpio-clk"},
 	{"SEC_AUXPCM_SYNC",      "qcom,sec-auxpcm-gpio-sync"},
 	{"SEC_AUXPCM_DIN",       "qcom,sec-auxpcm-gpio-din"},
 	{"SEC_AUXPCM_DOUT",      "qcom,sec-auxpcm-gpio-dout"},
 };
-#endif /* CONFIG_PCM_ROUTE_VOICE_STUB */
 
 struct msm8974_liquid_dock_dev {
 	int dock_plug_gpio;
@@ -2576,7 +2567,7 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.ignore_suspend = 1,
 	},
 #ifdef CONFIG_PCM_ROUTE_VOICE_STUB
-	{ // 25
+	{
 		.name = "Voice Stub", 
 		.stream_name = "Voice Stub", 
 		.cpu_dai_name = "VOICE_STUB", 
@@ -3304,9 +3295,14 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 			goto err1;
 		}
 	}
-
+#ifdef CONFIG_PCM_ROUTE_VOICE_STUB
+      sec_muxsel = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+						"lpaif_quat_mode_muxsel");
+#else
 	sec_muxsel = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 						"lpaif_sec_mode_muxsel");
+#endif /* CONFIG_PCM_ROUTE_VOICE_STUB */
+
 	if (!sec_muxsel) {
 		dev_err(&pdev->dev, "MUX addr invalid for secondary AUXPCM\n");
 		ret = -ENODEV;

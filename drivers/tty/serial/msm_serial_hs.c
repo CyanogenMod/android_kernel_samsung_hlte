@@ -2362,6 +2362,15 @@ int msm_hs_get_clock_state(struct uart_port *uport)
 }
 EXPORT_SYMBOL(msm_hs_get_clock_state);
 
+int msm_hs_get_clock_state(struct uart_port *uport)
+{
+	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
+
+	return (int)msm_uport->clk_state;
+}
+EXPORT_SYMBOL(msm_hs_get_clock_state);
+
+
 static irqreturn_t msm_hs_wakeup_isr(int irq, void *dev)
 {
 	unsigned int wakeup = 0;
