@@ -150,6 +150,7 @@ struct sec_battery_info {
 	/* wearable charging */
 	int ps_enable;
 	int ps_status;
+	int ps_changed;
 
 	/* test mode */
 	int test_mode;
@@ -161,8 +162,6 @@ struct sec_battery_info {
 	int stability_test;
 	int eng_not_full_status;
 #endif
-
-	bool ps_changed;
 };
 
 ssize_t sec_bat_show_attrs(struct device *dev,

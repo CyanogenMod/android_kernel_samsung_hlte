@@ -478,7 +478,11 @@ static int pn547_probe(struct i2c_client *client,
 	pn547_dev->clock_state = false;
 #endif
 #ifdef CONFIG_NFC_PN547_PMC8974_CLK_REQ
+#ifdef CONFIG_NFC_I2C_OVERWRITE
+	pn547_dev->nfc_clk = clk_get(NULL, "nfc_clk");
+#else
 	pn547_dev->nfc_clk = clk_get(&client->dev, "nfc_clk");
+#endif
 	if (IS_ERR(pn547_dev->nfc_clk)) {
 		ret = PTR_ERR(pn547_dev->nfc_clk);
 		printk(KERN_ERR "%s: Couldn't get D1 (%d)\n",

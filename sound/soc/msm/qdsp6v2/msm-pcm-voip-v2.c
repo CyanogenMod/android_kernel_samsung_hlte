@@ -33,7 +33,12 @@
 #include "audio_ocmem.h"
 
 #define SHARED_MEM_BUF 2
+#if defined(CONFIG_SEC_H_PROJECT)
+#define VOIP_MIN_Q_LEN 2
+#define VOIP_MAX_Q_LEN 10
+#else
 #define VOIP_MAX_Q_LEN 2
+#endif
 #define VOIP_MAX_VOC_PKT_SIZE 4096
 #define VOIP_MIN_VOC_PKT_SIZE 320
 
@@ -204,11 +209,20 @@ static struct snd_pcm_hardware msm_pcm_hardware = {
 	.rate_max =             16000,
 	.channels_min =         1,
 	.channels_max =         1,
+#if defined(CONFIG_SEC_H_PROJECT)
+	.buffer_bytes_max =	sizeof(struct voip_buf_node) * VOIP_MIN_Q_LEN,
+#else
 	.buffer_bytes_max =	sizeof(struct voip_buf_node) * VOIP_MAX_Q_LEN,
+#endif
 	.period_bytes_min =	VOIP_MIN_VOC_PKT_SIZE,
 	.period_bytes_max =	VOIP_MAX_VOC_PKT_SIZE,
+#if defined(CONFIG_SEC_H_PROJECT)
+	.periods_min =		VOIP_MIN_Q_LEN,
+	.periods_max =		VOIP_MAX_Q_LEN,
+#else
 	.periods_min =		VOIP_MAX_Q_LEN,
 	.periods_max =		VOIP_MAX_Q_LEN,
+#endif
 	.fifo_size =            0,
 };
 
@@ -1209,11 +1223,18 @@ static int msm_pcm_hw_params(struct snd_pcm_substream *substream,
 	struct snd_dma_buffer *dma_buf = &substream->dma_buffer;
 	struct voip_buf_node *buf_node = NULL;
 	int i = 0, offset = 0;
-
+#if defined(CONFIG_SEC_H_PROJECT)
+	int periods = VOIP_MIN_Q_LEN;
+#endif
 	pr_debug("%s: voip\n", __func__);
 
 	mutex_lock(&voip_info.lock);
 
+#if defined(CONFIG_SEC_H_PROJECT)
+	periods = params_periods(params);
+	pr_info("%s: periods = %d\n", __func__, periods);
+	runtime->hw.buffer_bytes_max = sizeof(struct voip_buf_node) * periods;
+#endif
 	dma_buf->dev.type = SNDRV_DMA_TYPE_DEV;
 	dma_buf->dev.dev = substream->pcm->card->dev;
 	dma_buf->private_data = NULL;
@@ -1231,7 +1252,11 @@ static int msm_pcm_hw_params(struct snd_pcm_substream *substream,
 	memset(dma_buf->area, 0, runtime->hw.buffer_bytes_max);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+#if defined(CONFIG_SEC_H_PROJECT)
+		for (i = 0; i < periods; i++) {
+#else
 		for (i = 0; i < VOIP_MAX_Q_LEN; i++) {
+#endif
 			buf_node = (void *)dma_buf->area + offset;
 
 			list_add_tail(&buf_node->list,
@@ -1239,7 +1264,11 @@ static int msm_pcm_hw_params(struct snd_pcm_substream *substream,
 			offset = offset + sizeof(struct voip_buf_node);
 		}
 	} else {
+#if defined(CONFIG_SEC_H_PROJECT)
+		for (i = 0; i < periods; i++) {
+#else
 		for (i = 0; i < VOIP_MAX_Q_LEN; i++) {
+#endif
 			buf_node = (void *) dma_buf->area + offset;
 			list_add_tail(&buf_node->list,
 					&voip_info.free_out_queue);
