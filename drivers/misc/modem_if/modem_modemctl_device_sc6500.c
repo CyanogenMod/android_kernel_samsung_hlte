@@ -75,50 +75,16 @@ static unsigned sprd6500_uart_off_table[] = {
 		 GPIO_CFG_8MA),
 };
 
-#define GPIO_IPC_MRDY		105
-#define GPIO_IPC_SUB_MRDY	106
-#define GPIO_IPC_SRDY		117
-#define GPIO_IPC_SUB_SRDY	104
-
-void spi_modem_cfg_gpio1(void)
-{
-	gpio_tlmm_config(GPIO_CFG(GPIO_IPC_MRDY, GPIOMUX_FUNC_GPIO,
-		GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-		GPIO_CFG_ENABLE);
-	gpio_set_value(GPIO_IPC_MRDY, 0);
-
-	gpio_tlmm_config(GPIO_CFG(GPIO_IPC_SUB_MRDY, GPIOMUX_FUNC_GPIO,
-		GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-		GPIO_CFG_ENABLE);
-	gpio_set_value(GPIO_IPC_SUB_MRDY, 0);
-
-	gpio_tlmm_config(GPIO_CFG(GPIO_IPC_SRDY, GPIOMUX_FUNC_GPIO,
-		GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
-		GPIO_CFG_ENABLE);
-
-	gpio_tlmm_config(GPIO_CFG(GPIO_IPC_SUB_SRDY, GPIOMUX_FUNC_GPIO,
-		GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
-		GPIO_CFG_ENABLE);
-
-	pr_info("[SPI] %s done\n", __func__);
-
-}
-
-
 static int sprd6500_on(struct modem_ctl *mc)
 {
-	int pin, rc = 0;
+	int pin = 0;
 
 	pr_err("[MODEM_IF:SC6500] <%s> start!!!\n", __func__);
 
 	disable_irq(mc->irq_phone_active);
 
 	for (pin = 0; pin < ARRAY_SIZE(sprd6500_uart_on_table); pin++) {
-			rc = gpio_tlmm_config(sprd6500_uart_on_table[pin],
-					      GPIO_CFG_ENABLE);
-		if (rc < 0)
-			pr_err("[MODEM_IF:SC6500] %s: gpio_tlmm_config(%#x)=%d\n",
-			       __func__, sprd6500_uart_on_table[pin], rc);
+		gpio_tlmm_config(sprd6500_uart_on_table[pin], GPIO_CFG_ENABLE);
 	}
 
 	// UART_SEL for UART download
@@ -155,8 +121,6 @@ static int sprd6500_on(struct modem_ctl *mc)
 #endif
 
 	gpio_set_value(mc->gpio_pda_active, 1);
-
-	spi_modem_cfg_gpio1();
 
 	return 0;
 }
@@ -267,7 +231,6 @@ static irqreturn_t phone_active_irq_handler(int irq, void *arg)
 	}
 
 	phone_active = gpio_get_value(mc->gpio_phone_active);
-	cp_dump_int = gpio_get_value(mc->gpio_cp_dump_int);
 
 	pr_info("[MODEM_IF:SC6500] <%s> phone_active=%d, cp_dump_int=%d\n",
 		__func__, phone_active, cp_dump_int);
