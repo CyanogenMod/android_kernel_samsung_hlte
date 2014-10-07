@@ -125,7 +125,6 @@ DHDCFLAGS += -DWL_CFG80211_STA_EVENT
 DHDCFLAGS += -DWL_IFACE_COMB_NUM_CHANNELS
 # To support p2p private command on kernel 3.8 or above
 DHDCFLAGS += -DWL_NEWCFG_PRIVCMD_SUPPORT
-DHDCFLAGS += -DCUSTOM_SET_SHORT_DWELL_TIME
 
 ##########################
 # driver type
