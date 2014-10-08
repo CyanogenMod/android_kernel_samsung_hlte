@@ -369,8 +369,6 @@ static inline int64_t get_time_inms(void) {
 	return tinms;
 }
 
-extern void mdnie_toggle_negative(void);
-
 void gpio_sync_worker(bool pwr)
 {
 	/* sys_sync(); */
@@ -407,25 +405,6 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 		input_event(input, type, button->code, !!state);
 	}
 	input_sync(input);
-
-	//mdnie negative effect toggle by gm
-	if (button->code == 172) {
-		if (state) {
-			gpio_sync_worker(false);
-			if (get_time_inms() - homekey_lasttime < 300) {
-				homekey_count++;
-				printk(KERN_INFO "repeated home_key action %d.\n", homekey_count);
-			} else {
-				homekey_count = 0;
-			}
-		} else {
-			if (homekey_count == 3) {
-				mdnie_toggle_negative();
-				homekey_count = 0;
-			}
-			homekey_lasttime = get_time_inms();
-		}
-	}
 }
 
 static void gpio_keys_gpio_work_func(struct work_struct *work)
