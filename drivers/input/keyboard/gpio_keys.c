@@ -41,7 +41,6 @@
 #ifdef CONFIG_POWERSUSPEND
 #include <linux/powersuspend.h>
 #endif
-#include <mach/cpufreq.h>
 
 struct gpio_button_data {
 	struct gpio_keys_button *button;
@@ -75,20 +74,7 @@ static void sync_system(struct work_struct *work);
 static DECLARE_WORK(sync_system_work, sync_system);
 struct wake_lock sync_wake_lock;
 
-static void gpio_boost(struct work_struct *work);
-static DECLARE_WORK(gpio_boost_work, gpio_boost);
-struct delayed_work boost_off;
-
-#define MAX_FREQ_LIMIT 2265600
-
 static bool suspended = false;
-
-static void gpio_boost(struct work_struct *work)
-{
-	pr_info("%s: locking cpufreq for resume boost\n", __func__);
-	msm_cpufreq_set_freq_limits(0, MAX_FREQ_LIMIT, MSM_CPUFREQ_NO_LIMIT);
-	schedule_delayed_work(&boost_off, msecs_to_jiffies(2500));
-}
 
 static void sync_system(struct work_struct *work)
 {
@@ -385,12 +371,6 @@ static inline int64_t get_time_inms(void) {
 
 extern void mdnie_toggle_negative(void);
 
-void gpio_boost_worker(void)
-{
-	if (suspended)
-		schedule_work(&gpio_boost_work);
-}
-
 void gpio_sync_worker(bool pwr)
 {
 	/* sys_sync(); */
@@ -416,9 +396,6 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	struct input_dev *input = bdata->input;
 	unsigned int type = button->type ?: EV_KEY;
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
-
-	if (button->code == 172 && state)
-		gpio_boost_worker();
 
 	printk(KERN_INFO "%s: %s key is %s\n",
 		__func__, button->desc, state ? "pressed" : "released");
@@ -1213,16 +1190,8 @@ static struct platform_driver gpio_keys_device_driver = {
 	}
 };
 
-static void set_boost_off(struct work_struct *work)
-{
-	pr_info("%s: freeing resume cpufreq lock\n", __func__);
-	msm_cpufreq_set_freq_limits(0, MSM_CPUFREQ_NO_LIMIT, MSM_CPUFREQ_NO_LIMIT);
-}
-
 static int __init gpio_keys_init(void)
 {
-	INIT_DELAYED_WORK(&boost_off, set_boost_off);
-
 	return platform_driver_register(&gpio_keys_device_driver);
 }
 
