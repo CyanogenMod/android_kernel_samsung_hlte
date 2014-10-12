@@ -287,6 +287,7 @@ struct cypress_touchkey_info {
 #endif
 	u8	touchkeyid;
 	bool	support_fw_update;
+	atomic_t keypad_enable;
 };
 
 #ifdef TK_INFORM_CHARGER
