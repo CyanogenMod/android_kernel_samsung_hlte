@@ -43,6 +43,8 @@
 
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) // H
 #include "mdnie_lite_tuning_data_hlte.h"
+#elif defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_FULL_HD_PT_PANEL) // KS01
+#include "mdnie_lite_tuning_data.h"
 #elif defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL) // F
 #include "mdnie_lite_tuning_data_flte.h"
 #elif defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL) // K
@@ -53,11 +55,11 @@
 #include "mdnie_lite_tuning_data_jactiveltexx.h"
 #elif defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_WVGA_S6E88A0_PT_PANEL) // ?
 #include "mdnie_lite_tuning_data_wvga_s6e88a0.h"
-*/
-#elif defined(CONFIG_MACH_JS01LTEDCM) // JS01
+#elif defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_JS01LTESBM) // JS01
 #include "mdnie_lite_tuning_data_js01.h"
+*/
 #else
-#include "mdnie_lite_tuning_data.h"	// KS01
+#include "mdnie_lite_tuning_data.h"
 #endif
 
 #if defined(CONFIG_TDMB)
@@ -158,9 +160,7 @@ const char accessibility_name[ACCESSIBILITY_MAX][20] = {
 	"ACCESSIBILITY_OFF",
 	"NEGATIVE_MODE",
 	"COLOR_BLIND_MODE",
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL) || \
-	defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) ||\
-	defined(CONFIG_MACH_JS01LTEDCM)
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
 	"SCREEN_CURTAIN_MODE",
 #endif
 };
@@ -1469,9 +1469,7 @@ static ssize_t accessibility_store(struct device *dev,
 		memcpy(&COLOR_BLIND_2[MDNIE_COLOR_BLINDE_OFFSET],
 				buffer, MDNIE_COLOR_BLINDE_CMD);
 	}
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL) || \
-	defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) ||\
-	defined(CONFIG_MACH_JS01LTEDCM)
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
 	else if (cmd_value == SCREEN_CURTAIN) {
 		mdnie_tun_state.accessibility = SCREEN_CURTAIN;
 	}

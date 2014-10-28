@@ -105,26 +105,30 @@ DHDCFLAGS += -DWAIT_DEQUEUE
 # Config PM Control
 DHDCFLAGS += -DCONFIG_CONTROL_PM
 
-# Use Android wake lock mechanism
-DHDCFLAGS += -DCONFIG_HAS_WAKELOCK
-
 # idle count
 DHDCFLAGS += -DDHD_USE_IDLECOUNT
 
 # Used short dwell time during initial scan
 DHDCFLAGS += -DUSE_INITIAL_SHORT_DWELL_TIME
 
-##########
-# KitKat
-##########
-# Definitions are filtered by Kernel version
+############
+# JellyBean
+############
 DHDCFLAGS += -DWL_ENABLE_P2P_IF
-DHDCFLAGS += -DWL_SUPPORT_BACKPORTED_KPATCHES
-# Default definitions for KitKat
+DHDCFLAGS += -DMULTIPLE_SUPPLICANT
 DHDCFLAGS += -DWL_CFG80211_STA_EVENT
+
+#################
+# JellyBean Plus
+#################
+DHDCFLAGS += -DWL_SUPPORT_BACKPORTED_KPATCHES
+
+########################################################
+# Kitkat Only, These FLAGS should be removed on JB/JBP.
+########################################################
 DHDCFLAGS += -DWL_IFACE_COMB_NUM_CHANNELS
-# To support p2p private command on kernel 3.8 or above
 DHDCFLAGS += -DWL_NEWCFG_PRIVCMD_SUPPORT
+DHDCFLAGS :=$(filter-out -DMULTIPLE_SUPPLICANT,$(DHDCFLAGS))
 
 ##########################
 # driver type
@@ -154,7 +158,7 @@ ifneq ($(CONFIG_BCM4339),)
   DHDCFLAGS += -DCUSTOM_AMPDU_BA_WSIZE=64 -DCUSTOM_IBSS_AMPDU_BA_WSIZE=16
   DHDCFLAGS += -DCUSTOM_DPC_CPUCORE=0
   DHDCFLAGS += -DPROP_TXSTATUS_VSDB
-ifeq ($(CONFIG_ARCH_MSM),y)
+ifeq ($(CONFIG_ARCH_MSM8974),y)
   DHDCFLAGS += -DCUSTOM_DEF_TXGLOM_SIZE=32 -DDHD_TXBOUND=32
   DHDCFLAGS += -DENABLE_ADAPTIVE_SCHED -DCUSTOM_CPUFREQ_THRESH=1000000
 endif
@@ -205,7 +209,7 @@ ifneq ($(CONFIG_BCM4335),)
 ifeq ($(CONFIG_MACH_JF),y)
   DHDCFLAGS += -DCUSTOM_DEF_TXGLOM_SIZE=32 -DDHD_TXBOUND=32
 endif
-ifeq ($(CONFIG_ARCH_MSM),y)
+ifeq ($(CONFIG_ARCH_MSM8974),y)
   DHDCFLAGS += -DCUSTOM_DEF_TXGLOM_SIZE=32 -DDHD_TXBOUND=32
   DHDCFLAGS += -DENABLE_ADAPTIVE_SCHED -DCUSTOM_CPUFREQ_THRESH=1000000
 endif

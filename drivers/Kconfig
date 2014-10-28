@@ -169,6 +169,4 @@ source "drivers/felica/Kconfig"
 source "drivers/extcon/Kconfig"
 
 source "drivers/irda/Kconfig"
-
-source "drivers/secfilter/Kconfig"
 endmenu

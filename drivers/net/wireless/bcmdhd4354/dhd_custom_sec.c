@@ -149,6 +149,7 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"PS", "XZ", 11},	/* Universal if Country code is PALESTINIAN TERRITORY, OCCUPIED */
 	{"TL", "XZ", 11},	/* Universal if Country code is TIMOR-LESTE (EAST TIMOR) */
 	{"MH", "XZ", 11},	/* Universal if Country code is MARSHALL ISLANDS */
+	{"SG", "SG", 4},
 	{"US", "US", 46},
 	{"UA", "UA", 8},
 	{"CO", "CO", 4},
@@ -271,6 +272,7 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"RO", "RO", 4},
 	{"SN", "SN", 2},
 	{"RS", "RS", 2},
+	{"SG", "SG", 4},
 	{"SK", "SK", 4},
 	{"SI", "SI", 4},
 	{"ES", "ES", 4},
