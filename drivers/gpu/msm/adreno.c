@@ -1196,7 +1196,6 @@ static int adreno_iommu_setstate(struct kgsl_device *device,
 						KGSL_IOMMU_CONTEXT_USER);
 
 done:
-	kfree(link);
 	kgsl_context_put(context);
 	return result;
 }
