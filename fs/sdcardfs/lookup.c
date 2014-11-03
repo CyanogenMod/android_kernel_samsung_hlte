@@ -219,7 +219,11 @@ static struct dentry *__sdcardfs_lookup(struct dentry *dentry,
 
 	sbi = SDCARDFS_SB(dentry->d_sb);
 	/* must initialize dentry operations */
-	d_set_d_op(dentry, &sdcardfs_ci_dops);
+	if (sbi->options.lower_fs == LOWER_FS_EXT4) {
+		d_set_d_op(dentry, &sdcardfs_ci_dops);
+	} else if (sbi->options.lower_fs == LOWER_FS_FAT) {
+		d_set_d_op(dentry, &sdcardfs_dops);
+	}
 
 	if (IS_ROOT(dentry))
 		goto out;
