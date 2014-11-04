@@ -711,9 +711,8 @@ static int rx_hdlc_packet(struct io_device *iod, struct link_device *ld,
 		goto data_check;
 	}
 
+	mif_info("\n<%s> Rx FMT frame (len %d)\n",iod->name, rest);
 #ifdef CONFIG_LINK_DEVICE_SPI_DEBUG
-	mif_info("\n<%s> Rx FMT frame (len %d)\n",
-		iod->name, rest);
 	mif_print_data((char*)data, rest);
 	mif_info("\n");
 #endif
