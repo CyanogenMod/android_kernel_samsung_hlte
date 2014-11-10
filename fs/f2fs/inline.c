@@ -289,7 +289,8 @@ process_inline:
 }
 
 struct f2fs_dir_entry *find_in_inline_dir(struct inode *dir,
-			struct f2fs_filename *fname, struct page **res_page)
+			struct f2fs_filename *fname, struct page **res_page,
+			unsigned int flags)
 {
 	struct f2fs_sb_info *sbi = F2FS_SB(dir->i_sb);
 	struct f2fs_inline_dentry *inline_dentry;
@@ -308,7 +309,7 @@ struct f2fs_dir_entry *find_in_inline_dir(struct inode *dir,
 	inline_dentry = inline_data_addr(ipage);
 
 	make_dentry_ptr(NULL, &d, (void *)inline_dentry, 2);
-	de = find_target_dentry(fname, namehash, NULL, &d);
+	de = find_target_dentry(fname, namehash, NULL, &d, flags);
 	unlock_page(ipage);
 	if (de)
 		*res_page = ipage;
