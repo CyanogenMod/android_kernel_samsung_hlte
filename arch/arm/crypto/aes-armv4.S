@@ -34,6 +34,7 @@
 @ A little glue here to select the correct code below for the ARM CPU
 @ that is being targetted.
 
+#include <asm/assembler.h>
 #include <linux/linkage.h>
 
 .text
@@ -648,7 +649,7 @@ _armv4_AES_set_encrypt_key:
 
 .Ldone:	mov	r0,#0
 	ldmia   sp!,{r4-r12,lr}
-.Labrt:	mov	pc,lr
+.Labrt:	ret	lr
 ENDPROC(private_AES_set_encrypt_key)
 
 .align	5

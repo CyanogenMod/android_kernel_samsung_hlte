@@ -24,7 +24,7 @@
 
 ENTRY(cpu_arm6_dcache_clean_area)
 ENTRY(cpu_arm7_dcache_clean_area)
-		mov	pc, lr
+		ret	lr
 
 /*
  * Function: arm6_7_data_abort ()
@@ -178,17 +178,17 @@ ENTRY(cpu_arm6_data_abort)
  */
 ENTRY(cpu_arm6_proc_init)
 ENTRY(cpu_arm7_proc_init)
-		mov	pc, lr
+		ret	lr
 
 ENTRY(cpu_arm6_proc_fin)
 ENTRY(cpu_arm7_proc_fin)
 		mov	r0, #0x31			@ ....S..DP...M
 		mcr	p15, 0, r0, c1, c0, 0		@ disable caches
-		mov	pc, lr
+		ret	lr
 
 ENTRY(cpu_arm6_do_idle)
 ENTRY(cpu_arm7_do_idle)
-		mov	pc, lr
+		ret	lr
 
 /*
  * Function: arm6_7_switch_mm(unsigned long pgd_phys)
@@ -204,7 +204,7 @@ ENTRY(cpu_arm7_switch_mm)
 		mcr	p15, 0, r0, c2, c0, 0		@ update page table ptr
 		mcr	p15, 0, r1, c5, c0, 0		@ flush TLBs
 #endif
-		mov	pc, lr
+		ret	lr
 
 /*
  * Function: arm6_7_set_pte_ext(pte_t *ptep, pte_t pte, unsigned int ext)
@@ -218,7 +218,7 @@ ENTRY(cpu_arm7_set_pte_ext)
 #ifdef CONFIG_MMU
 	armv3_set_pte_ext wc_disable=0
 #endif /* CONFIG_MMU */
-	mov	pc, lr
+	ret	lr
 
 /*
  * Function: _arm6_7_reset
@@ -235,7 +235,7 @@ ENTRY(cpu_arm7_reset)
 #endif
 		mov	r1, #0x30
 		mcr	p15, 0, r1, c1, c0, 0		@ turn off MMU etc
-		mov	pc, r0
+		ret	r0
 ENDPROC(cpu_arm6_reset)
 ENDPROC(cpu_arm7_reset)
 		.popsection
@@ -252,7 +252,7 @@ __arm6_setup:	mov	r0, #0
 #else
 		mov	r0, #0x3c			@ . ..RS BLDP WCA.
 #endif
-		mov	pc, lr
+		ret	lr
 		.size	__arm6_setup, . - __arm6_setup
 
 		.type	__arm7_setup, #function
@@ -266,7 +266,7 @@ __arm7_setup:	mov	r0, #0
 #else
 		mov	r0, #0x7c			@ . ..RS BLDP WCA.
 #endif
-		mov	pc, lr
+		ret	lr
 		.size	__arm7_setup, . - __arm7_setup
 
 		__INITDATA

@@ -131,8 +131,6 @@ static struct inode *sdcardfs_iget(struct super_block *sb,
 	else
 		inode->i_fop = &sdcardfs_main_fops;
 
-	inode->i_mapping->a_ops = &sdcardfs_aops;
-
 	inode->i_atime.tv_sec = 0;
 	inode->i_atime.tv_nsec = 0;
 	inode->i_mtime.tv_sec = 0;

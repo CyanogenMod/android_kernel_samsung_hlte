@@ -52,7 +52,7 @@ ENTRY(msm_arch_idle)
 #endif
 
 	msr	cpsr_c, r2		/* restore the CPSR state */
-	mov     pc, lr
+	ret     lr
 
 ENTRY(msm_pm_collapse)
 	ldr     r0, =saved_state
@@ -96,7 +96,7 @@ ENTRY(msm_pm_collapse)
 	ldr     r0, =saved_state         /* restore registers */
 	ldmfd   r0, {r4-r14}
 	mov     r0, #0                   /* return power collapse failed */
-	mov     pc, lr
+	ret     lr
 
 ENTRY(msm_pm_collapse_exit)
 #if 0 /* serial debug */
@@ -152,7 +152,7 @@ msm_pm_mapped_pa:
 	/* Switch to virtual */
 	adr     r2, msm_pm_pa_to_va
 	ldr     r0, =msm_pm_pa_to_va
-	mov     pc, r0
+	ret     r0
 msm_pm_pa_to_va:
 	sub     r0, r0, r2
 	/* Restore r1 in MMU table */
@@ -172,7 +172,7 @@ msm_pm_pa_to_va:
 	mcr     p15, 0, r0, c7, c5, 4  /* isb */
 
 	mov     r0, #1
-	mov     pc, lr
+	ret     lr
 	nop
 	nop
 	nop
