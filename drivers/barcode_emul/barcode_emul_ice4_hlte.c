@@ -193,14 +193,14 @@ static int ice4_clock_en(int onoff)
 #if defined(CONFIG_MACH_H3GDUOS)
      if (onoff) {
 		int rc = 0;
-		
+
 		//msm_tlmm_misc_reg_write(TLMM_SPARE_REG, 0x1);
 		rc = gpio_request(GPIO_FPGA_MAIN_CLK, "fpga_main_clk");
 
 		if (rc) {
 			pr_err("'%s'(%d) gpio_request failed, rc=%d\n",
 				"GPIO_FPGA_MAIN_CLK", GPIO_FPGA_MAIN_CLK, rc);
-			
+
 			gpio_free(GPIO_FPGA_MAIN_CLK);
 			return 0;
 		}
@@ -208,7 +208,7 @@ static int ice4_clock_en(int onoff)
      } else {
 		//msm_tlmm_misc_reg_write(TLMM_SPARE_REG, 0x5);
 		gpio_free(GPIO_FPGA_MAIN_CLK);
-     }  
+     }
 
       if (!fpga_main_src_clk){
       	fpga_main_src_clk = clk_get(NULL, "gp1_src_clk");
@@ -216,15 +216,15 @@ static int ice4_clock_en(int onoff)
       if (IS_ERR(fpga_main_src_clk)) {
       	pr_err( "%s: unable to get fpga_main_src_clk\n", __func__);
       }
-      
+
       if (!fpga_main_clk){
       	fpga_main_clk = clk_get(NULL, "gp1_clk");
       }
       if (IS_ERR(fpga_main_clk)) {
       	pr_err( "%s: unable to get fpga_main_clk\n", __func__);
       }
-	
-#else	
+
+#else
 	if (!fpga_main_src_clk){
 		fpga_main_src_clk = clk_get(NULL, "gp2_src_clk");
 	}
@@ -248,7 +248,7 @@ static int ice4_clock_en(int onoff)
 		clk_put(fpga_main_clk);
 		fpga_main_src_clk = NULL;
 		fpga_main_clk = NULL;
-	}	
+	}
 	return 0;
 }
 
@@ -295,7 +295,7 @@ static int barcode_parse_dt(struct device *dev,
 	pdata->rst_n = of_get_named_gpio_flags(np, "barcode,reset_n",
 		0, &pdata->rst_n_flag);
 	pdata->spi_clk =of_get_named_gpio_flags(np, "barcode,scl-gpio",
-				0, &pdata->spi_clk_flag);		
+				0, &pdata->spi_clk_flag);
 	pdata->spi_si =of_get_named_gpio_flags(np, "barcode,sda-gpio",
 				0, &pdata->spi_si_flag);
 	pdata->irda_irq =of_get_named_gpio_flags(np, "barcode,irq-gpio",
@@ -325,7 +325,7 @@ static void barcode_gpio_config(void)
 		GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
 #if !defined(CONFIG_MACH_H3GDUOS)
 	gpio_tlmm_config(GPIO_CFG(GPIO_FPGA_MAIN_CLK, \
-		2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);	
+		2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 #endif
 
 	gpio_request(g_pdata->cresetb, "irda_creset");
@@ -353,14 +353,14 @@ static void barcode_gpio_reconfig(void)
 	gpio_tlmm_config(GPIO_CFG(g_pdata->spi_clk, 0,
 		GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), 1);
 	gpio_tlmm_config(GPIO_CFG(GPIO_FPGA_MAIN_CLK, \
-		2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);	
-		
+		2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+
 	gpio_tlmm_config(GPIO_CFG(g_pdata->cresetb,0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 	gpio_direction_output(g_pdata->cresetb, 0);
-	
-	gpio_tlmm_config(GPIO_CFG(g_pdata->rst_n,0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);	
+
+	gpio_tlmm_config(GPIO_CFG(g_pdata->rst_n,0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 	gpio_direction_output(g_pdata->rst_n, 0);
-	
+
 	gpio_tlmm_config(GPIO_CFG(g_pdata->irda_irq,0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 	gpio_direction_input(g_pdata->irda_irq);
 
@@ -427,8 +427,8 @@ static int barcode_fpga_fimrware_update_start(const u8 *data, int len)
 		udelay(5);
 		pr_barcode("FPGA firmware update success\n");
 		fw_dl_complete = true;
-		break;		
-		
+		break;
+
 	} while (retry);
 	fpga_enable(0,0);
 	return 0;
@@ -469,7 +469,7 @@ void ice4_fpga_firmware_update_hlte(void)
 		GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
 #endif
 	usleep_range(10000, 12000);
-	
+
 }
 
 static ssize_t barcode_emul_store(struct device *dev,
@@ -480,7 +480,7 @@ static ssize_t barcode_emul_store(struct device *dev,
 	struct barcode_emul_data *data = dev_get_drvdata(dev);
 	struct i2c_client *client = data->client;
 	pr_barcode("%s start\n", __func__);
-	
+
 	fpga_enable(1,1);
 
 	client->addr = BARCODE_I2C_ADDR;
@@ -790,7 +790,7 @@ static ssize_t barcode_ver_check_show(struct device *dev,
 	pr_info("Actual value read f/w %u \n",fw_ver);
 	fw_ver = (fw_ver >> 5) & 0x7;
 
-	return snprintf(buf, sizeof(buf), "%u\n", fw_ver+14);
+	return sprintf(buf, "%u\n", fw_ver+14);
 }
 
 static DEVICE_ATTR(barcode_ver_check, 0664, barcode_ver_check_show, NULL);
@@ -803,7 +803,7 @@ static ssize_t barcode_led_status_show(struct device *dev,
 	u8 status;
 	barcode_emul_read(data->client, BEAM_STATUS_ADDR, 1, &status);
 	status = status & 0x1;
-	return snprintf(buf, sizeof(buf), "%d\n", status);
+	return sprintf(buf, "%d\n", status);
 }
 static DEVICE_ATTR(barcode_led_status, 0664, barcode_led_status_show, NULL);
 
@@ -1196,7 +1196,7 @@ static int __devinit barcode_emul_probe(struct i2c_client *client,
 	struct barcode_emul_platform_data *pdata;
 	struct device *barcode_emul_dev;
 	int error;
-	
+
 #ifdef CONFIG_IR_REMOCON_FPGA
 	int i;
 #endif
@@ -1230,7 +1230,7 @@ static int __devinit barcode_emul_probe(struct i2c_client *client,
 		pdata->fw_type = ICE_I2C_R2;
 
 	 else
-		pdata->fw_type = ICE_I2C_R3;	
+		pdata->fw_type = ICE_I2C_R3;
 #else
 	pdata->fw_type = ICE_I2C_R3;
 #endif
@@ -1244,9 +1244,9 @@ static int __devinit barcode_emul_probe(struct i2c_client *client,
 	data = kzalloc(sizeof(struct barcode_emul_data), GFP_KERNEL);
 	if (NULL == data) {
 		pr_err("Failed to data allocate %s\n", __func__);
-		return -ENOMEM;		
+		return -ENOMEM;
 	}
-	
+
 	data->client = client;
 	mutex_init(&en_mutex);
 #ifdef CONFIG_IR_REMOCON_FPGA
