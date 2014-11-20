@@ -377,6 +377,8 @@ KBUILD_CFLAGS   := -Wundef -Wstrict-prototypes -Wno-trigraphs \
 KBUILD_CFLAGS	+= -s -pipe -Ofast -mcpu=cortex-a15 -mtune=cortex-a15 -mfloat-abi=hard -mfpu=vfpv4 -fno-tree-vectorize -fmodulo-sched -fmodulo-sched-allow-regmoves -fno-inline-functions -funroll-loops
 # -Wno-unused
 KBUILD_CFLAGS	+= -Wno-unused
+# L1/L2 cache size parameters by @JustArchi
+KBUILD_CFLAGS	+= --param l1-cache-size=16 --param l1-cache-line-size=16 --param l2-cache-size=2048
 
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
