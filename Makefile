@@ -370,7 +370,6 @@ KBUILD_CFLAGS   := -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Wno-format-security \
 		   -Wno-maybe-uninitialized \
 		   -fno-delete-null-pointer-checks \
-		   -Wno-sizeof-pointer-memaccess \
 		   -std=gnu89
 
 # arter97's optimizations
