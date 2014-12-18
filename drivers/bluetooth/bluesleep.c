@@ -954,7 +954,7 @@ static int __init bluesleep_init(void)
 
 	BT_INFO("BlueSleep Mode Driver Ver %s", VERSION);
 
-	bt_enabled = false;
+	bt_enabled = true;
 
 	retval = platform_driver_register(&bluesleep_driver);
 
