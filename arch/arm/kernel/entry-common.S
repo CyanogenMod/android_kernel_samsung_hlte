@@ -189,7 +189,7 @@ ENDPROC(ret_from_fork)
 1: 	mcount_get_lr	r1			@ lr of instrumented func
 	mcount_adjust_addr	r0, lr		@ instrumented function
 	adr	lr, BSYM(2f)
-	ret	r2
+	mov	pc, r2
 2:	mcount_exit
 .endm
 

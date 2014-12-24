@@ -145,6 +145,6 @@ get_flash_ids:
 	beq	.fids1
 	ldrb	r2, [r1, #20]		@ NAND Manufacturer ID
 	ldrb	r3, [r1, #20]		@ NAND Chip ID
-	ret	lr
+	mov	pc, lr
 
 .SHARPEND:
