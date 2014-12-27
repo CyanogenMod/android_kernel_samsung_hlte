@@ -42,6 +42,12 @@ config SUSPEND_TIME_TIMEKEEPING
 	  Get the suspend time in suspend from timekeeping for the archs
 	  that don't support persistent clock.
 
+config POWERSUSPEND_DEBUG
+	bool "Powersuspend driver debugging code"
+	depends on POWERSUSPEND
+	help
+	  Output debugging info in dmesg [POWERSUSPEND] (Yank555.lu)
+
 config HIBERNATE_CALLBACKS
 	bool
 
