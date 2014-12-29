@@ -2,11 +2,11 @@
  * fs/sdcardfs/packagelist.c
  *
  * Copyright (c) 2013 Samsung Electronics Co. Ltd
- *   Authors: Daeho Jeong, Woojoong Lee, Seunghwan Hyun, 
+ *   Authors: Daeho Jeong, Woojoong Lee, Seunghwan Hyun,
  *               Sunghwan Yun, Sungjong Seo
- *                      
+ *
  * This program has been developed as a stackable file system based on
- * the WrapFS which written by 
+ * the WrapFS which written by
  *
  * Copyright (c) 1998-2011 Erez Zadok
  * Copyright (c) 2009     Shrikar Archak
@@ -40,6 +40,7 @@ struct packagelist_data {
 	struct mutex hashtable_lock;
 	struct task_struct *thread_id;
 	gid_t write_gid;
+	char *strtok_last;
 	char read_buf[STRING_BUF_SIZE];
 	char event_buf[STRING_BUF_SIZE];
 	char app_name_buf[STRING_BUF_SIZE];
@@ -80,7 +81,7 @@ int get_caller_has_rw_locked(void *pkgl_id, derive_t derive) {
 	struct packagelist_data *pkgl_dat = (struct packagelist_data *)pkgl_id;
 	appid_t appid;
 	int ret;
-	
+
 	/* No additional permissions enforcement */
 	if (derive == DERIVE_NONE) {
 		return 1;
@@ -158,7 +159,7 @@ int check_caller_access_to_name(struct inode *parent_node, const char* name,
 }
 
 /* This function is used when file opening. The open flags must be
- * checked before calling check_caller_access_to_name() */  
+ * checked before calling check_caller_access_to_name() */
 int open_flags_to_access_mode(int open_flags) {
 	if((open_flags & O_ACCMODE) == O_RDONLY) {
 		return 0; /* R_OK */
@@ -267,7 +268,7 @@ static int read_package_list(struct packagelist_data *pkgl_dat) {
 		int one_line_len = 0;
 		int additional_read;
 		unsigned long ret_gid;
-	
+
 		while (one_line_len < read_amount) {
 			if (pkgl_dat->read_buf[one_line_len] == '\n') {
 				one_line_len++;
@@ -277,7 +278,7 @@ static int read_package_list(struct packagelist_data *pkgl_dat) {
 		}
 		additional_read = read_amount - one_line_len;
 		if (additional_read > 0)
-			sys_lseek(fd, -additional_read, SEEK_CUR);	
+			sys_lseek(fd, -additional_read, SEEK_CUR);
 
 		if (sscanf(pkgl_dat->read_buf, "%s %d %*d %*s %*s %s",
 				pkgl_dat->app_name_buf, &appid,
@@ -289,7 +290,7 @@ static int read_package_list(struct packagelist_data *pkgl_dat) {
 				return ret;
 			}
 
-			token = strtok(pkgl_dat->gids_buf, ",");
+			token = strtok_r(pkgl_dat->gids_buf, ",", &pkgl_dat->strtok_last);
 			while (token != NULL) {
 				if (!kstrtoul(token, 10, &ret_gid) &&
 						(ret_gid == pkgl_dat->write_gid)) {
@@ -301,7 +302,7 @@ static int read_package_list(struct packagelist_data *pkgl_dat) {
 					}
 					break;
 				}
-				token = strtok(NULL, ",");
+				token = strtok_r(NULL, ",", &pkgl_dat->strtok_last);
 			}
 		}
 	}
@@ -415,7 +416,7 @@ void * packagelist_create(gid_t write_gid)
 		kfree(pkgl_dat);
 		return packagelist_thread;
         }
-	pkgl_dat->thread_id = packagelist_thread;	
+	pkgl_dat->thread_id = packagelist_thread;
 
 	printk(KERN_INFO "sdcardfs: created packagelist pkgld/%d\n",
 				(int)pkgl_dat->thread_id->pid);
@@ -453,5 +454,3 @@ void packagelist_exit(void)
 	if (hashtable_entry_cachep)
 		kmem_cache_destroy(hashtable_entry_cachep);
 }
-
-
