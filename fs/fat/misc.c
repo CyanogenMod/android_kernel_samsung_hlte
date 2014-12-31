@@ -32,18 +32,23 @@ void __fat_fs_error(struct super_block *sb, int report, const char *fmt, ...)
 		va_start(args, fmt);
 		vaf.fmt = fmt;
 		vaf.va = &args;
-		printk(KERN_ERR "FAT-fs (%s[%d:%d]): error, %pV\n", 
+		printk(KERN_ERR "FAT-fs (%s[%d:%d]): error, %pV\n",
+				sb->s_id, MAJOR(bd_dev), MINOR(bd_dev), &vaf);
+		if (opts->errors == FAT_ERRORS_RO && !(sb->s_flags & MS_RDONLY))
+			ST_LOG("FAT-fs (%s[%d:%d]): error, %pV\n",
 				sb->s_id, MAJOR(bd_dev), MINOR(bd_dev), &vaf);
 		va_end(args);
 	}
 
 	if (opts->errors == FAT_ERRORS_PANIC)
-		panic("FAT-fs (%s[%d:%d]): fs panic from previous error\n", 
+		panic("FAT-fs (%s[%d:%d]): fs panic from previous error\n",
 				sb->s_id, MAJOR(bd_dev), MINOR(bd_dev));
 	else if (opts->errors == FAT_ERRORS_RO && !(sb->s_flags & MS_RDONLY)) {
 		sb->s_flags |= MS_RDONLY;
 		printk(KERN_ERR "FAT-fs (%s[%d:%d]): Filesystem has been "
-				"set read-only\n", 
+				"set read-only\n",
+				sb->s_id, MAJOR(bd_dev), MINOR(bd_dev));
+		ST_LOG("FAT-fs (%s[%d:%d]): Filesystem has been set read-only\n",
 				sb->s_id, MAJOR(bd_dev), MINOR(bd_dev));
 	}
 }
@@ -102,7 +107,7 @@ int fat_clusters_flush(struct super_block *sb)
 			fsinfo->free_clusters = cpu_to_le32(sbi->free_clusters);
 		if (sbi->prev_free != -1)
 			fsinfo->next_cluster = cpu_to_le32(sbi->prev_free);
-		mark_buffer_dirty(bh);
+		mark_buffer_dirty_sync(bh);
 	}
 	brelse(bh);
 

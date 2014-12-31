@@ -263,8 +263,6 @@ INT32 ffsMountVol(struct super_block *sb, INT32 drv)
 		bdev_close(sb);
 		return FFS_MEDIAERR;
 	}
-	
-	printk("[EXFAT] mounted successfully\n");
 
 	return FFS_SUCCESS;
 } 
@@ -272,8 +270,6 @@ INT32 ffsMountVol(struct super_block *sb, INT32 drv)
 INT32 ffsUmountVol(struct super_block *sb)
 {
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
-	
-	printk("[EXFAT] trying to unmount...\n");
 
 	fs_sync(sb, 0);
 	fs_set_vol_flags(sb, VOL_CLEAN);
@@ -288,13 +284,8 @@ INT32 ffsUmountVol(struct super_block *sb)
 
 	bdev_close(sb);
 
-	if (p_fs->dev_ejected) {
-		printk( "[EXFAT] unmounted with media errors. "
-			"device's already ejected.\n");
+	if (p_fs->dev_ejected)
 		return FFS_MEDIAERR;
-	}
-	
-	printk("[EXFAT] unmounted successfully\n");
 
 	return FFS_SUCCESS;
 } 
@@ -1700,6 +1691,7 @@ void fs_error(struct super_block *sb)
 	else if ((opts->errors == EXFAT_ERRORS_RO) && !(sb->s_flags & MS_RDONLY)) {
 		sb->s_flags |= MS_RDONLY;
 		printk(KERN_ERR "[EXFAT] Filesystem has been set read-only\n");
+		ST_LOG("[EXFAT] Filesystem has been set read-only\n");
 	}
 }
 
@@ -2043,6 +2035,9 @@ INT32 exfat_count_used_clusters(struct super_block *sb)
 			map_b = 0;
 		}
 	}
+
+	if ((p_fs->num_clusters - 2) < (UINT32)count)
+		count = p_fs->num_clusters - 2;
 
 	return(count);
 }

@@ -1249,6 +1249,12 @@ const struct inode_operations exfat_dir_inode_operations = {
 	.rename        = exfat_rename,
 	.setattr       = exfat_setattr,
 	.getattr       = exfat_getattr,
+#ifdef CONFIG_EXFAT_VIRTUAL_XATTR
+	.setxattr	= exfat_setxattr,
+	.getxattr	= exfat_getxattr,
+	.listxattr	= exfat_listxattr,
+	.removexattr	= exfat_removexattr,
+#endif
 };
 
 static void *exfat_follow_link(struct dentry *dentry, struct nameidata *nd)
@@ -1261,6 +1267,12 @@ static void *exfat_follow_link(struct dentry *dentry, struct nameidata *nd)
 const struct inode_operations exfat_symlink_inode_operations = {
 	.readlink    = generic_readlink,
 	.follow_link = exfat_follow_link,
+#ifdef CONFIG_EXFAT_VIRTUAL_XATTR
+	.setxattr	= exfat_setxattr,
+	.getxattr	= exfat_getxattr,
+	.listxattr	= exfat_listxattr,
+	.removexattr	= exfat_removexattr,
+#endif
 };
 
 static int exfat_file_release(struct inode *inode, struct file *filp)
@@ -1332,6 +1344,12 @@ const struct inode_operations exfat_file_inode_operations = {
 #endif
 	.setattr     = exfat_setattr,
 	.getattr     = exfat_getattr,
+#ifdef CONFIG_EXFAT_VIRTUAL_XATTR
+	.setxattr	= exfat_setxattr,
+	.getxattr	= exfat_getxattr,
+	.listxattr	= exfat_listxattr,
+	.removexattr	= exfat_removexattr,
+#endif
 };
 
 static int exfat_bmap(struct inode *inode, sector_t sector, sector_t *phys,
