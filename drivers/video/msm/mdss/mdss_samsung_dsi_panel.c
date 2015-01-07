@@ -558,7 +558,12 @@ static ssize_t mipi_samsung_disp_windowtype_show(struct device *dev,
 static ssize_t mipi_samsung_disp_acl_show(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%u\n", (msd.dstat.acl_on ? 1 : 0));
+	int rc;
+
+	rc = snprintf((char *)buf, sizeof(*buf), "%d\n", msd.dstat.acl_on);
+	pr_info("acl status: %d\n", *buf);
+
+	return rc;
 }
 
 /*
