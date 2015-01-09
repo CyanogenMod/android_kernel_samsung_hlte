@@ -283,21 +283,6 @@ static struct msm_hs_port *msm_hs_get_hs_port(int port_index);
 #define UARTDM_TO_MSM(uart_port) \
 	container_of((uart_port), struct msm_hs_port, uport)
 
-struct uart_port * msm_hs_get_port_by_id(int num)
-{
-	struct uart_port *uport;
-	struct msm_hs_port *msm_uport;
-
-	if (num < 0 || num >= UARTDM_NR)
-		return NULL;
-
-	msm_uport = &q_uart_port[num];
-
-	uport = &(msm_uport->uport);
-
-	return uport;
-}
-
 static int msm_hs_ioctl(struct uart_port *uport, unsigned int cmd,
 						unsigned long arg)
 {
@@ -1194,8 +1179,6 @@ static void hsuart_disconnect_rx_endpoint_work(struct work_struct *w)
 		wake_lock_timeout(&msm_uport->rx.wake_lock,
 						HZ / 2);
 	msm_uport->rx.flush = FLUSH_SHUTDOWN;
-	MSM_HS_DBG("%s: Calling Completion\n", __func__);
-	wake_up(&msm_uport->bam_disconnect_wait);
 	MSM_HS_DBG("%s: Done Completion\n", __func__);
 	wake_up(&msm_uport->rx.wait);
 }
@@ -2142,17 +2125,6 @@ void msm_hs_request_clock_on(struct uart_port *uport)
 		/* else fall-through */
 	case MSM_HS_CLK_REQUEST_OFF:
 		hrtimer_cancel(&msm_uport->clk_off_timer);
-		if (msm_uport->rx.flush == FLUSH_STOP) {
-			spin_unlock_irqrestore(&uport->lock, flags);
-			MSM_HS_DBG("%s:Calling wait forxcompletion\n",
-					__func__);
-			ret = wait_event_timeout(msm_uport->bam_disconnect_wait,
-				msm_uport->rx.flush == FLUSH_SHUTDOWN, 300);
-			if (!ret)
-				MSM_HS_ERR("BAM Disconnect not happened\n");
-			spin_lock_irqsave(&uport->lock, flags);
-			MSM_HS_DBG("%s:DONE wait for completion\n", __func__);
-		}
 		MSM_HS_DBG("%s:clock state %d\n\n", __func__,
 				msm_uport->clk_state);
 		if (msm_uport->clk_state == MSM_HS_CLK_REQUEST_OFF)
@@ -2512,7 +2484,6 @@ static int uartdm_init_port(struct uart_port *uport)
 
 	init_waitqueue_head(&rx->wait);
 	init_waitqueue_head(&tx->wait);
-	init_waitqueue_head(&msm_uport->bam_disconnect_wait);
 	wake_lock_init(&rx->wake_lock, WAKE_LOCK_SUSPEND, "msm_serial_hs_rx");
 	wake_lock_init(&msm_uport->dma_wake_lock, WAKE_LOCK_SUSPEND,
 		       "msm_serial_hs_dma");
@@ -2541,68 +2512,6 @@ static int uartdm_init_port(struct uart_port *uport)
 	msm_hs_write(uport, UART_DM_RFWR, 32);
 
 	INIT_DELAYED_WORK(&rx->flip_insert_work, flip_insert_work);
-
-
-
-	/* Allocate the command pointer. Needs to be 64 bit aligned */
-	tx->command_ptr = kmalloc(sizeof(dmov_box), GFP_KERNEL | __GFP_DMA);
-	if (!tx->command_ptr) {
-		return -ENOMEM;
-		goto free_rx_buffer;
-	}
-
-	tx->command_ptr_ptr = kmalloc(sizeof(u32), GFP_KERNEL | __GFP_DMA);
-	if (!tx->command_ptr_ptr) {
-		ret = -ENOMEM;
-		goto free_tx_command_ptr;
-	}
-
-	tx->mapped_cmd_ptr = dma_map_single(uport->dev, tx->command_ptr,
-					sizeof(dmov_box), DMA_TO_DEVICE);
-	tx->mapped_cmd_ptr_ptr = dma_map_single(uport->dev,
-						tx->command_ptr_ptr,
-						sizeof(u32), DMA_TO_DEVICE);
-	tx->xfer.cmdptr = DMOV_CMD_ADDR(tx->mapped_cmd_ptr_ptr);
-
-	/* Allocate the command pointer. Needs to be 64 bit aligned */
-	rx->command_ptr = kmalloc(sizeof(dmov_box), GFP_KERNEL | __GFP_DMA);
-	if (!rx->command_ptr) {
-		MSM_HS_ERR("%s(): cannot allocate rx->command_ptr", __func__);
-		ret = -ENOMEM;
-		goto free_tx_command_ptr_ptr;
-	}
-
-	rx->command_ptr_ptr = kmalloc(sizeof(u32), GFP_KERNEL | __GFP_DMA);
-	if (!rx->command_ptr_ptr) {
-		MSM_HS_ERR("%s(): cannot allocate rx->command_ptr_ptr",
-			 __func__);
-		ret = -ENOMEM;
-		goto free_rx_command_ptr;
-	}
-
-	rx->command_ptr->num_rows = ((UARTDM_RX_BUF_SIZE >> 4) << 16) |
-					 (UARTDM_RX_BUF_SIZE >> 4);
-
-	rx->command_ptr->dst_row_addr = rx->rbuffer;
-
-	rx->xfer.complete_func = msm_hs_dmov_rx_callback;
-
-	rx->command_ptr->cmd = CMD_LC |
-	    CMD_SRC_CRCI(msm_uport->dma_rx_crci) | CMD_MODE_BOX;
-
-	rx->command_ptr->src_dst_len = (MSM_UARTDM_BURST_SIZE << 16)
-					   | (MSM_UARTDM_BURST_SIZE);
-	rx->command_ptr->row_offset =  MSM_UARTDM_BURST_SIZE;
-	rx->command_ptr->src_row_addr = uport->mapbase + UART_DM_RF;
-
-	rx->mapped_cmd_ptr = dma_map_single(uport->dev, rx->command_ptr,
-					    sizeof(dmov_box), DMA_TO_DEVICE);
-
-	*rx->command_ptr_ptr = CMD_PTR_LP | DMOV_CMD_ADDR(rx->mapped_cmd_ptr);
-
-	rx->cmdptr_dmaaddr = dma_map_single(uport->dev, rx->command_ptr_ptr,
-					    sizeof(u32), DMA_TO_DEVICE);
-	rx->xfer.cmdptr = DMOV_CMD_ADDR(rx->cmdptr_dmaaddr);
 
 	return ret;
 free_pool:
