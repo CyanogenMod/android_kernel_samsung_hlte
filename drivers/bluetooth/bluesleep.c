@@ -107,8 +107,8 @@ DECLARE_DELAYED_WORK(uart_awake_workqueue, bluesleep_uart_awake_work);
 #define bluesleep_tx_idle()     schedule_delayed_work(&sleep_workqueue, 0)
 #define bluesleep_uart_work()     schedule_delayed_work(&uart_awake_workqueue, 0)
 
-/* 10 second timeout */
-#define TX_TIMER_INTERVAL	10
+/* 5 second timeout */
+#define TX_TIMER_INTERVAL	5
 
 
 /* state variable names and bit positions */
