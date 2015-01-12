@@ -1818,7 +1818,9 @@ static int msm_hs_check_clock_off(struct uart_port *uport)
 {
 	unsigned long sr_status;
 	unsigned long flags;
+#ifdef CONFIG_MSM_BT_POWER
 	unsigned int data;
+#endif
 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
 	struct circ_buf *tx_buf = &uport->state->xmit;
 
@@ -1839,6 +1841,7 @@ static int msm_hs_check_clock_off(struct uart_port *uport)
 	    msm_uport->imr_reg & UARTDM_ISR_TXLEV_BMSK) {
 		spin_unlock_irqrestore(&uport->lock, flags);
 		mutex_unlock(&msm_uport->clk_mutex);
+#ifdef CONFIG_MSM_BT_POWER
 		if (msm_uport->clk_state == MSM_HS_CLK_REQUEST_OFF) {
 			msm_uport->clk_state = MSM_HS_CLK_ON;
 			/* Pulling RFR line high */
@@ -1849,6 +1852,7 @@ static int msm_hs_check_clock_off(struct uart_port *uport)
 			msm_hs_write(uport, UART_DM_MR1, data);
 			mb();
 		}
+#endif
 		MSM_HS_DBG("%s(): clkstate %d", __func__, msm_uport->clk_state);
 		return -1;
 	}
@@ -1876,7 +1880,7 @@ static int msm_hs_check_clock_off(struct uart_port *uport)
 	}
 
 	spin_unlock_irqrestore(&uport->lock, flags);
-
+#ifdef CONFIG_MSM_BT_POWER
 	/* Pulling RFR line high */
 	msm_hs_write(uport, UART_DM_CR, RFR_LOW);
 	/* Enable auto RFR */
@@ -1884,7 +1888,7 @@ static int msm_hs_check_clock_off(struct uart_port *uport)
 	data |= UARTDM_MR1_RX_RDY_CTL_BMSK;
 	msm_hs_write(uport, UART_DM_MR1, data);
 	mb();
-
+#endif
 	/* we really want to clock off */
 	msm_hs_clock_unvote(msm_uport);
 
@@ -2096,7 +2100,7 @@ void msm_hs_request_clock_on(struct uart_port *uport)
 
 	mutex_lock(&msm_uport->clk_mutex);
 	spin_lock_irqsave(&uport->lock, flags);
-
+#ifdef CONFIG_MSM_BT_POWER
 	if (msm_uport->clk_state == MSM_HS_CLK_REQUEST_OFF) {
 		/* Pulling RFR line high */
 		msm_hs_write(uport, UART_DM_CR, RFR_LOW);
@@ -2106,6 +2110,7 @@ void msm_hs_request_clock_on(struct uart_port *uport)
 		msm_hs_write(uport, UART_DM_MR1, data);
 		mb();
 	}
+#endif
 	switch (msm_uport->clk_state) {
 	case MSM_HS_CLK_OFF:
 		printk(KERN_INFO "(msm_serial_hs) msm_hs_check_clock_on - dma wake lock\n");
@@ -3207,7 +3212,6 @@ static void __exit msm_serial_hs_exit(void)
 	uart_unregister_driver(&msm_hs_driver);
 }
 
-#if 0 /*Bluesleep manages uart clk control*/
 static int msm_hs_runtime_idle(struct device *dev)
 {
 	/*
@@ -3249,16 +3253,13 @@ static const struct dev_pm_ops msm_hs_dev_pm_ops = {
 	.runtime_resume  = msm_hs_runtime_resume,
 	.runtime_idle    = msm_hs_runtime_idle,
 };
-#endif
-
 
 static struct platform_driver msm_serial_hs_platform_driver = {
 	.probe	= msm_hs_probe,
 	.remove = __devexit_p(msm_hs_remove),
 	.driver = {
 		.name = "msm_serial_hs",
-		/*Bluesleep manages uart clk control*/
-		/*.pm   = &msm_hs_dev_pm_ops,*/
+		.pm   = &msm_hs_dev_pm_ops,
 		.of_match_table = msm_hs_match_table,
 	},
 };
