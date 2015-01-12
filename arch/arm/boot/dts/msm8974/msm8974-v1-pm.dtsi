@@ -130,7 +130,7 @@
 		qcom,L2-spm-is-apcs-master;
 	};
 
-	lpm_levels: qcom,lpm-levels {
+	qcom,lpm-levels {
 		compatible = "qcom,lpm-levels";
 		qcom,default-l2-state = "l2_cache_retention";
 		#address-cells = <1>;
@@ -311,7 +311,6 @@
 		qcom,pc-mode = "tz_l2_int";
 		qcom,use-sync-timer;
 		qcom,cpus-as-clocks;
-		qcom,lpm-levels = <&lpm_levels>;
 	};
 
 	qcom,cpu-sleep-status@f9088008 {
