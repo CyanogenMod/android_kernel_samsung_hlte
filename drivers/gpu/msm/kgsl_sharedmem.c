@@ -415,6 +415,27 @@ static int kgsl_contiguous_vmflags(struct kgsl_memdesc *memdesc)
 }
 
 /*
+ * kgsl_page_alloc_unmap_kernel() - Unmap the memory in memdesc
+ *
+ * @memdesc: The memory descriptor which contains information about the memory
+ *
+ * Unmaps the memory mapped into kernel address space
+ */
+static void kgsl_page_alloc_unmap_kernel(struct kgsl_memdesc *memdesc)
+{
+    if (!memdesc->hostptr) {
+        BUG_ON(memdesc->hostptr_count);
+        return;
+    }
+    memdesc->hostptr_count--;
+    if (memdesc->hostptr_count)
+        return;
+    vunmap(memdesc->hostptr);
+    kgsl_driver.stats.vmalloc -= memdesc->size;
+    memdesc->hostptr = NULL;
+}
+
+/*
  * kgsl_page_alloc_map_kernel - Map the memory in memdesc to kernel address
  * space
  *
@@ -482,6 +503,7 @@ static int kgsl_contiguous_vmfault(struct kgsl_memdesc *memdesc,
 	return VM_FAULT_NOPAGE;
 }
 
+
 static void kgsl_coherent_free(struct kgsl_memdesc *memdesc)
 {
 	kgsl_driver.stats.coherent -= memdesc->size;
@@ -503,7 +525,8 @@ struct kgsl_memdesc_ops kgsl_page_alloc_ops = {
 	.free = kgsl_page_alloc_free,
 	.vmflags = kgsl_page_alloc_vmflags,
 	.vmfault = kgsl_page_alloc_vmfault,
-	.map_kernel_mem = kgsl_page_alloc_map_kernel,
+	.map_kernel = kgsl_page_alloc_map_kernel,
+	.unmap_kernel = kgsl_page_alloc_unmap_kernel,
 };
 EXPORT_SYMBOL(kgsl_page_alloc_ops);
 
