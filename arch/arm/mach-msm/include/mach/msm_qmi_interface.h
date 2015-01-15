@@ -172,44 +172,37 @@ int qmi_recv_msg(struct qmi_handle *handle);
  * qmi_connect_to_service() - Connect the QMI handle with a QMI service
  * @handle: QMI handle to be connected with the QMI service.
  * @service_id: Service id to identify the QMI service.
- * @service_vers: Version to identify the compatibility.
- * @service_ins: Instance id to identify the instance of the QMI service.
+ * @instance_id: Instance id to identify the instance of the QMI service.
  *
  * @return: 0 on success, < 0 on error.
  */
 int qmi_connect_to_service(struct qmi_handle *handle,
-			   uint32_t service_id,
-			   uint32_t service_vers,
-			   uint32_t service_ins);
+			   uint32_t service_id, uint32_t instance_id);
 
 /**
  * qmi_svc_event_notifier_register() - Register a notifier block to receive
  *                                     events regarding a QMI service
  * @service_id: Service ID to identify the QMI service.
- * @service_vers: Version to identify the compatibility.
- * @service_ins: Instance ID to identify the instance of the QMI service.
+ * @instance_id: Instance ID to identify the instance of the QMI service.
  * @nb: Notifier block used to receive the event.
  *
  * @return: 0 if successfully registered, < 0 on error.
  */
 int qmi_svc_event_notifier_register(uint32_t service_id,
-				    uint32_t service_vers,
-				    uint32_t service_ins,
+				    uint32_t instance_id,
 				    struct notifier_block *nb);
 
 /**
  * qmi_svc_event_notifier_unregister() - Unregister service event
  *                                       notifier block
  * @service_id: Service ID to identify the QMI service.
- * @service_vers: Version to identify the compatibility.
- * @service_ins: Instance ID to identify the instance of the QMI service.
+ * @instance_id: Instance ID to identify the instance of the QMI service.
  * @nb: Notifier block registered to receive the events.
  *
  * @return: 0 if successfully registered, < 0 on error.
  */
 int qmi_svc_event_notifier_unregister(uint32_t service_id,
-				      uint32_t service_vers,
-				      uint32_t service_ins,
+				      uint32_t instance_id,
 				      struct notifier_block *nb);
 #else
 
@@ -267,23 +260,20 @@ static inline int qmi_recv_msg(struct qmi_handle *handle)
 
 static inline int qmi_connect_to_service(struct qmi_handle *handle,
 					 uint32_t service_id,
-					 uint32_t service_vers,
-					 uint32_t service_ins)
+					 uint32_t instance_id)
 {
 	return -ENODEV;
 }
 
 static inline int qmi_svc_event_notifier_register(uint32_t service_id,
-						  uint32_t service_vers,
-						  uint32_t service_ins,
+						  uint32_t instance_id,
 						  struct notifier_block *nb)
 {
 	return -ENODEV;
 }
 
 static inline int qmi_svc_event_notifier_unregister(uint32_t service_id,
-						    uint32_t service_vers,
-						    uint32_t service_ins,
+						    uint32_t instance_id,
 						    struct notifier_block *nb)
 {
 	return -ENODEV;
