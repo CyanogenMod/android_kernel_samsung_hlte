@@ -1747,20 +1747,6 @@ static void msm_hs_enable_ms_locked(struct uart_port *uport)
 
 }
 
-static void msm_hs_power(struct uart_port *port, unsigned int state,
-			  unsigned int oldstate)
-{
-	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(port);
-
-	switch (state) {
-	case 1:
-		msm_hs_request_clock_on(&msm_uport->uport);
-		break;
-	default:
-		pr_err("Unknown PM state %d\n", state);
-	}
-}
-
 /*
  *  Standard API, Break Signal
  *
@@ -3288,7 +3274,6 @@ static struct uart_ops msm_hs_ops = {
 	.config_port = msm_hs_config_port,
 	.flush_buffer = NULL,
 	.ioctl = msm_hs_ioctl,
-	.pm = msm_hs_power,
 };
 
 module_init(msm_serial_hs_init);
