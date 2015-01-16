@@ -249,7 +249,7 @@ struct msm_hs_port {
 	struct msm_bus_scale_pdata *bus_scale_table;
 	int rx_count_callback;
 	bool rx_bam_inprogress;
-    unsigned int *reg_ptr;
+	wait_queue_head_t bam_disconnect_wait;
 };
 
 static struct of_device_id msm_hs_match_table[] = {
@@ -1179,6 +1179,8 @@ static void hsuart_disconnect_rx_endpoint_work(struct work_struct *w)
 		wake_lock_timeout(&msm_uport->rx.wake_lock,
 						HZ / 2);
 	msm_uport->rx.flush = FLUSH_SHUTDOWN;
+	MSM_HS_DBG("%s: Calling Completion\n", __func__);
+	wake_up(&msm_uport->bam_disconnect_wait);
 	MSM_HS_DBG("%s: Done Completion\n", __func__);
 	wake_up(&msm_uport->rx.wait);
 }
@@ -2116,6 +2118,17 @@ void msm_hs_request_clock_on(struct uart_port *uport)
 		/* else fall-through */
 	case MSM_HS_CLK_REQUEST_OFF:
 		hrtimer_cancel(&msm_uport->clk_off_timer);
+		if (msm_uport->rx.flush == FLUSH_STOP) {
+			spin_unlock_irqrestore(&uport->lock, flags);
+			MSM_HS_DBG("%s:Calling wait forxcompletion\n",
+					__func__);
+			ret = wait_event_timeout(msm_uport->bam_disconnect_wait,
+				msm_uport->rx.flush == FLUSH_SHUTDOWN, 300);
+			if (!ret)
+				MSM_HS_ERR("BAM Disconnect not happened\n");
+			spin_lock_irqsave(&uport->lock, flags);
+			MSM_HS_DBG("%s:DONE wait for completion\n", __func__);
+		}
 		MSM_HS_DBG("%s:clock state %d\n\n", __func__,
 				msm_uport->clk_state);
 		if (msm_uport->clk_state == MSM_HS_CLK_REQUEST_OFF)
@@ -2475,6 +2488,7 @@ static int uartdm_init_port(struct uart_port *uport)
 
 	init_waitqueue_head(&rx->wait);
 	init_waitqueue_head(&tx->wait);
+	init_waitqueue_head(&msm_uport->bam_disconnect_wait);
 	wake_lock_init(&rx->wake_lock, WAKE_LOCK_SUSPEND, "msm_serial_hs_rx");
 	wake_lock_init(&msm_uport->dma_wake_lock, WAKE_LOCK_SUSPEND,
 		       "msm_serial_hs_dma");
