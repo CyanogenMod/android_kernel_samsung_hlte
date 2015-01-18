@@ -233,27 +233,6 @@ void reset_mcu(struct ssp_data *data)
 		ssp_send_cmd(data, data->uLastResumeState, 0);
 }
 
-void reset_mcu_quick(struct ssp_data *data)
-{
-	func_dbg();
-	ssp_enable(data, false);
-
-	clean_pending_list(data);
-	toggle_mcu_reset(data);
-	msleep(250);
-	ssp_enable(data, true);
-
-	if (initialize_mcu(data) < 0)
-		return;
-
-	sync_sensor_state(data);
-
-	if(data->uLastAPState!=0)
-		ssp_send_cmd(data, data->uLastAPState, 0);
-	if(data->uLastResumeState != 0)
-		ssp_send_cmd(data, data->uLastResumeState, 0);
-}
-
 void sync_sensor_state(struct ssp_data *data)
 {
 	unsigned char uBuf[9] = {0,};
@@ -434,12 +413,6 @@ static void debug_work_func(struct work_struct *work)
 		if ((atomic_read(&data->aSensorEnable) & (1 << uSensorCnt))
 			|| data->batchLatencyBuf[uSensorCnt])
 			print_sensordata(data, uSensorCnt);
-
-	if ((atomic_read(&data->aSensorEnable) & SSP_BYPASS_SENSORS_EN_ALL)\
-		&& (data->uIrqCnt == 0))
-		data->uIrqFailCnt++;
-	else
-		data->uIrqFailCnt = 0;
 
 	if (((data->uSsdFailCnt >= LIMIT_SSD_FAIL_CNT)
 		|| (data->uInstFailCnt >= LIMIT_INSTRUCTION_FAIL_CNT)

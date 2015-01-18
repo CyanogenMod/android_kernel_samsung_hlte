@@ -78,7 +78,7 @@ static void change_sensor_delay(struct ssp_data *data,
 
 		data->aiCheckStatus[iSensorType] = RUNNING_SENSOR_STATE;
 
-		if (iSensorType == PROXIMITY_SENSOR) {
+		if (iSensorType == PROXIMITY_SENSOR && !(data->bSspShutdown)) {
 			proximity_open_lcd_ldi(data);
 			proximity_open_calibration(data);
 

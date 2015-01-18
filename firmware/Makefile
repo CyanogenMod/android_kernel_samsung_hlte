@@ -182,10 +182,20 @@ fw-shipped-$(CONFIG_INPUT_WACOM) += epen/W9010_0208.bin
 fw-shipped-all := $(fw-shipped-y) $(fw-shipped-m) $(fw-shipped-)
 
 #for sensorhub
-fw-shipped-$(CONFIG_SENSORS_SSP_ATMEL) += ssp.fw ssp_rev03.fw
+fw-shipped-$(CONFIG_SENSORS_SSP_ATMEL) += ssp.fw ssp_rev03.fw ssp_fortius.fw
 ifndef CONFIG_SENSORS_SSP_BOUNCE_FIRMWARE
+ifdef CONFIG_SEC_PATEK_PROJECT
+fw-shipped-$(CONFIG_SEC_PATEK_PROJECT) += ssp_stm_patek.fw ssp_stm_maxim_patek.fw
+else
 fw-shipped-$(CONFIG_SENSORS_SSP_STM) += ssp_stm.fw ssp_stm_rvs.fw ssp_stm_88921.fw ssp_stm_w2014.fw
+endif
+ifdef CONFIG_MACH_JSGLTE_CHN_CMCC
+fw-shipped-$(CONFIG_MACH_JSGLTE_CHN_CMCC) += ssp_stm32f_jsglte.fw
+else
 fw-shipped-$(CONFIG_SENSORS_SSP_STM_32F) += ssp_stm32f.fw
+endif
+fw-shipped-$(CONFIG_SEC_KSPORTS_PROJECT) += ssp_stm_tasman.fw
+fw-shipped-$(CONFIG_SENSORS_SSP_STM_HESTIA) += ssp_stm_hestia.fw
 endif
 fw-shipped-$(CONFIG_SENSORS_SSP_BOUNCE_FIRMWARE) += ssp_stm_bf.fw
 fw-shipped-$(CONFIG_SENSORS_SSP) += ssp_crashed.fw
