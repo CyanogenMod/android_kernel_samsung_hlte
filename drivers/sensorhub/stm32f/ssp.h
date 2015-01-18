@@ -36,6 +36,7 @@
 #include <linux/timer.h>
 #include <linux/list.h>
 #include <linux/rtc.h>
+#include <linux/android_alarm.h>
 #include <linux/regulator/consumer.h>
 #include <linux/spi/spi.h>
 
@@ -303,12 +304,6 @@ enum {
 	STEP_COUNTER,
 	SENSOR_MAX,
 };
-
-#define SSP_BYPASS_SENSORS_EN_ALL (1 << ACCELEROMETER_SENSOR |\
-	1 << GYROSCOPE_SENSOR | 1 << GEOMAGNETIC_UNCALIB_SENSOR |\
-	1 << GEOMAGNETIC_SENSOR | 1 << PRESSURE_SENSOR |\
-	1 << TEMPERATURE_HUMIDITY_SENSOR | 1 << LIGHT_SENSOR|\
-	1 << GYRO_UNCALIB_SENSOR | 1 << GAME_ROTATION_VECTOR) /* PROXIMITY_SENSOR is not continuos */
 	
 struct meta_data_event {
 	s32 what;
@@ -356,7 +351,11 @@ struct sensor_value {
 		u8 step_det;
 		u8 sig_motion;
 		u32 step_diff;
+#if defined (CONFIG_SENSORS_SSP_MAX88920)
+		u8 prox[2];
+#else
 		u16 prox[4];
+#endif
 		s16 data[19];
 		s32 pressure[3];
 		struct meta_data_event meta_data;
@@ -424,12 +423,27 @@ enum {
 	BIG_TYPE_MAX,
 };
 
+enum {
+	BATCH_MODE_NONE = 0,
+	BATCH_MODE_RUN,
+};
+
+struct ssp_time_diff {
+	u16 batch_count;
+	u16 batch_mode;
+	u64 time_diff;
+	u64 irq_diff;
+	u16 batch_count_fixed;
+};
 struct ssp_data {
 	struct iio_dev *accel_indio_dev;
 	struct iio_dev *gyro_indio_dev;
+	struct iio_dev *uncal_gyro_indio_dev;
 	struct iio_dev *rot_indio_dev;
 	struct iio_dev *game_rot_indio_dev;
 	struct iio_dev *step_det_indio_dev;
+	struct iio_dev *mag_indio_dev;
+	struct iio_dev *uncal_mag_indio_dev;
 	struct iio_trigger *accel_trig;
 	struct iio_trigger *gyro_trig;
 	struct iio_trigger *rot_trig;
@@ -439,11 +453,8 @@ struct ssp_data {
 	struct input_dev *light_input_dev;
 	struct input_dev *prox_input_dev;
 	struct input_dev *temp_humi_input_dev;
-	struct input_dev *mag_input_dev;
-	struct input_dev *uncalib_mag_input_dev;
 	struct input_dev *gesture_input_dev;
 	struct input_dev *sig_motion_input_dev;
-	struct input_dev *uncalib_gyro_input_dev;
 	struct input_dev *step_cnt_input_dev;
 	struct input_dev *meta_input_dev;
 	struct spi_device *spi;
@@ -520,8 +531,10 @@ struct ssp_data {
 	u64 step_count_total;
 	atomic_t aSensorEnable;
 	int64_t adDelayBuf[SENSOR_MAX];
+	u64 lastTimestamp[SENSOR_MAX];
 	s32 batchLatencyBuf[SENSOR_MAX];
 	s8 batchOptBuf[SENSOR_MAX];
+	bool reportedData[SENSOR_MAX];
 
 	int (*wakeup_mcu)(void);
 	int (*check_mcu_ready)(void);
@@ -680,7 +693,6 @@ void report_temp_humidity_data(struct ssp_data *, struct sensor_value *);
 void report_bulk_comp_data(struct ssp_data *data);
 unsigned int get_module_rev(struct ssp_data *data);
 void reset_mcu(struct ssp_data *);
-void reset_mcu_quick(struct ssp_data *);
 void convert_acc_data(s16 *);
 int sensors_register(struct device *, void *,
 	struct device_attribute*[], char *);

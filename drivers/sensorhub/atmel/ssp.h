@@ -267,6 +267,12 @@ enum {
 	SENSOR_FACTORY_MAX,
 };
 
+enum {
+	STORE_SUCCESS = 0,
+	FILE_OPEN_FAIL,
+	OFFSET_CAL_DATA,
+};
+
 struct sensor_value {
 	union {
 		struct {
@@ -417,6 +423,10 @@ struct ssp_data {
 	int sns_combination;
 	struct regulator *reg_hub;
 	struct regulator *reg_sns;
+
+	unsigned char prox_state;
+	unsigned char proximity_highThreshold;
+	unsigned char proximity_lowThreshold;
 };
 
 void ssp_enable(struct ssp_data *, bool);
