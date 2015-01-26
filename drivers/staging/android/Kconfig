@@ -21,18 +21,6 @@ config ASHMEM
 	  POSIX SHM but with different behavior and sporting a simpler
 	  file-based API.
 
-config ANDROID_LOGGER
-	tristate "Android log driver"
-	default n
-
-config LOGCAT_SIZE
-	int "Adjust android log buffer sizes"
-	default 512
-	depends on ANDROID_LOGGER
-	help
-	  Set logger buffer size. Enter a number greater than zero.
-	  Any value less than 256 is recommended. Reduce value to save kernel static memory size.
-
 config ANDROID_PERSISTENT_RAM
 	bool
 	depends on HAVE_MEMBLOCK
