@@ -1385,7 +1385,8 @@ out:
 }
 
 /* Parse platform data */
-static struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev)
+static struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev,
+				struct sdhci_host *host)
 {
 	struct sdhci_msm_pltfm_data *pdata = NULL;
 	struct device_node *np = dev->of_node;
@@ -1500,7 +1501,6 @@ static struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev)
 	else
 		pdata->mpm_sdiowakeup_int = -1;
 
-
 #if defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE) || \
     defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE) || \
     defined(CONFIG_BCM4354) || defined(CONFIG_BCM4354_MODULE)
@@ -1510,6 +1510,9 @@ static struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev)
 		pr_err("%s: vendor_type=%d \n", __FUNCTION__, vendor_type);
 	}
 #endif
+
+	if (of_property_read_bool(np, "qcom,wakeup-on-idle"))
+		host->mmc->wakeup_on_idle = true;
 
 	return pdata;
 out:
@@ -2968,7 +2971,7 @@ static int __devinit sdhci_msm_probe(struct platform_device *pdev)
 			goto pltfm_free;
 		}
 
-		msm_host->pdata = sdhci_msm_populate_pdata(&pdev->dev);
+		msm_host->pdata = sdhci_msm_populate_pdata(&pdev->dev, host);
 		if (!msm_host->pdata) {
 			dev_err(&pdev->dev, "DT parsing error\n");
 			goto pltfm_free;
