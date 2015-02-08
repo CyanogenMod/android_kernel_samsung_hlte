@@ -580,7 +580,7 @@ static void krait_update_uv(int *uv, int num, int boost_uv)
 	case 0x511F04D1: /* KR28M2A21 */
 	case 0x510F06F0: /* KR28M4A10 */
 		for (i = 0; i < num; i++)
-			uv[i] = max(1150000, uv[i]);
+			uv[i] = max(1200000, uv[i]);
 	};
 
 	if (enable_boost) {
