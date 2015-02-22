@@ -202,7 +202,7 @@ int sidtab_context_to_sid(struct sidtab *s,
 	int ret = 0;
 	unsigned long flags;
 
-	*out_sid = SECSID_NULL;
+	*out_sid = SECSID_WILD;
 
 	sid  = sidtab_search_cache(s, context);
 	if (!sid)
@@ -221,7 +221,7 @@ int sidtab_context_to_sid(struct sidtab *s,
 		sid = s->next_sid++;
 		if (context->len)
 			printk(KERN_INFO
-		       "SELinux:  Context %s is not valid (left unmapped).\n",
+		       "SELinux:  Context %s is not valid (left wildcarded).\n",
 			       context->str);
 		ret = sidtab_insert(s, sid, context);
 		if (ret)
