@@ -35,6 +35,13 @@ config POWERSUSPEND
 	  Call early suspend handlers when the user requested sleep state
 	  changes.
 
+config SUSPEND_TIME_TIMEKEEPING
+	bool "get suspend time from timekeeping"
+	default y
+	---help---
+	  Get the suspend time in suspend from timekeeping for the archs
+	  that don't support persistent clock.
+
 config HIBERNATE_CALLBACKS
 	bool
 
