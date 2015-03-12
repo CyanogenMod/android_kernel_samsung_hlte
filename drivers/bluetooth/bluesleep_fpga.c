@@ -107,8 +107,8 @@ DECLARE_DELAYED_WORK(tx_timer_expired_workqueue, bluesleep_ext_wake_set_wq);
 
 #define bluesleep_tx_timer_expired()     schedule_delayed_work(&tx_timer_expired_workqueue, 0)
 
-/* 10 second timeout */
-#define TX_TIMER_INTERVAL  3
+/* 5 second timeout */
+#define TX_TIMER_INTERVAL  5
 
 /* state variable names and bit positions */
 #define BT_PROTO	 0x01
