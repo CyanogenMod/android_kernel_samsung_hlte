@@ -128,13 +128,11 @@ struct f2fs_dir_entry *find_target_dentry(struct qstr *name, int *max_slots,
 		*max_slots = 0;
 	while (bit_pos < d->max) {
 		if (!test_bit_le(bit_pos, d->bitmap)) {
-			if (bit_pos == 0)
-				max_len = 1;
-			else if (!test_bit_le(bit_pos - 1, d->bitmap))
-				max_len++;
 			bit_pos++;
+			max_len++;
 			continue;
 		}
+
 		de = &d->dentry[bit_pos];
 		if (flags & LOOKUP_CASE_INSENSITIVE) {
 			if ((le16_to_cpu(de->name_len) == namehash) &&
@@ -146,10 +144,9 @@ struct f2fs_dir_entry *find_target_dentry(struct qstr *name, int *max_slots,
 			!memcmp(d->filename[bit_pos], name->name, name->len))
 			goto found;
 
-		if (max_slots && *max_slots >= 0 && max_len > *max_slots) {
+		if (max_slots && max_len > *max_slots)
 			*max_slots = max_len;
-			max_len = 0;
-		}
+		max_len = 0;
 
 		/* remain bug on condition */
 		if (unlikely(!de->name_len))
@@ -228,13 +225,13 @@ struct f2fs_dir_entry *f2fs_find_entry(struct inode *dir,
 	unsigned int max_depth;
 	unsigned int level;
 
+	*res_page = NULL;
+
 	if (f2fs_has_inline_dentry(dir))
 		return find_in_inline_dir(dir, child, res_page, flags);
 
 	if (npages == 0)
 		return NULL;
-
-	*res_page = NULL;
 
 	name_hash = f2fs_dentry_hash(child);
 	max_depth = F2FS_I(dir)->i_current_depth;

@@ -257,7 +257,6 @@ static void f2fs_map_bh(struct super_block *sb, pgoff_t pgofs,
 	unsigned int blkbits = sb->s_blocksize_bits;
 	size_t count;
 
-	set_buffer_new(bh_result);
 	map_bh(bh_result, sb, ei->blk + pgofs - ei->fofs);
 	count = ei->fofs + ei->len - pgofs;
 	if (count < (UINT_MAX >> blkbits))
@@ -1066,7 +1065,10 @@ static void __allocate_data_blocks(struct inode *inode, loff_t offset,
 		end_offset = ADDRS_PER_PAGE(dn.node_page, F2FS_I(inode));
 
 		while (dn.ofs_in_node < end_offset && len) {
-			if (dn.data_blkaddr == NULL_ADDR) {
+			block_t blkaddr;
+
+			blkaddr = datablock_addr(dn.node_page, dn.ofs_in_node);
+			if (blkaddr == NULL_ADDR) {
 				if (__allocate_data_block(&dn))
 					goto sync_out;
 				allocated = true;
@@ -1136,7 +1138,7 @@ static int __get_data_block(struct inode *inode, sector_t iblock,
 		goto put_out;
 
 	if (dn.data_blkaddr != NULL_ADDR) {
-		set_buffer_new(bh_result);
+		clear_buffer_new(bh_result);
 		map_bh(bh_result, inode->i_sb, dn.data_blkaddr);
 	} else if (create) {
 		err = __allocate_data_block(&dn);
@@ -1181,6 +1183,7 @@ get_next:
 			if (err)
 				goto sync_out;
 			allocated = true;
+			set_buffer_new(bh_result);
 			blkaddr = dn.data_blkaddr;
 		}
 		/* Give more consecutive addresses for the readahead */
@@ -1393,7 +1396,6 @@ static int f2fs_write_data_pages(struct address_space *mapping,
 {
 	struct inode *inode = mapping->host;
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
-	bool locked = false;
 	int ret;
 	long diff;
 
@@ -1414,13 +1416,7 @@ static int f2fs_write_data_pages(struct address_space *mapping,
 
 	diff = nr_pages_to_write(sbi, DATA, wbc);
 
-	if (!S_ISDIR(inode->i_mode)) {
-		mutex_lock(&sbi->writepages);
-		locked = true;
-	}
 	ret = write_cache_pages(mapping, wbc, __f2fs_writepage, mapping);
-	if (locked)
-		mutex_unlock(&sbi->writepages);
 
 	f2fs_submit_merged_bio(sbi, DATA, WRITE);
 
