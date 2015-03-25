@@ -200,7 +200,7 @@ alloc_new:
  *  ->node_page
  *    update block addresses in the node page
  */
-static void __set_data_blkaddr(struct dnode_of_data *dn)
+void set_data_blkaddr(struct dnode_of_data *dn)
 {
 	struct f2fs_node *rn;
 	__le32 *addr_array;
@@ -229,7 +229,7 @@ int reserve_new_block(struct dnode_of_data *dn)
 	trace_f2fs_reserve_new_block(dn->inode, dn->nid, dn->ofs_in_node);
 
 	dn->data_blkaddr = NEW_ADDR;
-	__set_data_blkaddr(dn);
+	set_data_blkaddr(dn);
 	mark_inode_dirty(dn->inode);
 	sync_inode_page(dn);
 	return 0;
@@ -255,14 +255,13 @@ static void f2fs_map_bh(struct super_block *sb, pgoff_t pgofs,
 			struct extent_info *ei, struct buffer_head *bh_result)
 {
 	unsigned int blkbits = sb->s_blocksize_bits;
-	size_t count;
+	size_t max_size = bh_result->b_size;
+	size_t mapped_size;
 
+	clear_buffer_new(bh_result);
 	map_bh(bh_result, sb, ei->blk + pgofs - ei->fofs);
-	count = ei->fofs + ei->len - pgofs;
-	if (count < (UINT_MAX >> blkbits))
-		bh_result->b_size = (count << blkbits);
-	else
-		bh_result->b_size = UINT_MAX;
+	mapped_size = (ei->fofs + ei->len - pgofs) << blkbits;
+	bh_result->b_size = min(max_size, mapped_size);
 }
 
 static bool lookup_extent_info(struct inode *inode, pgoff_t pgofs,
@@ -391,6 +390,49 @@ static void __detach_extent_node(struct f2fs_sb_info *sbi,
 
 	if (et->cached_en == en)
 		et->cached_en = NULL;
+}
+
+static struct extent_tree *__find_extent_tree(struct f2fs_sb_info *sbi,
+							nid_t ino)
+{
+	struct extent_tree *et;
+
+	down_read(&sbi->extent_tree_lock);
+	et = radix_tree_lookup(&sbi->extent_tree_root, ino);
+	if (!et) {
+		up_read(&sbi->extent_tree_lock);
+		return NULL;
+	}
+	atomic_inc(&et->refcount);
+	up_read(&sbi->extent_tree_lock);
+
+	return et;
+}
+
+static struct extent_tree *__grab_extent_tree(struct inode *inode)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+	struct extent_tree *et;
+	nid_t ino = inode->i_ino;
+
+	down_write(&sbi->extent_tree_lock);
+	et = radix_tree_lookup(&sbi->extent_tree_root, ino);
+	if (!et) {
+		et = f2fs_kmem_cache_alloc(extent_tree_slab, GFP_NOFS);
+		f2fs_radix_tree_insert(&sbi->extent_tree_root, ino, et);
+		memset(et, 0, sizeof(struct extent_tree));
+		et->ino = ino;
+		et->root = RB_ROOT;
+		et->cached_en = NULL;
+		rwlock_init(&et->lock);
+		atomic_set(&et->refcount, 0);
+		et->count = 0;
+		sbi->total_ext_tree++;
+	}
+	atomic_inc(&et->refcount);
+	up_write(&sbi->extent_tree_lock);
+
+	return et;
 }
 
 static struct extent_node *__lookup_extent_tree(struct extent_tree *et,
@@ -528,6 +570,39 @@ static unsigned int __free_extent_tree(struct f2fs_sb_info *sbi,
 	return count - et->count;
 }
 
+static void f2fs_init_extent_tree(struct inode *inode,
+						struct f2fs_extent *i_ext)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+	struct extent_tree *et;
+	struct extent_node *en;
+	struct extent_info ei;
+
+	if (le32_to_cpu(i_ext->len) < F2FS_MIN_EXTENT_LEN)
+		return;
+
+	et = __grab_extent_tree(inode);
+
+	write_lock(&et->lock);
+	if (et->count)
+		goto out;
+
+	set_extent_info(&ei, le32_to_cpu(i_ext->fofs),
+		le32_to_cpu(i_ext->blk), le32_to_cpu(i_ext->len));
+
+	en = __insert_extent_tree(sbi, et, &ei, NULL);
+	if (en) {
+		et->cached_en = en;
+
+		spin_lock(&sbi->extent_lock);
+		list_add_tail(&en->list, &sbi->extent_list);
+		spin_unlock(&sbi->extent_lock);
+	}
+out:
+	write_unlock(&et->lock);
+	atomic_dec(&et->refcount);
+}
+
 static bool f2fs_lookup_extent_tree(struct inode *inode, pgoff_t pgofs,
 							struct extent_info *ei)
 {
@@ -537,14 +612,9 @@ static bool f2fs_lookup_extent_tree(struct inode *inode, pgoff_t pgofs,
 
 	trace_f2fs_lookup_extent_tree_start(inode, pgofs);
 
-	down_read(&sbi->extent_tree_lock);
-	et = radix_tree_lookup(&sbi->extent_tree_root, inode->i_ino);
-	if (!et) {
-		up_read(&sbi->extent_tree_lock);
+	et = __find_extent_tree(sbi, inode->i_ino);
+	if (!et)
 		return false;
-	}
-	atomic_inc(&et->refcount);
-	up_read(&sbi->extent_tree_lock);
 
 	read_lock(&et->lock);
 	en = __lookup_extent_tree(et, pgofs);
@@ -569,7 +639,6 @@ static void f2fs_update_extent_tree(struct inode *inode, pgoff_t fofs,
 							block_t blkaddr)
 {
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
-	nid_t ino = inode->i_ino;
 	struct extent_tree *et;
 	struct extent_node *en = NULL, *en1 = NULL, *en2 = NULL, *en3 = NULL;
 	struct extent_node *den = NULL;
@@ -578,22 +647,7 @@ static void f2fs_update_extent_tree(struct inode *inode, pgoff_t fofs,
 
 	trace_f2fs_update_extent_tree(inode, fofs, blkaddr);
 
-	down_write(&sbi->extent_tree_lock);
-	et = radix_tree_lookup(&sbi->extent_tree_root, ino);
-	if (!et) {
-		et = f2fs_kmem_cache_alloc(extent_tree_slab, GFP_NOFS);
-		f2fs_radix_tree_insert(&sbi->extent_tree_root, ino, et);
-		memset(et, 0, sizeof(struct extent_tree));
-		et->ino = ino;
-		et->root = RB_ROOT;
-		et->cached_en = NULL;
-		rwlock_init(&et->lock);
-		atomic_set(&et->refcount, 0);
-		et->count = 0;
-		sbi->total_ext_tree++;
-	}
-	atomic_inc(&et->refcount);
-	up_write(&sbi->extent_tree_lock);
+	et = __grab_extent_tree(inode);
 
 	write_lock(&et->lock);
 
@@ -661,6 +715,55 @@ update_extent:
 
 	write_unlock(&et->lock);
 	atomic_dec(&et->refcount);
+}
+
+void f2fs_preserve_extent_tree(struct inode *inode)
+{
+	struct extent_tree *et;
+	struct extent_info *ext = &F2FS_I(inode)->ext;
+	bool sync = false;
+
+	if (!test_opt(F2FS_I_SB(inode), EXTENT_CACHE))
+		return;
+
+	et = __find_extent_tree(F2FS_I_SB(inode), inode->i_ino);
+	if (!et) {
+		if (ext->len) {
+			ext->len = 0;
+			update_inode_page(inode);
+		}
+		return;
+	}
+
+	read_lock(&et->lock);
+	if (et->count) {
+		struct extent_node *en;
+
+		if (et->cached_en) {
+			en = et->cached_en;
+		} else {
+			struct rb_node *node = rb_first(&et->root);
+
+			if (!node)
+				node = rb_last(&et->root);
+			en = rb_entry(node, struct extent_node, rb_node);
+		}
+
+		if (__is_extent_same(ext, &en->ei))
+			goto out;
+
+		*ext = en->ei;
+		sync = true;
+	} else if (ext->len) {
+		ext->len = 0;
+		sync = true;
+	}
+out:
+	read_unlock(&et->lock);
+	atomic_dec(&et->refcount);
+
+	if (sync)
+		update_inode_page(inode);
 }
 
 void f2fs_shrink_extent_tree(struct f2fs_sb_info *sbi, int nr_shrink)
@@ -731,14 +834,9 @@ void f2fs_destroy_extent_tree(struct inode *inode)
 	if (!test_opt(sbi, EXTENT_CACHE))
 		return;
 
-	down_read(&sbi->extent_tree_lock);
-	et = radix_tree_lookup(&sbi->extent_tree_root, inode->i_ino);
-	if (!et) {
-		up_read(&sbi->extent_tree_lock);
+	et = __find_extent_tree(sbi, inode->i_ino);
+	if (!et)
 		goto out;
-	}
-	atomic_inc(&et->refcount);
-	up_read(&sbi->extent_tree_lock);
 
 	/* free all extent info belong to this extent tree */
 	write_lock(&et->lock);
@@ -764,6 +862,16 @@ out:
 	return;
 }
 
+void f2fs_init_extent_cache(struct inode *inode, struct f2fs_extent *i_ext)
+{
+	if (test_opt(F2FS_I_SB(inode), EXTENT_CACHE))
+		f2fs_init_extent_tree(inode, i_ext);
+
+	write_lock(&F2FS_I(inode)->ext_lock);
+	get_extent_info(&F2FS_I(inode)->ext, *i_ext);
+	write_unlock(&F2FS_I(inode)->ext_lock);
+}
+
 static bool f2fs_lookup_extent_cache(struct inode *inode, pgoff_t pgofs,
 							struct extent_info *ei)
 {
@@ -782,9 +890,6 @@ void f2fs_update_extent_cache(struct dnode_of_data *dn)
 	pgoff_t fofs;
 
 	f2fs_bug_on(F2FS_I_SB(dn->inode), dn->data_blkaddr == NEW_ADDR);
-
-	/* Update the page address in the parent node */
-	__set_data_blkaddr(dn);
 
 	if (is_inode_flag_set(fi, FI_NO_EXTENT))
 		return;
@@ -1019,19 +1124,26 @@ static int __allocate_data_block(struct dnode_of_data *dn)
 
 	if (unlikely(is_inode_flag_set(F2FS_I(dn->inode), FI_NO_ALLOC)))
 		return -EPERM;
+
+	dn->data_blkaddr = datablock_addr(dn->node_page, dn->ofs_in_node);
+	if (dn->data_blkaddr == NEW_ADDR)
+		goto alloc;
+
 	if (unlikely(!inc_valid_block_count(sbi, dn->inode, 1)))
 		return -ENOSPC;
 
+alloc:
 	get_node_info(sbi, dn->nid, &ni);
 	set_summary(&sum, dn->nid, dn->ofs_in_node, ni.version);
 
 	if (dn->ofs_in_node == 0 && dn->inode_page == dn->node_page)
 		seg = CURSEG_DIRECT_IO;
 
-	allocate_data_block(sbi, NULL, NULL_ADDR, &dn->data_blkaddr, &sum, seg);
+	allocate_data_block(sbi, NULL, dn->data_blkaddr, &dn->data_blkaddr,
+								&sum, seg);
 
 	/* direct IO doesn't use extent cache to maximize the performance */
-	__set_data_blkaddr(dn);
+	set_data_blkaddr(dn);
 
 	/* update i_size */
 	fofs = start_bidx_of_node(ofs_of_node(dn->node_page), fi) +
@@ -1068,7 +1180,7 @@ static void __allocate_data_blocks(struct inode *inode, loff_t offset,
 			block_t blkaddr;
 
 			blkaddr = datablock_addr(dn.node_page, dn.ofs_in_node);
-			if (blkaddr == NULL_ADDR) {
+			if (blkaddr == NULL_ADDR || blkaddr == NEW_ADDR) {
 				if (__allocate_data_block(&dn))
 					goto sync_out;
 				allocated = true;
@@ -1286,10 +1398,15 @@ int do_write_data_page(struct page *page, struct f2fs_io_info *fio)
 			need_inplace_update(inode))) {
 		rewrite_data_page(page, fio);
 		set_inode_flag(F2FS_I(inode), FI_UPDATE_WRITE);
+		trace_f2fs_do_write_data_page(page, IPU);
 	} else {
 		write_data_page(page, &dn, fio);
+		set_data_blkaddr(&dn);
 		f2fs_update_extent_cache(&dn);
+		trace_f2fs_do_write_data_page(page, OPU);
 		set_inode_flag(F2FS_I(inode), FI_APPEND_WRITE);
+		if (page->index == 0)
+			set_inode_flag(F2FS_I(inode), FI_FIRST_BLOCK_WRITTEN);
 	}
 out_writepage:
 	f2fs_put_dnode(&dn);

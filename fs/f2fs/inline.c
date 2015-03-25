@@ -21,7 +21,7 @@ bool f2fs_may_inline(struct inode *inode)
 	if (f2fs_is_atomic_file(inode))
 		return false;
 
-	if (!S_ISREG(inode->i_mode))
+	if (!S_ISREG(inode->i_mode) && !S_ISLNK(inode->i_mode))
 		return false;
 
 	if (i_size_read(inode) > MAX_INLINE_DATA)
@@ -131,6 +131,7 @@ no_update:
 	set_page_writeback(page);
 	fio.blk_addr = dn->data_blkaddr;
 	write_data_page(page, dn, &fio);
+	set_data_blkaddr(dn);
 	f2fs_update_extent_cache(dn);
 	f2fs_wait_on_page_writeback(page, DATA);
 	if (dirty)
