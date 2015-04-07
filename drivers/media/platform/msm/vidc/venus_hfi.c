@@ -91,8 +91,6 @@ struct tzbsp_video_set_state_req {
 #define IS_VENUS_IN_VALID_STATE(__device) (\
 		(__device)->state != VENUS_STATE_DEINIT)
 
-static int venus_hfi_power_enable(void *dev);
-
 static inline int venus_hfi_clk_gating_off(struct venus_hfi_device *device);
 
 static int venus_hfi_power_enable(void *dev);
