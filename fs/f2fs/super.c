@@ -44,7 +44,6 @@ enum {
 	Opt_disable_roll_forward,
 	Opt_norecovery,
 	Opt_discard,
-	Opt_nodiscard,
 	Opt_noheap,
 	Opt_user_xattr,
 	Opt_nouser_xattr,
@@ -68,7 +67,6 @@ static match_table_t f2fs_tokens = {
 	{Opt_disable_roll_forward, "disable_roll_forward"},
 	{Opt_norecovery, "norecovery"},
 	{Opt_discard, "discard"},
-	{Opt_nodiscard, "nodiscard"},
 	{Opt_noheap, "no_heap"},
 	{Opt_user_xattr, "user_xattr"},
 	{Opt_nouser_xattr, "nouser_xattr"},
@@ -305,9 +303,6 @@ static int parse_options(struct super_block *sb, char *options)
 			break;
 		case Opt_discard:
 			set_opt(sbi, DISCARD);
-			break;
-		case Opt_nodiscard:
-			clear_opt(sbi, DISCARD);
 			break;
 		case Opt_noheap:
 			set_opt(sbi, NOHEAP);
@@ -1235,7 +1230,7 @@ free_sbi:
 
 	/* give only one another chance */
 	if (retry) {
-		retry = 0;
+		retry = false;
 		shrink_dcache_sb(sb);
 		goto try_onemore;
 	}
