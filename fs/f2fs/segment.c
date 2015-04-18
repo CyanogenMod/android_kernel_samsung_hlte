@@ -1146,7 +1146,7 @@ int f2fs_trim_fs(struct f2fs_sb_info *sbi, struct fstrim_range *range)
 	unsigned int start_segno, end_segno;
 	struct cp_control cpc;
 
-	if (range->minlen > SEGMENT_SIZE(sbi) || start >= MAX_BLKADDR(sbi) ||
+	if (end - start < range->minlen || start >= MAX_BLKADDR(sbi) ||
 						range->len < sbi->blocksize)
 		return -EINVAL;
 
