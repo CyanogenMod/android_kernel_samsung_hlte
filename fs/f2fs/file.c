@@ -1146,8 +1146,6 @@ long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		return f2fs_ioc_abort_volatile_write(filp);
 	case F2FS_IOC_SHUTDOWN:
 		return f2fs_ioc_shutdown(filp, arg);
-	case FITRIM:
-		return f2fs_ioc_fitrim(filp, arg);
 	default:
 		return -ENOTTY;
 	}
