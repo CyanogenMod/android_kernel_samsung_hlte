@@ -309,7 +309,7 @@ static void bluesleep_sleep_work(struct work_struct *work)
 			if (test_bit(BT_TXDATA, &flags)) {
 				BT_DBG("TXDATA remained. Wait until timer expires.");
 
-				mod_timer(&tx_timer, jiffies + TX_TIMER_INTERVAL * HZ);
+				mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));
 				mutex_unlock(&bluesleep_mutex);
 				return;
 			}
@@ -333,7 +333,7 @@ static void bluesleep_sleep_work(struct work_struct *work)
 		} else {
 			BT_DBG("host can enter sleep but some tx remained.");
 
-			mod_timer(&tx_timer, jiffies + TX_TIMER_INTERVAL * HZ);
+			mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));
 			mutex_unlock(&bluesleep_mutex);
 			return;
 		}
