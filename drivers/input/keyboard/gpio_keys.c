@@ -83,11 +83,9 @@ static void sync_system(struct work_struct *work);
 static DECLARE_WORK(sync_system_work, sync_system);
 struct wake_lock sync_wake_lock;
 
-static bool suspended = false;
-
 static void sync_system(struct work_struct *work)
 {
-	if (suspended)
+	if (power_suspended)
 		msleep(5000);
 
 	pr_info("%s +\n", __func__);
@@ -381,7 +379,7 @@ static inline int64_t get_time_inms(void) {
 void gpio_sync_worker(bool pwr)
 {
 	/* sys_sync(); */
-	if (suspended) {
+	if (power_suspended) {
 		if (pwr)
 			pr_info("%s: KEY_POWER pressed, calling sys_sync() in 5 sec...\n", __func__);
 		else
