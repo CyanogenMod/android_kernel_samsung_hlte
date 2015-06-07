@@ -177,6 +177,20 @@ static inline void bfq_schedule_dispatch(struct bfq_data *bfqd);
 #define bfq_sample_valid(samples)	((samples) > 80)
 
 /*
+ * The following macro groups conditions that need to be evaluated when
+ * checking if existing queues and groups form a symmetric scenario
+ * and therefore idling can be reduced or disabled for some of the
+ * queues. See the comment to the function bfq_bfqq_must_not_expire()
+ * for further details.
+ */
+#ifdef CONFIG_CGROUP_BFQIO
+#define symmetric_scenario	  (!bfqd->active_numerous_groups && \
+				   !bfq_differentiated_weights(bfqd))
+#else
+#define symmetric_scenario	  (!bfq_differentiated_weights(bfqd))
+#endif
+
+/*
  * We regard a request as SYNC, if either it's a read or has the SYNC bit
  * set (in which case it could also be a direct WRITE).
  */
@@ -1699,14 +1713,16 @@ static void bfq_arm_slice_timer(struct bfq_data *bfqd)
 	 */
 	sl = bfqd->bfq_slice_idle;
 	/*
-	 * Unless the queue is being weight-raised, grant only minimum idle
-	 * time if the queue either has been seeky for long enough or has
-	 * already proved to be constantly seeky.
+	 * Unless the queue is being weight-raised or the scenario is
+	 * asymmetric, grant only minimum idle time if the queue either
+	 * has been seeky for long enough or has already proved to be
+	 * constantly seeky.
 	 */
 	if (bfq_sample_valid(bfqq->seek_samples) &&
 	    ((BFQQ_SEEKY(bfqq) && bfqq->entity.service >
 				  bfq_max_budget(bfqq->bfqd) / 8) ||
-	      bfq_bfqq_constantly_seeky(bfqq)) && bfqq->wr_coeff == 1)
+	      bfq_bfqq_constantly_seeky(bfqq)) && bfqq->wr_coeff == 1 &&
+	    symmetric_scenario)
 		sl = min(sl, msecs_to_jiffies(BFQ_MIN_TT));
 	else if (bfqq->wr_coeff > 1)
 		sl = sl * 3;
@@ -2465,12 +2481,6 @@ static inline int bfq_may_expire_for_budg_timeout(struct bfq_queue *bfqq)
 static inline bool bfq_bfqq_must_not_expire(struct bfq_queue *bfqq)
 {
 	struct bfq_data *bfqd = bfqq->bfqd;
-#ifdef CONFIG_CGROUP_BFQIO
-#define symmetric_scenario	  (!bfqd->active_numerous_groups && \
-				   !bfq_differentiated_weights(bfqd))
-#else
-#define symmetric_scenario	  (!bfq_differentiated_weights(bfqd))
-#endif
 #define cond_for_seeky_on_ncq_hdd (bfq_bfqq_constantly_seeky(bfqq) && \
 				   bfqd->busy_in_flight_queues == \
 				   bfqd->const_seeky_busy_in_flight_queues)
