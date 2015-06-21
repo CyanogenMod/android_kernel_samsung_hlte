@@ -83,9 +83,11 @@ static void sync_system(struct work_struct *work);
 static DECLARE_WORK(sync_system_work, sync_system);
 struct wake_lock sync_wake_lock;
 
+static bool suspended = false;
+
 static void sync_system(struct work_struct *work)
 {
-	if (power_suspended)
+	if (suspended)
 		msleep(5000);
 
 	pr_info("%s +\n", __func__);
@@ -379,7 +381,7 @@ static inline int64_t get_time_inms(void) {
 void gpio_sync_worker(bool pwr)
 {
 	/* sys_sync(); */
-	if (power_suspended) {
+	if (suspended) {
 		if (pwr)
 			pr_info("%s: KEY_POWER pressed, calling sys_sync() in 5 sec...\n", __func__);
 		else
@@ -487,6 +489,23 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	}
 	input_sync(input);
 }
+
+static void gpio_keys_early_suspend(struct power_suspend *handler)
+{
+	suspended = true;
+	return;
+}
+
+static void gpio_keys_late_resume(struct power_suspend *handler)
+{
+	suspended = false;
+	return;
+}
+
+static struct power_suspend gpio_suspend = {
+	.suspend = gpio_keys_early_suspend,
+	.resume = gpio_keys_late_resume,
+};
 
 static void gpio_keys_gpio_work_func(struct work_struct *work)
 {
@@ -1342,6 +1361,7 @@ static int __init gpio_keys_init(void)
 
 static void __exit gpio_keys_exit(void)
 {
+	register_power_suspend(&gpio_suspend);
 	platform_driver_unregister(&gpio_keys_device_driver);
 }
 
