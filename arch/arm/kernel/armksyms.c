@@ -84,7 +84,6 @@ EXPORT_SYMBOL(memset);
 EXPORT_SYMBOL(memcpy);
 EXPORT_SYMBOL(memmove);
 EXPORT_SYMBOL(memchr);
-EXPORT_SYMBOL(memcmp);
 EXPORT_SYMBOL(__memzero);
 
 #ifdef CONFIG_MMU
