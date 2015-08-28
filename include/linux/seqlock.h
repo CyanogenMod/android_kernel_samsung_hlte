@@ -87,9 +87,9 @@ static __always_inline unsigned read_seqbegin(const seqlock_t *sl)
 	unsigned ret;
 
 repeat:
-	ret = ACCESS_ONCE(sl->sequence);
+	ret = cpu_relaxed_read((volatile u32 *)&sl->sequence);
 	if (unlikely(ret & 1)) {
-		cpu_relax();
+		cpu_read_relax();
 		goto repeat;
 	}
 	smp_rmb();
