@@ -2421,8 +2421,9 @@ dhd_watchdog_thread(void *data)
 			if (dhd->pub.dongle_reset == FALSE) {
 				DHD_TIMER(("%s:\n", __FUNCTION__));
 
-				/* Call the bus module watchdog */
-				dhd_bus_watchdog(&dhd->pub);
+				/* Call the bus module watchdog only if pub.up is TRUE */
+				if (dhd->pub.up)
+					dhd_bus_watchdog(&dhd->pub);
 
 				flags = dhd_os_spin_lock(&dhd->pub);
 				/* Count the tick for reference */
@@ -2464,7 +2465,8 @@ static void dhd_watchdog(ulong data)
 
 	dhd_os_sdlock(&dhd->pub);
 	/* Call the bus module watchdog */
-	dhd_bus_watchdog(&dhd->pub);
+	if (dhd->pub.up)	
+		dhd_bus_watchdog(&dhd->pub);
 
 	flags = dhd_os_spin_lock(&dhd->pub);
 	/* Count the tick for reference */
