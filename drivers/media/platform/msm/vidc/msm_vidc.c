@@ -32,6 +32,8 @@ int msm_vidc_instance_open(void)
 	return open_video_instance;
 }
 
+extern void lazyplug_enter_lazy(bool enter);
+
 static int get_poll_flags(void *instance)
 {
 	struct msm_vidc_inst *inst = instance;
@@ -1289,6 +1291,8 @@ void *msm_vidc_open(int core_id, int session_type)
 
 	setup_event_queue(inst, &core->vdev[session_type].vdev);
 
+	lazyplug_enter_lazy(true);
+
 	return inst;
 fail_init:
 	vb2_queue_release(&inst->bufq[OUTPUT_PORT].vb2_bufq);
@@ -1419,6 +1423,8 @@ int msm_vidc_close(void *instance)
 	kfree(inst);
 
 	open_video_instance = 0;
+
+	lazyplug_enter_lazy(false);
 
 	return 0;
 }
