@@ -749,7 +749,7 @@ static int crypt_convert(struct crypt_config *cc,
 
 		atomic_inc(&ctx->pending);
 
-		r = crypt_convert_block(cc, ctx, this_cc->req);
+		r = crypt_convert_block(cc, ctx, ctx->req);
 
 		switch (r) {
 		/* async */
@@ -757,7 +757,7 @@ static int crypt_convert(struct crypt_config *cc,
 		case -EBUSY:
 			wait_for_completion(&ctx->restart);
 			INIT_COMPLETION(ctx->restart);
-			this_cc->req = NULL;
+			ctx->req = NULL;
 			ctx->sector++;
 			continue;
 
