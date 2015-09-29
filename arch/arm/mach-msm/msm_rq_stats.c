@@ -41,8 +41,8 @@ struct notifier_block cpu_hotplug;
 struct notifier_block freq_policy;
 
 struct cpu_load_data {
-	u64 prev_cpu_idle;
-	u64 prev_cpu_wall;
+	cputime64_t prev_cpu_idle;
+	cputime64_t prev_cpu_wall;
 	unsigned int avg_load_maxfreq;
 	unsigned int cur_load_maxfreq;
 	unsigned int samples;
@@ -77,7 +77,7 @@ static inline u64 get_cpu_idle_time_jiffy(unsigned int cpu, u64 *wall)
 	return jiffies_to_usecs(idle_time);
 }
 
-static inline u64 get_cpu_idle_time(unsigned int cpu, u64 *wall)
+static inline cputime64_t get_cpu_idle_time(unsigned int cpu, cputime64_t *wall)
 {
 	u64 idle_time = get_cpu_idle_time_us(cpu, NULL);
 
@@ -94,7 +94,7 @@ static int update_average_load(unsigned int freq, unsigned int cpu)
 	int ret;
 	unsigned int idle_time, wall_time;
 	unsigned int cur_load, load_at_max_freq;
-	u64 cur_wall_time, cur_idle_time;
+	cputime64_t cur_wall_time, cur_idle_time;
 	struct cpu_load_data *pcpu = &per_cpu(cpuload, cpu);
 	struct cpufreq_policy policy;
 
