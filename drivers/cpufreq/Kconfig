@@ -115,15 +115,6 @@ config CPU_FREQ_DEFAULT_GOV_INTERACTIVE
 	  loading your cpufreq low-level hardware driver, using the
 	  'interactive' governor for latency-sensitive workloads.
 
-config CPU_FREQ_DEFAULT_GOV_ARTERACTIVE
-	bool "arteractive"
-	select CPU_FREQ_GOV_ARTERACTIVE
-	help
-	  Use the CPUFreq governor 'arteractive' as default. This allows
-	  you to get a full dynamic cpu frequency capable system by simply
-	  loading your cpufreq low-level hardware driver, using the
-	  'arteractive' governor for latency-sensitive workloads.
-
 config CPU_FREQ_DEFAULT_GOV_INTELLIDEMAND
 	bool "intellidemand"
 	select CPU_FREQ_GOV_INTELLIDEMAND
@@ -155,11 +146,6 @@ config CPU_FREQ_DEFAULT_GOV_INTELLIMM
         help
           Use the CPUFreq governor 'intelliminmax' as default. This is
           governor will use only 3 different frequencies, idle, UI and max
-
-config CPU_FREQ_DEFAULT_GOV_ALUCARD
-  	bool "alucard"
-  	select CPU_FREQ_GOV_ALUCARD
-  	help
 
 endchoice
 
@@ -245,12 +231,6 @@ config CPU_FREQ_GOV_YANKACTIVE
 	  and can be achieved using interactive with a script. This is added for
 	  simplification purposes for myself.
 
-config CPU_FREQ_GOV_ARTERACTIVE
-	tristate "'arteractive' cpufreq policy governor"
-	help
-	  'arteractive' - This driver adds the interactive governor
-	  from the SM-G900F source drop.
-
 config CPU_FREQ_GOV_INTELLIMM
         tristate "'intelliminmax' cpufreq policy governor"
         help
@@ -318,10 +298,6 @@ config CPU_FREQ_GOV_INTELLIACTIVE
 	  For details, take a look at linux/Documentation/cpu-freq.
 
 	  If in doubt, say N.
-
-config CPU_FREQ_GOV_ALUCARD
-	tristate "'alucard' cpufreq governor"
-	depends on CPU_FREQ
 
 menu "x86 CPU frequency scaling drivers"
 depends on X86
