@@ -215,7 +215,7 @@ SYSCALL_DEFINE4(request_key, const char __user *, _type,
 	ret = key->serial;
 
 error6:
- 	key_put(key);
+	key_put(key);
 error5:
 	key_type_put(ktype);
 error4:

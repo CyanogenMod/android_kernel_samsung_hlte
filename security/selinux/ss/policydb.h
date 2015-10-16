@@ -367,4 +367,3 @@ extern u16 string_to_security_class(struct policydb *p, const char *name);
 extern u32 string_to_av_perm(struct policydb *p, u16 tclass, const char *name);
 
 #endif	/* _SS_POLICYDB_H_ */
-

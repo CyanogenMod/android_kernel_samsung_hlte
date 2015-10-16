@@ -52,5 +52,3 @@ void sidtab_set(struct sidtab *dst, struct sidtab *src);
 void sidtab_shutdown(struct sidtab *s);
 
 #endif	/* _SS_SIDTAB_H_ */
-
-

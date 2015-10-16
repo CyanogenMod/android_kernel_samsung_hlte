@@ -25,4 +25,3 @@ extern struct security_class_mapping secclass_map[];
 extern int ss_initialized;
 
 #endif /* _SELINUX_AVC_SS_H_ */
-

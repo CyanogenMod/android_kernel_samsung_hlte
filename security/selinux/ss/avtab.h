@@ -111,4 +111,3 @@ void avtab_cache_destroy(void);
 #define MAX_AVTAB_HASH_BUCKETS (1 << MAX_AVTAB_HASH_BITS)
 
 #endif	/* _SS_AVTAB_H_ */
-

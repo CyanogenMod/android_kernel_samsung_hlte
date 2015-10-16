@@ -67,7 +67,7 @@ tima_uevent_read(struct file *filp, char __user *buff,
     int size = strlen(tima_uevent);
     int retval = 0;
 
-    if ( !tima_uevent_validate() ) { 
+    if ( !tima_uevent_validate() ) {
         printk(KERN_ERR
                 "%s invalid request.\n",
                 __func__);
@@ -106,7 +106,7 @@ tima_uevent_write(struct file *filp, const char __user *buff,
     int retval = 0;
     char *req;
 
-    if ( !tima_uevent_validate() ) { 
+    if ( !tima_uevent_validate() ) {
         printk(KERN_ERR
                 "%s invalid request.\n",
                 __func__);

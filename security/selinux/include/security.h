@@ -55,6 +55,7 @@
 #define SE_SBINITIALIZED	0x10
 #define SE_SBPROC		0x20
 #define SE_SBLABELSUPP	0x40
+#define SE_SBGENFS	0x80
 
 #define CONTEXT_STR	"context="
 #define FSCONTEXT_STR	"fscontext="
@@ -259,4 +260,3 @@ extern void selnl_notify_policyload(u32 seqno);
 extern int selinux_nlmsg_lookup(u16 sclass, u16 nlmsg_type, u32 *perm);
 
 #endif /* _SELINUX_SECURITY_H_ */
-

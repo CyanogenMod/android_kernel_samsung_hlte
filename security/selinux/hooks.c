@@ -83,6 +83,7 @@
 #include <linux/export.h>
 #include <linux/msg.h>
 #include <linux/shm.h>
+#include <linux/pft.h>
 
 #include "avc.h"
 #include "objsec.h"
@@ -102,7 +103,7 @@ extern struct security_operations *security_ops;
 static atomic_t selinux_secmark_refcount = ATOMIC_INIT(0);
 
 #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
-int selinux_enforcing = 0;
+int selinux_enforcing;
 
 static int __init enforcing_setup(char *str)
 {
@@ -697,7 +698,12 @@ static int selinux_set_mnt_opts(struct super_block *sb,
 	}
 
 	if (strcmp(sb->s_type->name, "proc") == 0)
-		sbsec->flags |= SE_SBPROC;
+		sbsec->flags |= SE_SBPROC | SE_SBGENFS;
+
+	if (!strcmp(sb->s_type->name, "debugfs") ||
+	    !strcmp(sb->s_type->name, "sysfs") ||
+	    !strcmp(sb->s_type->name, "pstore"))
+		sbsec->flags |= SE_SBGENFS;
 
 	/* Determine the labeling behavior to use for this filesystem type. */
 	rc = security_fs_use((sbsec->flags & SE_SBPROC) ? "proc" : sb->s_type->name, &sbsec->behavior, &sbsec->sid);
@@ -1151,12 +1157,13 @@ static inline u16 socket_type_to_security_class(int family, int type, int protoc
 	return SECCLASS_SOCKET;
 }
 
-#ifdef CONFIG_PROC_FS
-static int selinux_proc_get_sid(struct dentry *dentry,
-				u16 tclass,
-				u32 *sid)
+static int selinux_genfs_get_sid(struct dentry *dentry,
+				 u16 tclass,
+				 u16 flags,
+				 u32 *sid)
 {
 	int rc;
+	struct super_block *sb = dentry->d_inode->i_sb;
 	char *buffer, *path;
 
 	buffer = (char *)__get_free_page(GFP_KERNEL);
@@ -1167,26 +1174,20 @@ static int selinux_proc_get_sid(struct dentry *dentry,
 	if (IS_ERR(path))
 		rc = PTR_ERR(path);
 	else {
-		/* each process gets a /proc/PID/ entry. Strip off the
-		 * PID part to get a valid selinux labeling.
-		 * e.g. /proc/1/net/rpc/nfs -> /net/rpc/nfs */
-		while (path[1] >= '0' && path[1] <= '9') {
-			path[1] = '/';
-			path++;
+		if (flags & SE_SBPROC) {
+			/* each process gets a /proc/PID/ entry. Strip off the
+			 * PID part to get a valid selinux labeling.
+			 * e.g. /proc/1/net/rpc/nfs -> /net/rpc/nfs */
+			while (path[1] >= '0' && path[1] <= '9') {
+				path[1] = '/';
+				path++;
+			}
 		}
-		rc = security_genfs_sid("proc", path, tclass, sid);
+		rc = security_genfs_sid(sb->s_type->name, path, tclass, sid);
 	}
 	free_page((unsigned long)buffer);
 	return rc;
 }
-#else
-static int selinux_proc_get_sid(struct dentry *dentry,
-				u16 tclass,
-				u32 *sid)
-{
-	return -EINVAL;
-}
-#endif
 
 /* The inode's security attributes must be initialized before first use. */
 static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dentry)
@@ -1341,7 +1342,7 @@ static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dent
 		/* Default to the fs superblock SID. */
 		isec->sid = sbsec->sid;
 
-		if ((sbsec->flags & SE_SBPROC) && !S_ISLNK(inode->i_mode)) {
+		if ((sbsec->flags & SE_SBGENFS) && !S_ISLNK(inode->i_mode)) {
 			/* We must have a dentry to determine the label on
 			 * procfs inodes */
 			if (opt_dentry)
@@ -1364,7 +1365,8 @@ static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dent
 			if (!dentry)
 				goto out_unlock;
 			isec->sclass = inode_mode_to_security_class(inode->i_mode);
-			rc = selinux_proc_get_sid(dentry, isec->sclass, &sid);
+			rc = selinux_genfs_get_sid(dentry, isec->sclass,
+						   sbsec->flags, &sid);
 			dput(dentry);
 			if (rc)
 				goto out_unlock;
@@ -1670,9 +1672,15 @@ static int may_create(struct inode *dir,
 	if (rc)
 		return rc;
 
-	return avc_has_perm(newsid, sbsec->sid,
-			    SECCLASS_FILESYSTEM,
-			    FILESYSTEM__ASSOCIATE, &ad);
+	rc = avc_has_perm(newsid, sbsec->sid,
+			  SECCLASS_FILESYSTEM,
+			  FILESYSTEM__ASSOCIATE, &ad);
+	if (rc)
+		return rc;
+
+	rc = pft_inode_mknod(dir, dentry, 0, 0);
+
+	return rc;
 }
 
 /* Check whether a task can create a key. */
@@ -1731,6 +1739,12 @@ static int may_link(struct inode *dir,
 	}
 
 	rc = avc_has_perm(sid, isec->sid, isec->sclass, av, &ad);
+	if (rc)
+		return rc;
+
+	if (kind == MAY_UNLINK)
+		rc = pft_inode_unlink(dir, dentry);
+
 	return rc;
 }
 
@@ -2745,7 +2759,23 @@ static int selinux_inode_init_security(struct inode *inode, struct inode *dir,
 
 static int selinux_inode_create(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
+	int ret;
+
+	ret = pft_inode_create(dir, dentry, mode);
+	if (ret < 0)
+		return ret;
+
 	return may_create(dir, dentry, SECCLASS_FILE);
+}
+
+static int selinux_inode_post_create(struct inode *dir, struct dentry *dentry,
+				     umode_t mode)
+{
+	int ret;
+
+	ret = pft_inode_post_create(dir, dentry, mode);
+
+	return ret;
 }
 
 static int selinux_inode_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_dentry)
@@ -2781,6 +2811,12 @@ static int selinux_inode_mknod(struct inode *dir, struct dentry *dentry, umode_t
 static int selinux_inode_rename(struct inode *old_inode, struct dentry *old_dentry,
 				struct inode *new_inode, struct dentry *new_dentry)
 {
+	int rc;
+
+	rc = pft_inode_rename(old_inode, old_dentry, new_inode, new_dentry);
+	if (rc)
+		return rc;
+
 	return may_rename(old_inode, old_dentry, new_inode, new_dentry);
 }
 
@@ -2860,6 +2896,10 @@ static int selinux_inode_getattr(struct vfsmount *mnt, struct dentry *dentry)
 static int selinux_inode_setotherxattr(struct dentry *dentry, const char *name)
 {
 	const struct cred *cred = current_cred();
+
+	if (pft_inode_set_xattr(dentry, name) < 0)
+		return -EACCES;
+
 
 	if (!strncmp(name, XATTR_SECURITY_PREFIX,
 		     sizeof XATTR_SECURITY_PREFIX - 1)) {
@@ -3084,10 +3124,15 @@ static int selinux_file_permission(struct file *file, int mask)
 	struct file_security_struct *fsec = file->f_security;
 	struct inode_security_struct *isec = inode->i_security;
 	u32 sid = current_sid();
+	int ret;
 
 	if (!mask)
 		/* No permission to check.  Existence test. */
 		return 0;
+
+	ret = pft_file_permission(file, mask);
+	if (ret < 0)
+		return ret;
 
 	if (sid == fsec->sid && fsec->isid == isec->sid &&
 	    fsec->pseqno == avc_policy_seqno())
@@ -3395,6 +3440,11 @@ static int selinux_dentry_open(struct file *file, const struct cred *cred)
 	struct file_security_struct *fsec;
 	struct inode *inode;
 	struct inode_security_struct *isec;
+	int ret;
+
+	ret = pft_file_open(file, cred);
+	if (ret < 0)
+		return ret;
 
 	inode = file->f_path.dentry->d_inode;
 	fsec = file->f_security;
@@ -3417,6 +3467,16 @@ static int selinux_dentry_open(struct file *file, const struct cred *cred)
 	 * This check is not redundant - do not remove.
 	 */
 	return inode_has_perm_noadp(cred, inode, open_file_to_av(file), 0);
+}
+
+static int selinux_file_close(struct file *file)
+{
+	return pft_file_close(file);
+}
+
+static bool selinux_allow_merge_bio(struct bio *bio1, struct bio *bio2)
+{
+	return pft_allow_merge_bio(bio1, bio2);
 }
 
 /* task security operations */
@@ -5823,6 +5883,7 @@ static struct security_operations selinux_ops = {
 	.inode_free_security =		selinux_inode_free_security,
 	.inode_init_security =		selinux_inode_init_security,
 	.inode_create =			selinux_inode_create,
+	.inode_post_create =		selinux_inode_post_create,
 	.inode_link =			selinux_inode_link,
 	.inode_unlink =			selinux_inode_unlink,
 	.inode_symlink =		selinux_inode_symlink,
@@ -5858,6 +5919,8 @@ static struct security_operations selinux_ops = {
 	.file_receive =			selinux_file_receive,
 
 	.dentry_open =			selinux_dentry_open,
+	.file_close =			selinux_file_close,
+	.allow_merge_bio =		selinux_allow_merge_bio,
 
 	.task_create =			selinux_task_create,
 	.cred_alloc_blank =		selinux_cred_alloc_blank,
