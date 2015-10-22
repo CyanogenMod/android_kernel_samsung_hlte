@@ -31,7 +31,6 @@
 #include "vidc_hfi_io.h"
 #include "msm_vidc_debug.h"
 #include <linux/iopoll.h>
-#include <media/msm_vidc.h>
 
 #define FIRMWARE_SIZE			0X00A00000
 #define REG_ADDR_OFFSET_BITMASK	0x000FFFFF
@@ -1387,7 +1386,6 @@ static inline int venus_hfi_power_on(struct venus_hfi_device *device)
 		dprintk(VIDC_ERR, "Failed to allocate OCMEM");
 		goto err_alloc_ocmem;
 	}
-
 	device->power_enabled = true;
 	++device->pwr_cnt;
 	dprintk(VIDC_INFO, "resuming from power collapse\n");
@@ -2919,7 +2917,6 @@ static void venus_hfi_pm_hndlr(struct work_struct *work)
 	}
 	device->pc_num_cmds = 0;
 	mutex_unlock(&device->clk_pwr_lock);
-
 
 	rc = __unset_free_ocmem(device);
 	if (rc) {
