@@ -864,7 +864,7 @@ static int mdss_dsi_dfps_config(struct mdss_panel_data *pdata, int new_fps)
 			vsync_period =
 				mdss_panel_get_vtotal(&pdata->panel_info);
 			hsync_period =
-				mdss_panel_get_htotal(&pdata->panel_info, true);
+				mdss_panel_get_htotal(&pdata->panel_info);
 			current_dsi_v_total =
 				MIPI_INP((ctrl_pdata->ctrl_base) + 0x2C);
 			new_dsi_v_total =
@@ -1605,10 +1605,8 @@ int dsi_panel_device_register(struct device_node *pan_node,
 		pinfo->new_fps = pinfo->mipi.frame_rate;
 	}
 
-	pinfo->panel_max_fps = mdss_panel_get_framerate(pinfo);
-	pinfo->panel_max_vtotal = mdss_panel_get_vtotal(pinfo);
-	ctrl_pdata->disp_en_gpio = of_get_named_gpio(pan_node,
-				     "qcom,enable-gpio", 0);
+		ctrl_pdata->disp_en_gpio = of_get_named_gpio(pan_node,
+						     "qcom,enable-gpio", 0);
 
 	pr_err("%s:%d, Disp_en_gpio (%d)",__func__, __LINE__,ctrl_pdata->disp_en_gpio );
 
