@@ -832,6 +832,9 @@ static ssize_t store_hispeed_freq(struct kobject *kobj,
 	int ret;
 	long unsigned int val;
 
+	if (sysfs_streq(current->comm, "mpdecision"))
+		return -EINVAL;
+
 	ret = kstrtoul(buf, 0, &val);
 	if (ret < 0)
 		return ret;
@@ -1068,6 +1071,9 @@ static ssize_t store_io_is_busy(struct kobject *kobj,
 {
 	int ret;
 	unsigned long val;
+
+	if (sysfs_streq(current->comm, "mpdecision"))
+		return -EINVAL;
 
 	ret = kstrtoul(buf, 0, &val);
 	if (ret < 0)
