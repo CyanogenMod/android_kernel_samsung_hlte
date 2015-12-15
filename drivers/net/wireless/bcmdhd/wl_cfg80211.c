@@ -3731,9 +3731,6 @@ wl_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
 	}
 #endif
 #ifdef WL_SCHED_SCAN
-	/* Locks are taken in wl_cfg80211_sched_scan_stop()
-	 * A start scan occuring during connect is unlikely
-	 */
 	if (wl->sched_scan_req) {
 		wl_cfg80211_sched_scan_stop(wiphy, wl_to_prmry_ndev(wl));
 	}
@@ -7207,7 +7204,6 @@ wl_cfg80211_sched_scan_start(struct wiphy *wiphy,
 	int ssid_count = 0;
 	int i;
 	int ret = 0;
-	unsigned long flags;
 
 	WL_DBG(("Enter \n"));
 	WL_PNO((">>> SCHED SCAN START\n"));
@@ -7251,9 +7247,7 @@ wl_cfg80211_sched_scan_start(struct wiphy *wiphy,
 			WL_ERR(("PNO setup failed!! ret=%d \n", ret));
 			return -EINVAL;
 		}
-		spin_lock_irqsave(&wl->cfgdrv_lock, flags);
 		wl->sched_scan_req = request;
-		spin_unlock_irqrestore(&wl->cfgdrv_lock, flags);
 	} else {
 		return -EINVAL;
 	}
@@ -7265,7 +7259,6 @@ static int
 wl_cfg80211_sched_scan_stop(struct wiphy *wiphy, struct net_device *dev)
 {
 	struct wl_priv *wl = wiphy_priv(wiphy);
-	unsigned long flags;
 
 	WL_DBG(("Enter \n"));
 	WL_PNO((">>> SCHED SCAN STOP\n"));
@@ -7277,10 +7270,10 @@ wl_cfg80211_sched_scan_stop(struct wiphy *wiphy, struct net_device *dev)
 		WL_PNO((">>> Sched scan running. Aborting it..\n"));
 		wl_notify_escan_complete(wl, dev, true, true);
 	}
-	spin_lock_irqsave(&wl->cfgdrv_lock, flags);
-	wl->sched_scan_req = NULL;
-	wl->sched_scan_running = FALSE;
-	spin_unlock_irqrestore(&wl->cfgdrv_lock, flags);
+
+	 wl->sched_scan_req = NULL;
+	 wl->sched_scan_running = FALSE;
+
 	return 0;
 }
 #endif /* WL_SCHED_SCAN */
@@ -9770,14 +9763,11 @@ static s32 wl_notify_escan_complete(struct wl_priv *wl,
 	spin_lock_irqsave(&wl->cfgdrv_lock, flags);
 #ifdef WL_SCHED_SCAN
 	if (wl->sched_scan_req && !wl->scan_request) {
-		int count;
-
-		count = wl->bss_list ? wl->bss_list->count : 0;
-		if (!aborted) {
+		WL_PNO((">>> REPORTING SCHED SCAN RESULTS \n"));
+		if (!aborted)
 			cfg80211_sched_scan_results(wl->sched_scan_req->wiphy);
-			printk(">> SCHED SCAN RESULT %d\n", count);
-		}
 		wl->sched_scan_running = FALSE;
+		wl->sched_scan_req = NULL;
 	}
 #endif /* WL_SCHED_SCAN */
 	if (likely(wl->scan_request)) {
