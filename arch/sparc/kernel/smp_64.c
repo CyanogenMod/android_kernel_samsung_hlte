@@ -1260,7 +1260,7 @@ void __devinit smp_fill_in_sib_core_maps(void)
 	}
 }
 
-int __cpuinit __cpu_up(unsigned int cpu, struct task_struct *tidle)
+int __cpuinit __cpu_up(unsigned int cpu)
 {
 	int ret = smp_boot_one_cpu(cpu);
 
