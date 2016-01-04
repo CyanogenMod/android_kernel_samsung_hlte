@@ -20,7 +20,7 @@ struct cpufreq_limit_handle;
 //#define MAX_FREQ_LIMIT	2265600
 //#endif
 //#define MIN_FREQ_LIMIT	300000
-#define MAX_FREQ_LIMIT	2803200
+#define MAX_FREQ_LIMIT	2265600
 #define MIN_FREQ_LIMIT	300000
 
 struct cpufreq_limit_handle *cpufreq_limit_get(unsigned long min_freq,

@@ -24,6 +24,8 @@
 
 #define CPUFREQ_NAME_LEN 16
 
+#define MAX_FREQ_LIMIT	2265600
+#define MIN_FREQ_LIMIT	300000
 
 /*********************************************************************
  *                     CPUFREQ NOTIFIER INTERFACE                    *
