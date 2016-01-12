@@ -3797,9 +3797,4 @@ config FORCE_FAST_CHARGE
 	  are detected as USB to charge as AC (1A/h) or to set
 	  custom charging currents for AC and USB.
 
-config MSM_CPUFREQ_LIMIT
- 	tristate "MSM CPU frequency limiter"
- 	default n
- 	help
-	
 endif
