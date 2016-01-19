@@ -481,6 +481,11 @@ void max86900_mode_enable(struct max86900_device_data *data, int onoff)
 {
 	int err;
 	if (onoff) {
+		if (atomic_read(&data->is_enable)) {
+			pr_err("%s - already enabled !!!\n", __func__);
+			goto exit;
+		}
+		atomic_set(&data->is_enable, 1);
 		if (data->sub_ldo4 != NULL) {
 			err = max86900_regulator_onoff(data, HRM_LDO_ON);
 			if (err < 0)
@@ -495,9 +500,12 @@ void max86900_mode_enable(struct max86900_device_data *data, int onoff)
 		err = max86900_enable(data);
 		if (err != 0)
 			pr_err("max86900_enable err : %d\n", err);
-
-		atomic_set(&data->is_enable, 1);
 	} else {
+		if (!atomic_read(&data->is_enable)) {
+			pr_err("%s - already disabled !!!\n", __func__);
+			goto exit;
+		}
+		atomic_set(&data->is_enable, 0);
 		err = max86900_disable(data);
 		if (err != 0)
 			pr_err("max86900_disable err : %d\n", err);
@@ -507,9 +515,8 @@ void max86900_mode_enable(struct max86900_device_data *data, int onoff)
 				pr_err("%s max86900_regulator_off fail err = %d\n",
 					__func__, err);
 		}
-
-		atomic_set(&data->is_enable, 0);
 	}
+exit:
 	pr_info("%s - part_type = %u, onoff = %d\n", __func__, data->part_type, onoff);
 }
 
