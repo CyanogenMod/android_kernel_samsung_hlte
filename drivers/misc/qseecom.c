@@ -439,7 +439,7 @@ static int qseecom_unregister_listener(struct qseecom_dev_handle *data)
 	spin_unlock_irqrestore(&qseecom.registered_listener_list_lock, flags);
 
 	while (atomic_read(&data->ioctl_count) > 1) {
-		if (wait_event_freezable(data->abort_wq,
+		if (wait_io_event_freezable(data->abort_wq,
 				atomic_read(&data->ioctl_count) <= 1)) {
 			pr_err("Interrupted from abort\n");
 			ret = -ERESTARTSYS;
@@ -815,7 +815,7 @@ static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 		sigprocmask(SIG_SETMASK, &new_sigset, &old_sigset);
 
 		do {
-			if (!wait_event_freezable(qseecom.send_resp_wq,
+			if (!wait_io_event_freezable(qseecom.send_resp_wq,
 				__qseecom_listener_has_sent_rsp(data)))
 				break;
 		} while (1);
@@ -1081,7 +1081,7 @@ static int __qseecom_cleanup_app(struct qseecom_dev_handle *data)
 {
 	wake_up_all(&qseecom.send_resp_wq);
 	while (atomic_read(&data->ioctl_count) > 1) {
-		if (wait_event_freezable(data->abort_wq,
+		if (wait_io_event_freezable(data->abort_wq,
 					atomic_read(&data->ioctl_count) <= 1)) {
 			pr_err("Interrupted from abort\n");
 			return -ERESTARTSYS;
@@ -1799,7 +1799,7 @@ static int qseecom_receive_req(struct qseecom_dev_handle *data)
 	}
 
 	while (1) {
-		if (wait_event_freezable(this_lstnr->rcv_req_wq,
+		if (wait_io_event_freezable(this_lstnr->rcv_req_wq,
 				__qseecom_listener_has_rcvd_req(data,
 				this_lstnr))) {
 			pr_debug("Interrupted: exiting Listener Service = %d\n",
