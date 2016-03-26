@@ -25,6 +25,7 @@
 #include <linux/of.h>
 #include <asm/uaccess.h>
 
+#include <mach/msm_iomap.h>
 #include "rpm_stats.h"
 
 #define RPM_MASTERS_BUF_LEN 400

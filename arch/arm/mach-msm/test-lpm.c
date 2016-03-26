@@ -22,6 +22,7 @@
 #include <linux/ctype.h>
 #include <linux/moduleparam.h>
 #include <linux/platform_device.h>
+#include <mach/socinfo.h>
 #if defined(CONFIG_MSM_RPM)
 #include "rpm_resources.h"
 #endif
