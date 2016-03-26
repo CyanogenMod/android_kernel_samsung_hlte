@@ -40,12 +40,11 @@ static char *descriptions =
 	"15 Perf: bring CPU online if needed when disabling irq\n"
 	"16 Perf: Support sw events across hotplug\n"
 	"17 msm: perf: initialise krait perf L2 counter enables\n"
-	"18 msm: perf: clean up duplicate constraint events\n"
-	"19 Perf: Make per-process counters cumulative\n"
-	"20 Perf: Fix PID for tracepoints\n"
-	"21 Perf: preserve registers across hotplug\n"
-	"22 msm: perf: fix formatting of trace entry\n"
-	"23 msm: perf: Fix cpu id logic in tracectr notifier\n"
+	"18 Perf: Make per-process counters cumulative\n"
+	"19 Perf: Fix PID for tracepoints\n"
+	"20 Perf: preserve registers across hotplug\n"
+	"21 msm: perf: fix formatting of trace entry\n"
+	"22 msm: perf: Fix cpu id logic in tracectr notifier\n"
 ;
 
 static ssize_t desc_read(struct file *fp, char __user *buf,
