@@ -385,9 +385,7 @@ static void msm_rpm_print_sleep_buffer(struct slp_buf *s)
 	printk(buf);
 }
 
-static struct msm_rpm_driver_data msm_rpm_data = {
-	.smd_open = COMPLETION_INITIALIZER(msm_rpm_data.smd_open),
-};
+static struct msm_rpm_driver_data msm_rpm_data;
 
 static int msm_rpm_flush_requests(bool print)
 {
@@ -1394,6 +1392,7 @@ static int __devinit msm_rpm_dev_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
+	init_completion(&msm_rpm_data.smd_open);
 	spin_lock_init(&msm_rpm_data.smd_lock_write);
 	spin_lock_init(&msm_rpm_data.smd_lock_read);
 	INIT_WORK(&msm_rpm_data.work, msm_rpm_smd_work);
