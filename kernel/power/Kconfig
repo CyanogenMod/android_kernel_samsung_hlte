@@ -99,20 +99,20 @@ config PM_STD_PARTITION
 	default ""
 	---help---
 	  The default resume partition is the partition that the suspend-
-	  to-disk implementation will look for a suspended disk image.
+	  to-disk implementation will look for a suspended disk image. 
 
-	  The partition specified here will be different for almost every user.
+	  The partition specified here will be different for almost every user. 
 	  It should be a valid swap partition (at least for now) that is turned
-	  on before suspending.
+	  on before suspending. 
 
 	  The partition specified can be overridden by specifying:
 
-		resume=/dev/<other device>
+		resume=/dev/<other device> 
 
-	  which will set the resume partition to the device specified.
+	  which will set the resume partition to the device specified. 
 
 	  Note there is currently not a way to specify which device to save the
-	  suspended image to. It will simply pick the first available swap
+	  suspended image to. It will simply pick the first available swap 
 	  device.
 
 config PM_SLEEP
@@ -328,11 +328,3 @@ config SUSPEND_TIME_TIMEKEEPING
 	---help---
 	  Get the suspend time in suspend from timekeeping for the archs
 	  that don't support persistent clock.
-
-config QUICK_WAKEUP
-	bool "Quick wakeup"
-	depends on SUSPEND
-	default n
-	---help---
-	  Allow kernel driver to do periodic jobs without resuming the full system
-	  This option can increase battery life on android powered smartphone.
