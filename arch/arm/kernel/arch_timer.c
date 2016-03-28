@@ -308,7 +308,6 @@ static inline cycle_t notrace counter_get_cntpct_cp15(void)
 {
 	u32 cvall, cvalh;
 
-	isb();
 	asm volatile("mrrc p15, 0, %0, %1, c14" : "=r" (cvall), "=r" (cvalh));
 	return ((cycle_t) cvalh << 32) | cvall;
 }
@@ -330,7 +329,6 @@ static inline cycle_t notrace counter_get_cntvct_cp15(void)
 {
 	u32 cvall, cvalh;
 
-	isb();
 	asm volatile("mrrc p15, 1, %0, %1, c14" : "=r" (cvall), "=r" (cvalh));
 	return ((cycle_t) cvalh << 32) | cvall;
 }
