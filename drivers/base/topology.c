@@ -181,20 +181,16 @@ static int __cpuinit topology_cpu_callback(struct notifier_block *nfb,
 static int __cpuinit topology_sysfs_init(void)
 {
 	int cpu;
-	int rc = 0;
-
-	cpu_notifier_register_begin();
+	int rc;
 
 	for_each_online_cpu(cpu) {
 		rc = topology_add_dev(cpu);
 		if (rc)
-			goto out;
+			return rc;
 	}
-	__hotcpu_notifier(topology_cpu_callback, 0);
+	hotcpu_notifier(topology_cpu_callback, 0);
 
-out:
-	cpu_notifier_register_done();
-	return rc;
+	return 0;
 }
 
 device_initcall(topology_sysfs_init);
