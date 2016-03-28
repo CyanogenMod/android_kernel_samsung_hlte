@@ -381,7 +381,7 @@ EXPORT_SYMBOL_GPL(cpuidle_enable_device);
  */
 void cpuidle_disable_device(struct cpuidle_device *dev)
 {
-	if (!dev || !dev->enabled)
+	if (!dev->enabled)
 		return;
 	if (!cpuidle_get_driver() || !cpuidle_curr_governor)
 		return;
