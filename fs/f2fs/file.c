@@ -1887,6 +1887,7 @@ long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	}
 }
 
+#if 0
 static ssize_t f2fs_file_aio_write(struct kiocb *iocb, const struct iovec *iov,
 		unsigned long nr_segs, loff_t pos)
 {
@@ -1924,6 +1925,7 @@ static ssize_t f2fs_file_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	}
 	return ret;
 }
+#endif
 
 #ifdef CONFIG_COMPAT
 long f2fs_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
@@ -1979,8 +1981,8 @@ const struct file_operations f2fs_file_operations = {
 	.llseek		= f2fs_llseek,
 	.read		= do_sync_read,
 	.write		= do_sync_write,
-	.aio_read	= generic_file_aio_read,
-	.aio_write	= f2fs_file_aio_write,
+	.read_iter	= generic_file_read_iter,
+	.write_iter	= generic_file_write_iter,
 	.open		= f2fs_file_open,
 	.release	= f2fs_release_file,
 	.mmap		= f2fs_file_mmap,
