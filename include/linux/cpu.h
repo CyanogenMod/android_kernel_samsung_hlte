@@ -124,7 +124,7 @@ enum {
 }
 
 #define __cpu_notifier(fn, pri) {				\
-	static struct notifier_block fn##_nb =			\
+	static struct notifier_block fn##_nb __cpuinitdata =	\
 		{ .notifier_call = fn, .priority = pri };	\
 	__register_cpu_notifier(&fn##_nb);			\
 }
@@ -272,7 +272,5 @@ static inline void enable_nonboot_cpus(void) {}
 void idle_notifier_register(struct notifier_block *n);
 void idle_notifier_unregister(struct notifier_block *n);
 void idle_notifier_call_chain(unsigned long val);
-
-extern bool check_cpuboost(int cpu);
 
 #endif /* _LINUX_CPU_H_ */
