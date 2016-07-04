@@ -449,14 +449,7 @@ static ssize_t show_##file_name				\
 show_one(cpuinfo_min_freq, cpuinfo.min_freq);
 show_one(cpuinfo_max_freq, cpuinfo.max_freq);
 show_one(cpuinfo_transition_latency, cpuinfo.transition_latency);
-//show_one(scaling_min_freq, min);
-static ssize_t show_scaling_min_freq(struct cpufreq_policy *policy, char *buf)
-{
-	if (touch_boosted && (prev_policy_min != -1))
-		return sprintf(buf, "%u\n", prev_policy_min);
-	else
-		return sprintf(buf, "%u\n", policy->min);
-}
+show_one(scaling_min_freq, min);
 show_one(scaling_max_freq, max);
 show_one(cpu_utilization, util);
 
@@ -508,38 +501,7 @@ static ssize_t store_##file_name					\
 	return ret ? ret : count;					\
 }
 
-#ifdef CONFIG_SEC_PM
-
-/* Disable scaling_min_freq store */
-//store_one(scaling_min_freq, min);
-int exposed_policy_min = -1;
-static ssize_t store_scaling_min_freq(struct cpufreq_policy *policy, const char *buf, size_t count)
-{
-	unsigned int ret = -EINVAL;
-	struct cpufreq_policy new_policy;
-
-	ret = cpufreq_get_policy(&new_policy, policy->cpu);
-	if (ret)
-		return -EINVAL;
-
-	ret = sscanf(buf, "%u", &new_policy.min);
-	if (ret != 1)
-		return -EINVAL;
-
-	policy->user_policy.min = new_policy.min;
-	new_policy.user_policy.min = new_policy.min;
-	exposed_policy_min = new_policy.min;
-
-	ret = cpufreq_driver->verify(&new_policy);
-	if (ret)
-		pr_err("cpufreq: Frequency verification failed\n");
-
-	ret = __cpufreq_set_policy(policy, &new_policy);
-
-	return ret ? ret : count;
-}
-#endif
-
+store_one(scaling_min_freq, min);
 store_one(scaling_max_freq, max);
 
 /**

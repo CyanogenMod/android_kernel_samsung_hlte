@@ -700,8 +700,6 @@ power_attr(cpufreq_min_limit);
 
 struct cpufreq_limit_handle *cpufreq_min_touch;
 
-bool touch_boosted = false;
-int prev_policy_min = -1;
 
 int set_freq_limit(unsigned long id, unsigned int freq)
 {
@@ -719,19 +717,11 @@ int set_freq_limit(unsigned long id, unsigned int freq)
 	/* min lock */
 	if (id & DVFS_TOUCH_ID) {
 		if (freq != -1) {
-			if (exposed_policy_min != -1)
-				prev_policy_min = exposed_policy_min;
 			cpufreq_min_touch = cpufreq_limit_min_freq(freq, "touch min");
 			if (IS_ERR(cpufreq_min_touch)) {
-				prev_policy_min = -1;
 				pr_err("%s: fail to get the handle\n", __func__);
 				goto out;
-			} else {
-				touch_boosted = true;
 			}
-		} else {
-			prev_policy_min = -1;
-			touch_boosted = false;
 		}
 	}
 	ret = 0;
