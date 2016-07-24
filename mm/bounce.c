@@ -132,7 +132,7 @@ static void bounce_end_io(struct bio *bio, mempool_t *pool, int err)
 	/*
 	 * free up bounce indirect pages used
 	 */
-	bio_for_each_segment_all(bvec, bio, i) {
+	__bio_for_each_segment(bvec, bio, i, 0) {
 		org_vec = bio_orig->bi_io_vec + i;
 		if (bvec->bv_page == org_vec->bv_page)
 			continue;
